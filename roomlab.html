@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>密室试玩实验室 · roomlab-v6（实时操作型）</title>
+<style>
+  :root{
+    --a:#2563eb; --a-bg:#eff6ff;
+    --b:#ea580c; --b-bg:#fff7ed;
+    --ok:#16a34a; --err:#dc2626;
+    --ink:#1f2937; --sub:#6b7280; --line:#e5e7eb;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:#0f172a;min-height:100vh}
+  .wrap{max-width:760px;margin:0 auto;padding:12px 12px 40px}
+  .sub{color:var(--sub);font-size:12px;margin:0 0 12px}
+  .topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#1e293b;border:1px solid #334155;border-radius:12px;padding:10px 12px;margin-bottom:12px;color:#e2e8f0}
+  .badge{font-size:11px;font-weight:700;border-radius:8px;padding:3px 9px}
+  .badge.A{background:var(--a-bg);color:var(--a)}
+  .badge.B{background:var(--b-bg);color:var(--b)}
+  .badge.n{background:#334155;color:#94a3b8}
+  .count{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:#f8fafc}
+  .count.warn{color:#f87171;animation:blink .5s infinite}
+  @keyframes blink{50%{opacity:.3}}
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:10px;padding:11px 15px;font-size:15px;font-weight:600;cursor:pointer;background:#334155;color:#e2e8f0}
+  .btn.primary{background:var(--a);color:#fff}
+  .btn.green{background:var(--ok);color:#fff}
+  .btn.red{background:var(--err);color:#fff}
+  .btn.sm{padding:7px 12px;font-size:13px}
+  .btn:active{opacity:.8}
+  .panel{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:12px;color:#e2e8f0}
+  .panel h3{margin:0 0 10px;font-size:15px;color:#f8fafc}
+  .taskline{font-size:13px;color:#cbd5e1;background:#0f172a;border-left:3px solid #475569;padding:8px 10px;border-radius:6px;margin-bottom:12px;line-height:1.7}
+  .msg{font-size:13px;border-radius:8px;padding:8px 10px;margin:8px 0}
+  .msg.err{background:#7f1d1d;color:#fecaca}
+  .msg.ok{background:#14532d;color:#bbf7d0}
+  .msg.warn{background:#78350f;color:#fde68a}
+  .big{font-size:16px;font-weight:700}
+  .ok{color:#4ade80} .err{color:#f87171}
+  /* 角色选择 */
+  .roles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rolecard{border-radius:16px;padding:20px;cursor:pointer;border:2px solid #334155;background:#1e293b;text-align:left;color:#e2e8f0}
+  .rolecard.a:hover{border-color:var(--a)}
+  .rolecard.b:hover{border-color:var(--b)}
+  .rolecard .rt{font-size:18px;font-weight:800;margin:0 0 6px}
+  .rolecard .rd{font-size:13px;color:#94a3b8;line-height:1.6}
+  .howto{background:#0c4a6e;border:1px solid #075985;border-radius:12px;padding:12px;font-size:13px;line-height:1.7;margin-bottom:14px;color:#e0f2fe}
+  h1{font-size:20px;margin:4px 0 2px;color:#f8fafc}
+  /* canvas 容器 */
+  .stage{display:flex;justify-content:center;background:#0f172a;border-radius:12px;padding:10px;margin-bottom:8px}
+  .stage canvas{max-width:100%;height:auto;background:#0b1220}
+  /* 触屏方向键 */
+  .dpad{display:none;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin:6px 0}
+  .dpad button{height:52px;font-size:20px;font-weight:800;border:none;border-radius:12px;background:#334155;color:#e2e8f0}
+  .dpad button:active{background:#475569}
+  .wire-btns{display:flex;gap:8px;justify-content:center;margin:8px 0;flex-wrap:wrap}
+  .wire-btns button{width:52px;height:52px;font-size:20px;font-weight:800;border-radius:50%;border:2px solid #475569;background:#1e293b;color:#f8fafc}
+  .wire-btns button:active{background:#334155}
+  /* 手册 */
+  .manual-card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:12px;color:#e2e8f0}
+  .manual-card h3{margin:0 0 8px;font-size:15px;color:#f8fafc}
+  .manual-card .mc{margin:6px 0}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{border:1px solid #334155;padding:6px 8px;text-align:left}
+  th{background:#0f172a;color:#94a3b8}
+  .rule-step{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.7}
+  .rule-step .ans{color:#4ade80;font-weight:700}
+  /* 反馈面板 */
+  .fb{position:fixed;inset:0;background:rgba(2,6,23,.8);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .fb .box{background:#1e293b;border:1px solid #334155;border-radius:18px;padding:20px;max-width:400px;width:100%;max-height:92vh;overflow:auto;color:#e2e8f0}
+  .stars{display:flex;gap:8px;justify-content:center;margin:10px 0}
+  .stars .s{font-size:30px;cursor:pointer;opacity:.25}
+  .stars .s.on{opacity:1}
+  textarea{width:100%;min-height:64px;border:1px solid #334155;border-radius:10px;padding:8px;font-size:14px;font-family:inherit;background:#0f172a;color:#e2e8f0}
+  .frow{display:flex;gap:8px;margin-top:10px}
+  .frow .btn{flex:1}
+  @media(max-width:520px){ .roles{grid-template-columns:1fr 1fr} }
+  @media(pointer:coarse){ .dpad{display:grid} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+/* ============ 规则集：roomlab-v6（实时操作型） ============ */
+var RULESET_ID = 'roomlab-v6';
+
+/* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
+   traps：陷阱格（A 视野内看不出，踩到 -8s；B 全图用红点标出）
+   陷阱都布在非安全路线上——A 自己摸索容易踩，只有 B 的图知道安全路线 */
+var MAZE = {
+  walls: ["001111111111110","100000001000000","111111101110111","100000100010001","101110111010101","100010001010101","101110101011101","101000101000101","101011111110101","101000000000001","111111111111111"],
+  start: [0,0],
+  end: [0,14],
+  traps: [[1,10],[4,11],[9,10]],
+  path: [["0,0","0,1","1,1","1,2","1,3","1,4","1,5","1,6","1,7","2,7","3,7","3,8","3,9","4,9","5,9","6,9","7,9","7,10","7,11","8,11","9,11","9,12","9,13","8,13","7,13","6,13","5,13","4,13","3,13","3,12","3,11","2,11","1,11","1,12","1,13","1,14","0,14"]]
+};
+MAZE.rows = MAZE.walls.length;
+MAZE.cols = MAZE.walls[0].length;
+
+/* ---- 剪线规则（B 手册用，固定）：6 根线，按顺序剪 3 根 ---- */
+var WIRE_RULE = {
+  intro: '6 根线，按顺序剪 <b>3 根</b>。第 1 步：A 报 6 根颜色 → 判剪 1 根；剪完 A 报<b>剩余 5 根</b> → 第 2 步；再剪完 A 报<b>剩余 4 根</b> → 第 3 步。任何一步剪错 = 直接爆炸！',
+  steps: [
+    { q:'第 1 步 · 6 根里有几根【黄】？', cond:'≥ 2 根', ans:'剪【第 2 根黄线】' },
+    { q:'不是的话 · 有【黄】吗？', cond:'1 根', ans:'剪【第 1 根黄线】' },
+    { q:'没有黄 · 有几根【蓝】？', cond:'≥ 3 根', ans:'剪【第 3 根蓝线】' },
+    { q:'不是的话 · 有【蓝】吗？', cond:'1 ~ 2 根', ans:'剪【第 1 根蓝线】' },
+    { q:'只有红/绿 · 有【绿】吗？', cond:'有，剪第 1 根绿；没有（全红），剪第 1 根', ans:'剪【第 1 根】' }
+  ],
+  steps2: [
+    { q:'第 2 步 · 剩余 5 根里有几根【黄】？', cond:'≥ 2 根', ans:'剪【第 2 根黄线】' },
+    { q:'不是的话 · 有【黄】吗？', cond:'1 根', ans:'剪【第 1 根黄线】' },
+    { q:'没有黄 · 有几根【蓝】？', cond:'≥ 3 根', ans:'剪【第 3 根蓝线】' },
+    { q:'不是的话 · 有【蓝】吗？', cond:'1 ~ 2 根', ans:'剪【第 1 根蓝线】' },
+    { q:'只有红/绿 · 有【绿】吗？', cond:'有，剪第 1 根绿；没有（全红），剪第 1 根', ans:'剪【第 1 根】' }
+  ],
+  steps3: [
+    { q:'第 3 步 · 剩余 4 根里有几根【黄】？', cond:'≥ 2 根', ans:'剪【第 2 根黄线】' },
+    { q:'不是的话 · 有【黄】吗？', cond:'1 根', ans:'剪【第 1 根黄线】' },
+    { q:'没有黄 · 有几根【蓝】？', cond:'≥ 3 根', ans:'剪【第 3 根蓝线】' },
+    { q:'不是的话 · 有【蓝】吗？', cond:'1 ~ 2 根', ans:'剪【第 1 根蓝线】' },
+    { q:'只有红/绿 · 有【绿】吗？', cond:'有，剪第 1 根绿；没有（全红），剪第 1 根', ans:'剪【第 1 根】' }
+  ]
+};
+
+/* ---- 随机内容生成：玩法规则不变，每次进入的具体内容不同 ---- */
+var WIRE_CN = { red:'红', blue:'蓝', yellow:'黄', green:'绿' };
+var TOTAL_TIME = 180;
+
+function pickPositions(n, exclude){
+  var pool=[]; for(var i=0;i<6;i++){ if(exclude.indexOf(i)<0) pool.push(i); }
+  for(var i=pool.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=pool[i]; pool[i]=pool[j]; pool[j]=t; }
+  return pool.slice(0,n);
+}
+function rnd(a){ return a[Math.floor(Math.random()*a.length)]; }
+/* 随机生成 6 根线（两步剪线规则自洽，任意线序两步都有唯一合法答案） */
+function genWires(){
+  var w=[];
+  for(var i=0;i<6;i++) w.push(rnd(['red','blue','yellow','green']));
+  return w;
+}
+/* 转盘「目标指令卡」对照表：卡号 → 目标刻度（0-9 各一次）
+   A 端随机抽一张卡，卡号对 A 可见但对含义隐藏；A 把卡号口头报给 B，
+   B 在手册查表得到目标刻度，指挥 A 转针对齐。零后端、跨设备可玩。 */
+var CARD_TABLE = { 1:7, 2:3, 3:9, 4:0, 5:5, 6:2, 7:8, 8:4, 9:1, 10:6 };
+/* 每一局的内容：随机转盘起始刻度 + 随机目标指令卡 + 随机 6 根线序（迷宫固定） */
+function newSet(){
+  var card=1+Math.floor(Math.random()*10);
+  return { dialStart: Math.floor(Math.random()*10), targetCard: card, targetY: CARD_TABLE[card], wires: genWires() };
+}
+
+/* ============ 状态 ============ */
+var S = {
+  role: (function(){ var m=location.search.match(/role=(A|B)/i); return m?m[1].toUpperCase():null; })(),
+  started: 0,
+  time: TOTAL_TIME
+};
+var timers = [];
+function clearTimers(){ timers.forEach(function(t){ clearInterval(t); }); timers=[]; }
+function el(html){ var d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+function $(id){ return document.getElementById(id); }
+function setRole(r){ var u=new URL(location.href); u.searchParams.set('role',r); location.href=u.href; }
+function recSave(d){
+  var arr=[]; try{ arr=JSON.parse(localStorage.getItem('roomlab_records')||'[]'); }catch(e){}
+  arr.push(Object.assign({ts:Date.now(), ruleset:RULESET_ID}, d));
+  try{ localStorage.setItem('roomlab_records', JSON.stringify(arr)); }catch(e){}
+}
+
+/* ============ 音效 / 震动 ============ */
+var AC = null;
+function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function beep(freq,dur,type,vol){ var ac=audio(); if(!ac)return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=freq; g.gain.value=vol||0.12; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+dur); }
+function boom(){ var ac=audio(); if(!ac)return; var dur=0.9, buf=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate), d=buf.getChannelData(0); for(var i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); } var src=ac.createBufferSource(); src.buffer=buf; var g=ac.createGain(); g.gain.value=0.6; src.connect(g); g.connect(ac.destination); src.start(); }
+function buzz(){ if(navigator.vibrate) navigator.vibrate(90); }
+
+/* ============ 反馈面板 ============ */
+function showFB(d){
+  var box=$('fb-box');
+  var stars=''; for(var i=1;i<=5;i++){ stars+='<span class="s" data-v="'+i+'">★</span>'; }
+  box.innerHTML=
+    '<div class="big">'+(d.ok?'<span class="ok">✔ 核心已稳定！密室解锁</span>':'<span class="err">💥 能量过载爆炸</span>')+'</div>'+
+    '<div class="sub" style="color:#94a3b8;margin:6px 0">耗时 '+d.duration+'s · 剩余 '+d.timeLeft+'s · 角色 '+d.role+'</div>'+
+    '<div class="stars" id="stars">'+stars+'</div>'+
+    '<textarea id="fb-comment" placeholder="紧张吗？指挥清楚吗？笑到了吗？"></textarea>'+
+    '<div class="frow"><button class="btn" id="fb-restart">再来一次</button><button class="btn primary" id="fb-next">下一组装置</button></div>';
+  $('fb').style.display='flex';
+  var score=0;
+  box.querySelectorAll('.s').forEach(function(s){ s.onclick=function(){ score=+s.dataset.v; box.querySelectorAll('.s').forEach(function(x){x.classList.toggle('on',+x.dataset.v<=score);}); }; });
+  $('fb-restart').onclick=function(){ closeFB(); renderPlay(); };
+  $('fb-next').onclick=function(){
+    recSave({result:d.ok?'win':'lose', role:d.role, duration:d.duration, timeLeft:d.timeLeft, score:score, comment:$('fb-comment').value});
+    closeFB(); renderPlay();
+  };
+}
+function closeFB(){ var f=$('fb'); if(f) f.style.display='none'; }
+
+/* ============ 倒计时 ============ */
+function startCountdown(){
+  clearTimers();
+  var iv=setInterval(function(){
+    S.time--;
+    if(S.time<=0){ S.time=0; clearInterval(iv); timers=[]; explode('时间到'); return; }
+    var c=$('count'); if(c){ c.textContent=S.time+'s'; c.classList.toggle('warn', S.time<=15); }
+    if(S.time<=10) beep(880,0.05,'square',0.06);
+  },1000);
+  timers.push(iv);
+}
+function cut(n){
+  S.time=Math.max(0,S.time-n);
+  var c=$('count'); if(c){ c.textContent=S.time+'s'; c.classList.toggle('warn',S.time<=15); }
+  if(S.time<=0){ explode('时间到'); }
+}
+
+/* ============ 渲染分派 ============ */
+function render(){
+  if(!S.role){ renderRole(); }
+  else if(S.role==='A'){ renderPlay(); }
+  else if(S.role==='B'){ renderManual(); }
+}
+function renderRole(){
+  document.getElementById('app').innerHTML=
+    '<h1>密室试玩实验室 · v6</h1>'+
+    '<p class="sub">ruleset: '+RULESET_ID+' · 实时操作型 · 验证「180 秒节奏 + 配合密度」</p>'+
+    '<div class="howto">🎮 <b>怎么玩</b>：两台设备各打开<b>同一个链接</b> → 一人选 <b>角色A（现场）</b>、一人选 <b>角色B（后方）</b> → 开语音协作。<b>全程靠口头同步</b>（A 报卡号/针位/线色，B 查手册指挥），不用任何服务器。A 的屏幕是一颗<b>过载的能量核心</b>（倒计时+实时操作）；B 的屏幕是<b>《维保手册》</b>（迷宫图/指令卡对照/三步剪线）。<b>绝对不要看对方屏幕</b>。</div>'+
+    '<div class="roles">'+
+      '<div class="rolecard a" id="rcA"><p class="rt" style="color:#60a5fa">角色 A · 现场</p><p class="rd">手在装置上：盲走迷宫、转盘对接（<b>报卡号</b>给 B、转针听指挥、喊锁再按）、三步剪线（报线色）。听 B 指挥，<b>实时操作</b>。</p></div>'+
+      '<div class="rolecard b" id="rcB"><p class="rt" style="color:#fb923c">角色 B · 后方</p><p class="rd">手捧手册：迷宫全图、<b>指令卡对照表</b>（A 报卡号→查目标刻度→指挥）、三步剪线规则。听 A 报状态，<b>实时指挥</b>。</p></div>'+
+    '</div>';
+  $('rcA').onclick=function(){ setRole('A'); };
+  $('rcB').onclick=function(){ setRole('B'); };
+}
+
+/* ============ B 端：维保手册 ============ */
+function renderManual(){
+  var app=document.getElementById('app');
+  // 迷宫全图（canvas）
+  var mazeHTML='<div class="stage"><canvas id="maze-map"></canvas></div>';
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">角色 B · 后方</span><span class="badge n">'+RULESET_ID+'</span>'+
+      '<button class="btn sm" id="swap">换角色</button></div>'+
+    '<div class="manual-card"><h3>📕 《能量核心维保手册》</h3>'+
+      '<p class="mc" style="color:#94a3b8;font-size:13px">现场 A 正在稳住一颗过载的能量核心，<b>180 秒</b>内要完成 3 步操作。全程听 A 报状态、照手册指挥。流程：<b>① 引导探针走迷宫 → ② 逐格指挥转盘对接 → ③ 两步判线剪线</b>。最后一步剪错会直接爆炸！<b>每次进入，装置的具体内容都不同</b>（迷宫图一样，但转盘起始刻度、线的颜色排布每次都变）——一切以 A 口头报告的为准。</p></div>'+
+    '<div class="manual-card"><h3>① 迷宫走线</h3><p class="mc">A 的探针在<b>盲走</b>（视野只有上下左右 5 格，看不到斜向和远处，所以<b>不能自己探索</b>）。你看到的是<b>全图</b>：绿点=A 当前方位，按<b>绿色推荐路线</b>一句句指挥「上/下/左/右」；<b>红点 = 陷阱</b>（A 视野里看不出，踩到 -8s）——千万别让 A 走红线外的岔路。墙=深色块。</p>'+mazeHTML+'</div>'+
+    '<div class="manual-card"><h3>② 转盘对接（目标指令卡）</h3>'+
+      '<p class="mc">A 的转盘上有一张<b>目标指令卡</b>（如 C7）——卡号只有 A 看得到，他会<b>口头报给你</b>。你在这里<b>查表</b>得到本局目标刻度，然后听 A 报「我现在在第几格」，指挥他往左/右转，对齐（±1 格）时喊「锁！」让 A 按锁定。锁错 -3s。</p>'+
+      '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px">'+
+        '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:6px">📋 目标指令卡对照表（A 报卡号 → 查目标刻度）</div>'+
+        '<table style="width:100%;font-size:14px;border-collapse:collapse">'+
+          (function(){ var rows=[]; for(var k=1;k<=10;k++){ rows.push('<tr><td style="padding:3px 8px;border:1px solid #1e293b">C'+k+'</td><td style="padding:3px 8px;border:1px solid #1e293b;color:#4ade80;font-weight:700">'+CARD_TABLE[k]+' 点方向</td></tr>'); } return rows.join(''); })()+
+        '</table>'+
+        '<div style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.7">流程：① 听 A 报卡号 → ② 查表得目标刻度 → ③ 听 A 报当前针位 → ④ 指挥「往右/左 X 格」 → ⑤ 对齐喊「锁！」</div>'+
+      '</div></div>'+
+    '<div class="manual-card"><h3>③ 剪线（高风险 · 三步）</h3><p class="mc">'+WIRE_RULE.intro+'</p>'+
+      '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:10px 0 4px">【第 1 步】6 根线</div>'+
+      WIRE_RULE.steps.map(function(s){ return '<div class="rule-step"><div>'+s.q+'</div><div style="font-size:12px;color:#94a3b8">'+s.cond+'</div><div class="ans">→ '+s.ans+'</div></div>'; }).join('')+
+      '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:14px 0 4px">【第 2 步】剩余 5 根线（重新从左到右编号）</div>'+
+      WIRE_RULE.steps2.map(function(s){ return '<div class="rule-step"><div>'+s.q+'</div><div style="font-size:12px;color:#94a3b8">'+s.cond+'</div><div class="ans">→ '+s.ans+'</div></div>'; }).join('')+
+      '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:14px 0 4px">【第 3 步】剩余 4 根线（重新从左到右编号）</div>'+
+      WIRE_RULE.steps3.map(function(s){ return '<div class="rule-step"><div>'+s.q+'</div><div style="font-size:12px;color:#94a3b8">'+s.cond+'</div><div class="ans">→ '+s.ans+'</div></div>'; }).join('')+
+    '</div>';
+  $('swap').onclick=function(){ location.search=''; };
+  // 画迷宫全图 + 推荐路线
+  var cv=$('maze-map'), cell=Math.min(44, Math.floor(420/MAZE.cols));
+  cv.width=MAZE.cols*cell; cv.height=MAZE.rows*cell;
+  var ctx=cv.getContext('2d');
+  drawMazeFull(ctx, cell);
+}
+
+/* 画迷宫全图（B 手册）：墙+路+S/E+路径箭头 */
+function drawMazeFull(ctx, cell){
+  var R=MAZE.rows, C=MAZE.cols;
+  for(var r=0;r<R;r++) for(var c=0;c<C;c++){
+    var wall=MAZE.walls[r][c]==='1';
+    ctx.fillStyle=wall?'#334155':'#0b1220';
+    ctx.fillRect(c*cell, r*cell, cell, cell);
+    ctx.strokeStyle='#1e293b'; ctx.strokeRect(c*cell+.5, r*cell+.5, cell-1, cell-1);
+  }
+  // 路径高亮 + 箭头
+  var path=MAZE.path[0];
+  for(var i=0;i<path.length;i++){
+    var p=path[i].split(','), r=+p[0], c=+p[1];
+    ctx.fillStyle='rgba(74,222,128,.35)';
+    ctx.fillRect(c*cell, r*cell, cell, cell);
+    if(i<path.length-1){
+      var n=path[i+1].split(','), nr=+n[0], nc=+n[1];
+      var dr=nr-r, dc=nc-c;
+      var cx=c*cell+cell/2, cy=r*cell+cell/2;
+      ctx.strokeStyle='#4ade80'; ctx.lineWidth=3; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+dc*cell*0.55, cy+dr*cell*0.55); ctx.stroke();
+      ctx.fillStyle='#4ade80';
+      ctx.beginPath();
+      var tipx=cx+dc*cell*0.62, tipy=cy+dr*cell*0.62;
+      ctx.moveTo(tipx, tipy);
+      ctx.lineTo(tipx-dc*cell*0.2-dr*cell*0.2, tipy-dr*cell*0.2-dc*cell*0.2);
+      ctx.lineTo(tipx-dc*cell*0.2+dr*cell*0.2, tipy-dr*cell*0.2+dc*cell*0.2);
+      ctx.fill();
+    }
+  }
+  // S / E
+  var s=MAZE.start, e=MAZE.end;
+  ctx.fillStyle='#4ade80'; ctx.font='bold '+(cell*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('S', s[1]*cell+cell/2, s[0]*cell+cell/2);
+  ctx.fillStyle='#f87171';
+  ctx.fillText('E', e[1]*cell+cell/2, e[0]*cell+cell/2);
+  // 陷阱（红点）：绿色安全路线之外的陷阱格
+  ctx.fillStyle='#ef4444';
+  MAZE.traps.forEach(function(t){
+    ctx.beginPath(); ctx.arc(t[1]*cell+cell/2, t[0]*cell+cell/2, Math.max(4,cell*0.18), 0, Math.PI*2); ctx.fill();
+  });
+  ctx.fillStyle='#fecaca'; ctx.font='bold '+(cell*0.45)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('⚠ 陷阱', s[1]*cell+cell/2, Math.max(10, s[0]*cell-4));
+}
+
+/* ============ A 端：实时操作 ============ */
+function renderPlay(){
+  var app=document.getElementById('app');
+  var set=newSet();
+  clearTimers();
+  window._dead=false;
+  S.started=Date.now();
+  S.time=TOTAL_TIME;
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">角色 A · 现场</span><span class="badge n">能量核心</span>'+
+      '<span class="count" id="count">'+S.time+'s</span>'+
+      '<button class="btn sm" id="back" style="margin-left:auto">换角色</button>'+
+      '<button class="btn sm" id="again">重开</button></div>'+
+    '<div class="panel" id="playarea"></div>'+
+    '<div class="dpad" id="dpad">'+
+      '<button data-d="up">▲</button><button data-d="l">◀</button><button data-d="d">▼</button><button data-d="r">▶</button>'+
+    '</div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  $('again').onclick=function(){ renderPlay(); };
+  // 键盘
+  window._keys={};
+  window.onkeydown=function(e){ window._keys[e.key]=true; };
+  window.onkeyup=function(e){ window._keys[e.key]=false; };
+  startCountdown();
+  runModule(0, set);
+}
+
+var MODULE_INFO = [
+  { t:'① 迷宫走线', d:'你的探针在盲走（只能看到上/下/左/右 5 格，看不到斜向和远处）。问 B 要方向，一句句走。碰墙 -5s，<b>踩到陷阱 -8s</b>！只有 B 的图知道安全路线。走到终点自动下一关。' },
+  { t:'② 转盘对接（目标指令卡）', d:'你的转盘上有一张<b>目标指令卡</b>（卡号你看得到、含义你看不到）——<b>先把卡号报给 B</b>。转你的针，你的针位你看得见，<b>目标刻度你看不到</b>。B 查表后指挥你往左/往右，你报「我在第几格」，他说「锁！」你就按锁定键。对齐（±1）算对，否则 -3s。' },
+  { t:'③ 剪线（三步）', d:'报给 B 从左到右 6 根线的颜色，按他判断剪第 1 根；剪完<b>再报剩余 5 根</b>剪第 2 根；再报<b>剩余 4 根</b>剪第 3 根。任何一步剪错 = 直接爆炸！' }
+];
+
+function runModule(idx, set){
+  var pa=$('playarea');
+  if(!pa){ return; }
+  var dp=$('dpad');
+  pa.innerHTML=
+    '<div class="taskline"><b>'+MODULE_INFO[idx].t+'</b>：'+MODULE_INFO[idx].d+'</div>'+
+    '<div class="stage" id="stage"></div>'+
+    '<div id="msg"></div>';
+  if(idx===0){ dp.style.display='grid'; runMaze(set); }
+  else if(idx===1){ dp.style.display='grid'; runDial(set); }
+  else if(idx===2){ dp.style.display='none'; runWires(set); }
+}
+
+/* ---- 模块1：迷宫盲走 ---- */
+function runMaze(set){
+  var stage=$('stage');
+  var cell=Math.min(46, Math.floor(420/MAZE.cols));
+  var cv=document.createElement('canvas');
+  cv.width=MAZE.cols*cell; cv.height=MAZE.rows*cell;
+  stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var pos=[MAZE.start[0], MAZE.start[1]];
+  var done=false;
+
+  function render(){
+    var R=MAZE.rows, C=MAZE.cols;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(var r=0;r<R;r++) for(var c=0;c<C;c++){
+      var wall=MAZE.walls[r][c]==='1';
+      // A 视野：十字 5 格（上下左右+自己），看不到斜向——更依赖 B 的方向
+      var near=Math.abs(r-pos[0])+Math.abs(c-pos[1])<=1;
+      if(near){
+        ctx.fillStyle=wall?'#334155':'#0b1220';
+        ctx.fillRect(c*cell,r*cell,cell,cell);
+        ctx.strokeStyle='#1e293b'; ctx.strokeRect(c*cell+.5,r*cell+.5,cell-1,cell-1);
+      }else{
+        ctx.fillStyle='rgba(2,6,23,.92)';
+        ctx.fillRect(c*cell,r*cell,cell,cell);
+      }
+    }
+    // 探针
+    ctx.fillStyle='#4ade80';
+    ctx.shadowColor='#4ade80'; ctx.shadowBlur=10;
+    ctx.fillRect(pos[1]*cell+4, pos[0]*cell+4, cell-8, cell-8);
+    ctx.shadowBlur=0;
+    // 到达终点提示（若在终点旁）
+  }
+  function isTrap(r,c){
+    for(var i=0;i<MAZE.traps.length;i++){ if(MAZE.traps[i][0]===r && MAZE.traps[i][1]===c) return i; }
+    return -1;
+  }
+  var sprung={};
+  function move(dr,dc){
+    if(done) return;
+    var nr=pos[0]+dr, nc=pos[1]+dc;
+    if(nr<0||nc<0||nr>=MAZE.rows||nc>=MAZE.cols||MAZE.walls[nr][nc]==='1'){
+      beep(160,0.18,'sawtooth',0.14); buzz();
+      cut(5);
+      var m=$('msg'); if(m){ m.className='msg err'; m.textContent='✘ 碰墙！时间 -5s。让 B 重新确认方向。'; }
+      return;
+    }
+    pos=[nr,nc];
+    var ti=isTrap(nr,nc);
+    if(ti>=0 && !sprung[ti]){
+      sprung[ti]=true; cut(8); beep(200,0.2,'sawtooth',0.16); buzz();
+      var mt=$('msg'); if(mt){ mt.className='msg err'; mt.textContent='💥 踩到陷阱！时间 -8s。问 B 要安全路线，这条路别再走了。'; }
+    }else{
+      var dirName = dr===1?'下':(dr===-1?'上':(dc===1?'右':'左'));
+      var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 走了 1 步（'+dirName+'）。报给 B 你现在的方位。'; }
+    }
+    render();
+    if(nr===MAZE.end[0] && nc===MAZE.end[1]){
+      done=true;
+      beep(660,0.15,'square',0.1); setTimeout(function(){ beep(880,0.2,'square',0.1); },150);
+      var m2=$('msg'); if(m2){ m2.className='msg ok'; m2.textContent='✔ 到达终点！探针就位，装置解锁第 2 步。'; }
+      setTimeout(function(){ runModule(1, set); }, 800);
+    }
+  }
+  render();
+  // 键盘
+  window._mazeMove = move;
+  // 触屏方向键
+  document.querySelectorAll('#dpad [data-d]').forEach(function(b){
+    b.onclick=function(){
+      var d=b.dataset.d;
+      if(d==='up') move(-1,0);
+      else if(d==='d') move(1,0);
+      else if(d==='l') move(0,-1);
+      else if(d==='r') move(0,1);
+    };
+  });
+}
+
+/* ---- 模块2：转盘（目标指令卡 · A 手动锁定 · 口头协作） ---- */
+function runDial(set){
+  var stage=$('stage');
+  // 指令卡横幅：A 把卡号口头报给 B（含义隐藏，B 查表得目标刻度）
+  var banner=document.createElement('div');
+  banner.className='msg ok'; banner.style.cssText='margin:0 0 8px;text-align:center';
+  banner.innerHTML='📡 目标指令卡：<b style="font-size:20px">C'+set.targetCard+'</b> —— 把卡号报给 B';
+  stage.appendChild(banner);
+  var cv=document.createElement('canvas');
+  cv.width=220; cv.height=220;
+  stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var target = set.targetY;   // 目标刻度（对 A 隐藏；B 查指令卡表后口头指挥）
+  var theta=set.dialStart*36*Math.PI/180;
+  var vel=0, locked=false, rafStop=false;
+  window._dbgDial={ get theta(){return theta;}, get vel(){return vel;}, get target(){return target;}, get locked(){return locked;} };
+  window._mazeMove=null;
+
+  function render(){
+    ctx.clearRect(0,0,220,220);
+    var cx=110, cy=110, rad=86;
+    ctx.strokeStyle='#334155'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(cx,cy,rad,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle='#1e293b'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(cx,cy,rad-18,0,Math.PI*2); ctx.stroke();
+    // 刻度 0-9
+    for(var i=0;i<10;i++){
+      var a=-Math.PI/2 + i*Math.PI*2/10;
+      var x1=cx+Math.cos(a)*(rad-6), y1=cy+Math.sin(a)*(rad-6);
+      var x2=cx+Math.cos(a)*(rad-16), y2=cy+Math.sin(a)*(rad-16);
+      ctx.strokeStyle='#475569'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(i, cx+Math.cos(a)*(rad-30), cy+Math.sin(a)*(rad-30));
+    }
+    // 指针
+    var pa=-Math.PI/2+theta;
+    ctx.strokeStyle=locked?'#4ade80':'#f87171'; ctx.lineWidth=4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(pa)*(rad-22), cy+Math.sin(pa)*(rad-22)); ctx.stroke();
+    ctx.fillStyle=locked?'#4ade80':'#f8fafc';
+    ctx.beginPath(); ctx.arc(cx,cy,7,0,Math.PI*2); ctx.fill();
+    // 当前刻度（A 只看到自己的针；目标刻度靠 B 查卡后口头指挥）
+    var cur=curScale();
+    ctx.fillStyle='#e2e8f0'; ctx.font='bold 16px sans-serif';
+    ctx.fillText('你的针：'+cur, cx, cy+rad+20);
+    ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif';
+    ctx.fillText('报针位给 B · 听他指挥', cx, cy+rad+38);
+  }
+  function curScale(){
+    var deg=((theta*180/Math.PI)%360+360)%360;
+    return Math.round(deg/36)%10;
+  }
+  function apply(d){
+    if(locked) return;
+    if(d==='l') vel-=0.04;
+    else if(d==='r') vel+=0.04;
+  }
+  function isOn(v){ var t=target; return v===t || v===(t+1)%10 || v===(t+10-1)%10; }
+  function lock(){
+    if(locked) return;
+    var cur=curScale();
+    if(isOn(cur)){
+      locked=true; rafStop=true; try{clearInterval(physLoop);}catch(e){}
+      beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150);
+      var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 对齐（±1 格），锁定成功！转盘对接完成，解锁第 3 步。'; }
+      setTimeout(function(){ runModule(2, set); }, 900);
+    }else{
+      cut(3); beep(160,0.18,'sawtooth',0.14); buzz();
+      var m2=$('msg'); if(m2){ m2.className='msg err'; m2.textContent='✘ 你的针在 '+cur+'，还没到目标！让 B 再查表指挥，时间 -3s。'; }
+    }
+  }
+  window._dialLock=lock;
+  // 锁定按钮
+  var lockBtn=document.createElement('button');
+  lockBtn.className='btn red'; lockBtn.style.cssText='display:block;margin:10px auto 0;width:200px;padding:14px;font-size:17px';
+  lockBtn.textContent='🔒 听 B 喊「锁」再按';  lockBtn.onclick=lock;
+  $('playarea').appendChild(lockBtn);
+  // 物理循环（setInterval 驱动：前台体验同 RAF，切后台/测试环境也稳定运行）
+  function loop(){
+    if(rafStop) return;
+    vel*=0.85;
+    theta+=vel;
+    render();
+  }
+  var physLoop=setInterval(loop,16);
+  timers.push(physLoop);
+  loop();
+  window._physStop=function(){ rafStop=true; try{clearInterval(physLoop);}catch(e){} };
+  // 键盘（长按）
+  window._dialApply=apply;
+  window._dialLoop = setInterval(function(){
+    var k=window._keys||{};
+    if(k['ArrowLeft']||k['a']||k['A']) apply('l');
+    if(k['ArrowRight']||k['d']||k['D']) apply('r');
+  }, 30);
+  timers.push(window._dialLoop);
+  // 触屏方向键（按住持续转）
+  document.querySelectorAll('#dpad [data-d]').forEach(function(b){
+    var h=null;
+    function go(){ var d=b.dataset.d; if(d==='l')apply('l'); else if(d==='r')apply('r'); }
+    b.onpointerdown=function(){ go(); h=setInterval(go,40); };
+    b.onpointerup=function(){ clearInterval(h); };
+    b.onpointerleave=function(){ clearInterval(h); };
+  });
+}
+
+/* ---- 模块3：剪线（6 根线 · 按顺序剪 3 根） ---- */
+function runWires(set){
+  var stage=$('stage');
+  var pa=$('playarea');
+  var cv=document.createElement('canvas');
+  cv.width=330; cv.height=150;
+  stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var wires=set.wires.slice(), remaining=null, step=1, done=false;
+  window._curWires=wires;
+  var colors={ red:'#ef4444', blue:'#3b82f6', yellow:'#eab308', green:'#22c55e' };
+  function render(){
+    ctx.clearRect(0,0,330,150);
+    var arr = remaining || wires;
+    var x0=55;
+    arr.forEach(function(w,i){
+      var x=x0+i*44;
+      ctx.strokeStyle=colors[w]; ctx.lineWidth=5; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(x,10); ctx.quadraticCurveTo(x+18,55, x+8,120); ctx.stroke();
+      ctx.fillStyle=colors[w]; ctx.beginPath(); ctx.arc(x+8,124,6,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+      ctx.fillText(i+1, x+8, 142);
+    });
+  }
+  render();
+  // 数字按钮
+  var wb=document.createElement('div'); wb.className='wire-btns';
+  function buildBtns(n){
+    wb.innerHTML='';
+    for(var i=1;i<=n;i++){ var b=document.createElement('button'); b.textContent=i; b.dataset.n=i; b.onclick=function(){ pick(+this.dataset.n); }; wb.appendChild(b); }
+  }
+  buildBtns(6);
+  pa.appendChild(wb);
+  function pick(n){
+    if(done || window._dead) return;
+    var arr = step===1 ? wires : remaining;
+    // 越界保护：第 2/3 步只剩 5/4 根，误按 6 之类直接忽略，不触发爆炸
+    if(!arr || n<1 || n>arr.length){ return; }
+    var m=$('msg');
+    var ans=judgeStep(arr)+1;
+    if(n!==ans){ explode('剪错线'); return; }
+    beep(660,0.12,'square',0.1);
+    if(step===3){
+      done=true;
+      beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
+      m.className='msg ok'; m.textContent='✔ 第 3 根也剪对！三根全部剪对，能量核心稳定，密室解锁！';
+      finish(true);
+      return;
+    }
+    remaining = arr.filter(function(_,i){ return i!==(ans-1); });
+    step++;
+    buildBtns(arr.length-1);
+    render();
+    m.className='msg ok'; m.textContent='✔ 第 '+(step-1)+' 根剪对！现在剩 '+remaining.length+' 根线（重新从左到右编号 1-'+remaining.length+'）。把剩下的颜色报给 B，等他判第 '+step+' 根。';
+  }
+  function keyHandler(e){ var k=e.key; if(k>='1'&&k<='9'){ pick(+k); } }
+  window._wirePick=pick;
+  window._wireKey=keyHandler;
+  window._dialLock=null;
+}
+/* 判线（B 手册同规则）：6 根线颜色数组 → 返回 0-index 应剪位置（每步规则自洽） */
+function judgeStep(wires){
+  var yellow=[]; for(var i=0;i<wires.length;i++) if(wires[i]==='yellow') yellow.push(i);
+  if(yellow.length>=2) return yellow[1];
+  if(yellow.length===1) return yellow[0];
+  var blue=[]; for(var j=0;j<wires.length;j++) if(wires[j]==='blue') blue.push(j);
+  if(blue.length>=3) return blue[2];
+  if(blue.length>=1) return blue[0];
+  var green=[]; for(var k=0;k<wires.length;k++) if(wires[k]==='green') green.push(k);
+  if(green.length>=1) return green[0];
+  return 0; // 全红 → 剪第 1 根
+}
+
+/* ---- 键盘分发 ---- */
+(function(){
+  document.addEventListener('keydown', function(e){
+    if(!S.role) return;
+    if(S.role!=='A') return;
+    if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){ if(window._mazeMove) window._mazeMove(-1,0); }
+    else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'){ if(window._mazeMove) window._mazeMove(1,0); }
+    else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){ if(window._mazeMove) window._mazeMove(0,-1); }
+    else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'){ if(window._mazeMove) window._mazeMove(0,1); }
+    if(e.key>='1'&&e.key<='6'){ if(window._wireKey) window._wireKey(e); }
+    if(e.key===' '||e.key==='Enter'){ if(window._dialLock && !window._lockHeld){ window._lockHeld=true; window._dialLock(); } }
+    else { window._lockHeld=false; }
+  });
+})();
+
+/* ---- 爆炸 / 通关 ---- */
+function explode(reason){
+  clearTimers();
+  window._dead=true;
+  window._mazeMove=null; window._wireKey=null; window._wirePick=null; window._dialLock=null;
+  boom(); buzz();
+  var flash=document.createElement('div');
+  flash.style.cssText='position:fixed;inset:0;background:rgba(220,38,38,.4);z-index:40;display:flex;align-items:center;justify-content:center;font-size:64px;color:#fff;';
+  flash.innerHTML='💥';
+  document.body.appendChild(flash);
+  setTimeout(function(){ if(flash.parentNode) flash.parentNode.removeChild(flash); }, 900);
+  var m=$('msg'); if(m){ m.className='msg err'; m.textContent='💥 能量过载爆炸！原因：'+reason+'。和 B 复盘刚才哪步传错了，然后重来。'; }
+  finish(false);
+}
+function finish(ok){
+  clearTimers();
+  var dur=Math.round((Date.now()-S.started)/1000);
+  setTimeout(function(){
+    closeFB();
+    showFB({ok:ok, duration:dur, timeLeft:S.time, role:S.role});
+  }, 700);
+}
+
+render();
+</script>
+</body>
+</html>
