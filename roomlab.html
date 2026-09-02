@@ -108,7 +108,16 @@ var PLAYGROUNDS = [
     b:'查「目标指令卡对照表」得到本局目标刻度。听 A 报卡号 + 当前针位，指挥他往左/往右，对齐喊「锁！」。' },
   { id:'wires', icon:'🧨', name:'剪线排雷', tag:'拆弹', time:90,
     a:'报 6 根线颜色 → 按 B 判剪第 1 根 → 剪完再报剩余 5 根 → 剪第 2 根 → 再报剩余 4 根 → 剪第 3 根。任何一步剪错 = 爆炸！',
-    b:'按「三步剪线规则」逐步判：第 1 步 6 根、第 2 步剩余 5、第 3 步剩余 4，听 A 报颜色给答案。' }
+    b:'按「三步剪线规则」逐步判：第 1 步 6 根、第 2 步剩余 5、第 3 步剩余 4，听 A 报颜色给答案。' },
+  { id:'code', icon:'📖', name:'对暗号·接头', tag:'听译', time:120,
+    a:'墙上 4 个抽象符号（说不出口、只能描述）——逐个描述给 B，B 查「密码本」翻译成数字，你报着依次输入 4 位密码。描述错 / 听译错都会输错（-3s 清空重来）。',
+    b:'你是「密码本」：10 个符号 ↔ 数字对照全在你手上。听 A 描述墙上符号，认出是哪个、报对应数字；连对 4 个 A 就开门。' },
+  { id:'pressure', icon:'🌡️', name:'锅炉校准', tag:'操作', time:120,
+    a:'压力表在漂移，你只看到读数（看不到安全区间）。按 ⬆⬇ 调节并实时报数给 B，听指挥「加 / 减 / 稳住」。区间内累计保持 8 秒通关；撞到 0 或 100 = 爆炸！',
+    b:'你持有「安全区间」（如 40~60），A 看不到。听 A 报当前读数，判断在不在区间内，指挥他加 / 减 / 稳住。累计 8 秒就赢，别让 A 撞爆表。' },
+  { id:'vault', icon:'🧠', name:'记忆暗格', tag:'记忆', time:120,
+    a:'保险柜 6 个转轮：你看到第 1 / 3 / 5 位数字（蓝色格），5 秒后全变问号！记住自己的 3 位报给 B，听 B 拼好的完整 6 位密码输入。错 -3s 重来。',
+    b:'你看到第 2 / 4 / 6 位数字（橙色格），5 秒后全变问号！记住它，听 A 报他的 1 / 3 / 5 位，按顺序拼成完整 6 位密码报给 A 输入。' }
 ];
 
 /* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
@@ -163,10 +172,16 @@ function genWires(){
    A 端随机抽一张卡，卡号对 A 可见但对含义隐藏；A 把卡号口头报给 B，
    B 在手册查表得到目标刻度，指挥 A 转针对齐。零后端、跨设备可玩。 */
 var CARD_TABLE = { 1:7, 2:3, 3:9, 4:0, 5:5, 6:2, 7:8, 8:4, 9:1, 10:6 };
-/* 每一局的内容：随机转盘起始刻度 + 随机目标指令卡 + 随机 6 根线序（迷宫固定） */
+/* 每一局的内容：随机转盘起始刻度 + 随机目标指令卡 + 随机 6 根线序（迷宫固定）
+   code: 随机抽 4 个不重复符号（0-9）；pressure: 安全区间为设备标准 40~60（两端一致，A 端判定、B 端展示）；
+   vault: A 端生成 6 位密码（A 看 5 秒口述给 B，B 记录后报回，A 输入） */
 function newSet(){
   var card=1+Math.floor(Math.random()*10);
-  return { dialStart: Math.floor(Math.random()*10), targetCard: card, targetY: CARD_TABLE[card], wires: genWires() };
+  var syms=[], pool=[0,1,2,3,4,5,6,7,8,9];
+  while(syms.length<4){ var i=Math.floor(Math.random()*pool.length); syms.push(pool.splice(i,1)[0]); }
+  var vault=[]; for(var v=0;v<6;v++) vault.push(Math.floor(Math.random()*10));
+  return { dialStart: Math.floor(Math.random()*10), targetCard: card, targetY: CARD_TABLE[card], wires: genWires(),
+           syms:syms, pres:{lo:40,hi:60}, vault:vault };
 }
 
 /* ============ 状态 ============ */
@@ -316,7 +331,11 @@ function runModule(set){
     '<div id="msg"></div>';
   if(S.mod==='maze'){ dp.style.display='grid'; runMaze(set); }
   else if(S.mod==='dial'){ dp.style.display='grid'; runDial(set); }
-  else { dp.style.display='none'; runWires(set); }
+  else if(S.mod==='wires'){ dp.style.display='none'; runWires(set); }
+  else if(S.mod==='code'){ dp.style.display='none'; runCode(set); }
+  else if(S.mod==='pressure'){ dp.style.display='none'; runPressure(set); }
+  else if(S.mod==='vault'){ dp.style.display='none'; runVault(set); }
+  else { dp.style.display='none'; }
 }
 
 /* ---- 玩法 1：迷宫盲走 ---- */
@@ -577,6 +596,187 @@ function judgeStep(wires){
   return 0; // 全红 → 剪第 1 根
 }
 
+/* ============ 玩法 4：对暗号·接头（A 描述符号 → B 查密码本 → A 输 4 位码） ============ */
+/* 抽象符号库 0-9：难用名字直接叫，只能描述（产生笑点+听译错误） */
+function drawSymbol(ctx, id, x, y, s){
+  ctx.strokeStyle='#e2e8f0'; ctx.fillStyle='#e2e8f0';
+  ctx.lineWidth=Math.max(2,s*0.1); ctx.lineCap='round'; ctx.lineJoin='round';
+  function seg(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x+x1*s,y+y1*s); ctx.lineTo(x+x2*s,y+y2*s); ctx.stroke(); }
+  switch(id){
+    case 0: for(var i=-1;i<=1;i++) seg(-0.5,i*0.3,0.5,i*0.3); break;                      // 三横线
+    case 1: ctx.beginPath(); ctx.arc(x,y,0.4*s,-Math.PI/2,Math.PI/2); ctx.stroke(); break; // 半圆(开口朝右)
+    case 2: seg(-0.4,0.4,0.4,-0.4); ctx.beginPath(); ctx.arc(x+0.2*s,y+0.25*s,s*0.1,0,Math.PI*2); ctx.fill(); break; // 斜线+点
+    case 3: ctx.beginPath(); ctx.moveTo(x-0.5*s,y); for(var w=0;w<3;w++){ var px=x-0.5*s+(w+0.5)*0.33*s; ctx.quadraticCurveTo(px,y-0.35*s,px+0.165*s,y); } ctx.stroke(); break; // 波浪
+    case 4: ctx.beginPath(); ctx.moveTo(x,y-0.5*s); ctx.lineTo(x+0.45*s,y); ctx.lineTo(x,y+0.5*s); ctx.lineTo(x-0.45*s,y); ctx.closePath(); ctx.stroke(); seg(0,-0.35,0,0.35); break; // 菱形+竖线
+    case 5: ctx.beginPath(); ctx.arc(x,y,0.45*s,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(x,y,0.2*s,0,Math.PI*2); ctx.stroke(); break; // 双同心圆
+    case 6: seg(-0.4,-0.4,0.4,-0.4); seg(0.4,-0.4,-0.4,0.4); seg(-0.4,0.4,0.4,0.4); break; // Z
+    case 7: ctx.beginPath(); ctx.moveTo(x,y-0.45*s); ctx.lineTo(x+0.45*s,y+0.3*s); ctx.lineTo(x-0.45*s,y+0.3*s); ctx.closePath(); ctx.stroke(); seg(-0.5,0.42,0.5,0.42); break; // 三角+底横线
+    case 8: seg(0,-0.5,0,0.5); seg(-0.5,0,0.5,0); break; // 十字
+    case 9: [[-0.25,-0.25],[0.25,-0.25],[-0.25,0.25],[0.25,0.25]].forEach(function(p){ ctx.beginPath(); ctx.arc(x+p[0]*s,y+p[1]*s,s*0.1,0,Math.PI*2); ctx.fill(); }); break; // 2x2 点阵
+  }
+}
+/* 通用数字键盘：onNum(n) 0-9、onDel() 退格 */
+function makeNumpad(container, onNum, onDel){
+  var wrap=document.createElement('div');
+  wrap.style.cssText='display:grid;grid-template-columns:repeat(5,54px);gap:8px;justify-content:center;margin:10px auto 0';
+  function nb(n){ var b=document.createElement('button'); b.textContent=n; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f8fafc'; b.onclick=function(){ onNum(n); }; wrap.appendChild(b); }
+  function db(){ var b=document.createElement('button'); b.textContent='⌫'; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f87171'; b.onclick=function(){ onDel(); }; wrap.appendChild(b); }
+  for(var i=1;i<=9;i++) nb(i);
+  db();
+  nb(0);
+  container.appendChild(wrap);
+}
+function runCode(set){
+  var stage=$('stage'), pa=$('playarea');
+  var cv=document.createElement('canvas'); cv.width=300; cv.height=96; stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var syms=set.syms, enter='', done=false;
+  window._codeSyms=syms.slice();
+  function draw(){ ctx.clearRect(0,0,300,96); for(var i=0;i<4;i++){ drawSymbol(ctx,syms[i],40+i*75,48,26); ctx.strokeStyle='#334155'; ctx.strokeRect(7+i*75,9,66,78); } }
+  draw();
+  var inp=document.createElement('div');
+  inp.style.cssText='text-align:center;font-size:28px;font-weight:800;color:#f8fafc;letter-spacing:10px;margin:6px 0';
+  pa.appendChild(inp);
+  function renderIn(){
+    var dots=[]; for(var i=0;i<4;i++) dots.push(i<enter.length?'●':'・');
+    inp.textContent=dots.join(' ');
+  }
+  renderIn();
+  var hint=document.createElement('div'); hint.className='msg warn'; hint.style.cssText='margin:6px 0;text-align:center';
+  hint.textContent='把 4 个符号逐个描述给 B（别说名字，他也没名字），报 B 翻出的数字依次输入';
+  pa.appendChild(hint);
+  function input(n){
+    if(done||window._dead) return;
+    if(enter.length>=4) return;
+    enter+=n; renderIn(); beep(520,0.06,'square',0.08);
+    if(enter.length===4){
+      var ok=true; for(var i=0;i<4;i++){ if(+enter[i]!==syms[i]){ ok=false; break; } }
+      if(ok){
+        done=true;
+        beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
+        var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 4 位全对，暗号对上，门开了！玩法完成！'; }
+        finish(true);
+      }else{
+        cut(3); beep(160,0.18,'sawtooth',0.14); buzz();
+        enter=''; renderIn();
+        var m2=$('msg'); if(m2){ m2.className='msg err'; m2.textContent='✘ 密码错误 -3s！是哪位描述 / 翻译 / 输入错了？和 B 对一下再重来。'; }
+      }
+    }
+  }
+  window._codeIn=input;
+  window._codeDel=function(){ if(done||window._dead)return; enter=enter.slice(0,-1); renderIn(); };
+  makeNumpad(pa, input, window._codeDel);
+}
+
+/* ============ 玩法 5：锅炉校准（A 调表 → B 指挥区间 → 累计达标） ============ */
+function runPressure(set){
+  var stage=$('stage'), pa=$('playarea');
+  var lo=set.pres.lo, hi=set.pres.hi;
+  var cv=document.createElement('canvas'); cv.width=260; cv.height=190; stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var val=30+Math.random()*40, t=0, acc=0, done=false, btn=0;
+  var NEED=8000; // 区间内累计达标 8 秒
+  window._presVal=function(){ return {val:val, acc:acc, lo:lo, hi:hi, done:done}; };
+  function render(){
+    ctx.clearRect(0,0,260,190);
+    // 表盘（0-100 弧）
+    var cx=130, cy=120, rad=78;
+    ctx.strokeStyle='#334155'; ctx.lineWidth=12; ctx.lineCap='round';
+    ctx.beginPath(); ctx.arc(cx,cy,rad,-Math.PI,0); ctx.stroke();
+    // 危险区两端红
+    ctx.strokeStyle='rgba(220,38,38,.5)'; ctx.lineWidth=12;
+    ctx.beginPath(); ctx.arc(cx,cy,rad,-Math.PI,-Math.PI+0.12); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx,cy,rad,-0.12,0); ctx.stroke();
+    // 安全区（对 A 隐藏：画灰色，B 知道具体数字）
+    // 指针
+    var ang=-Math.PI+(val/100)*Math.PI;
+    var inZone = val>=lo&&val<=hi;
+    ctx.strokeStyle=inZone?'#4ade80':'#f87171'; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(ang)*(rad-14), cy+Math.sin(ang)*(rad-14)); ctx.stroke();
+    ctx.fillStyle='#f8fafc'; ctx.beginPath(); ctx.arc(cx,cy,7,0,Math.PI*2); ctx.fill();
+    // 读数大字
+    ctx.fillStyle='#f8fafc'; ctx.font='bold 30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(Math.round(val), cx, cy+rad+26);
+    ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif';
+    ctx.fillText('报读数给 B · 听他指挥', cx, cy+rad+48);
+    // 达标进度不显示给 A（避免反推安全区间）：达标 8s 时自动结算
+  }
+  function loop(){
+    if(done||window._dead){ return; }
+    t++;
+    var drift=Math.sin(t*0.06)*0.12+(Math.random()-0.5)*0.26;
+    val+=drift+btn*1.0;
+    if(val>=100){ explode('压力爆表！'); return; }
+    if(val<=0){ explode('压力归零！'); return; }
+    if(val>=lo&&val<=hi){ acc+=16; if(acc>=NEED){ done=true; beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 在区间内保持 '+Math.round(NEED/1000)+'s，锅炉稳定！玩法完成！'; } finish(true); return; } }
+    else acc=Math.max(0,acc-50);
+    render();
+  }
+  // 大按钮 ↑ ↓
+  var up=document.createElement('button'); up.textContent='⬆ 加压';
+  up.style.cssText='display:inline-block;width:110px;height:66px;font-size:17px;font-weight:800;border:none;border-radius:14px;background:var(--a);color:#fff;margin:10px 8px 0';
+  var dn=document.createElement('button'); dn.textContent='⬇ 减压';
+  dn.style.cssText='display:inline-block;width:110px;height:66px;font-size:17px;font-weight:800;border:none;border-radius:14px;background:var(--b);color:#fff;margin:10px 8px 0';
+  var row=document.createElement('div'); row.style.cssText='text-align:center';
+  row.appendChild(up); row.appendChild(dn); pa.appendChild(row);
+  up.onpointerdown=function(){ btn=1; }; up.onpointerup=function(){ btn=0; }; up.onpointerleave=function(){ btn=0; };
+  dn.onpointerdown=function(){ btn=-1; }; dn.onpointerup=function(){ btn=0; }; dn.onpointerleave=function(){ btn=0; };
+  window._presSet=function(d){ btn=d; };
+  var physLoop=setInterval(loop,16); timers.push(physLoop);
+  render();
+}
+
+/* ============ 玩法 6：记忆暗格（A 看 6 位密码 5 秒 → 口述给 B → B 记录 → 报回 → A 输入） ============ */
+function runVault(set){
+  var stage=$('stage'), pa=$('playarea');
+  var v=set.vault, enter='', done=false;
+  window._vaultAns=v.join('');
+  var box=document.createElement('div'); box.style.cssText='display:flex;gap:8px;justify-content:center;margin:10px 0';
+  var cells=[];
+  for(var i=0;i<6;i++){
+    var d=document.createElement('div');
+    d.style.cssText='width:54px;height:68px;background:#0f172a;border:2px solid #3b82f6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#f8fafc';
+    d.textContent=v[i];
+    cells.push(d); box.appendChild(d);
+  }
+  stage.appendChild(box);
+  var mem=document.createElement('div'); mem.className='msg warn'; mem.style.cssText='margin:6px 0;text-align:center';
+  mem.textContent='⏳ 记住这 6 位密码！5 秒后全部变问号——趁现在赶紧口述给 B 记！';
+  stage.appendChild(mem);
+  setTimeout(function(){
+    if(window._dead) return;
+    cells.forEach(function(d){ d.textContent='？？'; d.style.borderColor='#334155'; d.style.color='#94a3b8'; });
+    mem.className='msg err'; mem.textContent='⏰ 记忆消失！听 B 报回密码，依次输入（他也记不住就靠你俩的口头记忆了）。';
+    beep(300,0.15,'square',0.1);
+  },5000);
+  var inp=document.createElement('div');
+  inp.style.cssText='text-align:center;font-size:28px;font-weight:800;color:#f8fafc;letter-spacing:10px;margin:6px 0';
+  pa.appendChild(inp);
+  function renderIn(){ var dots=[]; for(var i=0;i<6;i++) dots.push(i<enter.length?'●':'・'); inp.textContent=dots.join(' '); }
+  renderIn();
+  function input(n){
+    if(done||window._dead) return;
+    if(enter.length>=6) return;
+    enter+=n; renderIn(); beep(520,0.06,'square',0.08);
+    if(enter.length===6){
+      var ok=enter===v.join('');
+      if(ok){
+        done=true;
+        beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
+        var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 6 位全对，暗格打开！玩法完成！'; }
+        finish(true);
+      }else{
+        cut(3); beep(160,0.18,'sawtooth',0.14); buzz();
+        enter=''; renderIn();
+        var m2=$('msg'); if(m2){ m2.className='msg err'; m2.textContent='✘ 密码错误 -3s！是不是 B 记错 / 传错位了？对一下再重来。'; }
+      }
+    }
+  }
+  window._vaultIn=input;
+  window._vaultDel=function(){ if(done||window._dead)return; enter=enter.slice(0,-1); renderIn(); };
+  makeNumpad(pa, input, window._vaultDel);
+}
+
 /* ============ B 端：手册（按玩法渲染） ============ */
 function renderManual(){
   var app=document.getElementById('app');
@@ -599,7 +799,7 @@ function renderManual(){
         '</table>'+
         '<div style="font-size:13px;color:#94a3b8;margin-top:6px;line-height:1.7">流程：① 听 A 报卡号 → ② 查表得目标刻度 → ③ 听 A 报当前针位 → ④ 指挥「往右/左 X 格」 → ⑤ 对齐喊「锁！」</div>'+
       '</div></div>';
-  }else{
+  }else if(S.mod==='wires'){
     body=
       '<div class="manual-card"><h3>🧨 剪线排雷 · 三步规则</h3><p class="mc">'+WIRE_RULE.intro+'</p>'+
       '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:10px 0 4px">【第 1 步】6 根线</div>'+
@@ -609,6 +809,38 @@ function renderManual(){
       '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:14px 0 4px">【第 3 步】剩余 4 根线（重新从左到右编号）</div>'+
       WIRE_RULE.steps3.map(function(s){ return '<div class="rule-step"><div>'+s.q+'</div><div style="font-size:12px;color:#94a3b8">'+s.cond+'</div><div class="ans">→ '+s.ans+'</div></div>'; }).join('')+
       '</div>';
+  }else if(S.mod==='code'){
+    body=
+      '<div class="manual-card"><h3>📖 对暗号 · 密码本</h3>'+
+      '<p class="mc">A 的墙上 4 个<b>抽象符号</b>（没有名字、只能靠嘴描述）。你是「密码本」——10 个符号对应数字全在下面。<b>听 A 描述</b>，你在本子里认出是哪个、报对应数字。A 连对 4 个门就开。</p>'+
+      '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px">'+
+        '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:6px">📋 符号 ↔ 数字对照表（全 10 个）</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px">'+
+        (function(){ var rows=[]; for(var k=0;k<10;k++){ rows.push('<div style="display:flex;align-items:center;gap:10px;border-bottom:1px dashed #1e293b;padding:5px 2px"><canvas id="sym-'+k+'" width="46" height="46" style="flex:none"></canvas><span style="font-size:18px;font-weight:800;color:#4ade80">= '+k+'</span></div>'); } return rows.join(''); })()+
+        '</div>'+
+        '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 描述第 1 个符号 → ② 你认图报数字 → ③ A 输入 → ④ 依次 4 个。报错了 A 那边会 -3s。</div>'+
+      '</div></div>';
+  }else if(S.mod==='pressure'){
+    body=
+      '<div class="manual-card"><h3>🌡️ 锅炉校准 · 安全区间</h3>'+
+      '<p class="mc">A 只看到压力表读数（0~100），<b>看不到安全区间</b>。区间在你手里，听 A 报当前读数，判断在不在区间内，指挥他 <b>加 / 减 / 稳住</b>。区间内累计保持 <b>8 秒</b>通关；撞到 0 或 100 = 爆炸。</p>'+
+      '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;text-align:center">'+
+        '<div style="font-size:13px;color:#94a3b8">本局安全区间（设备标准，每局一致）</div>'+
+        '<div style="font-size:44px;font-weight:900;color:#4ade80;margin:4px 0">40 ~ 60</div>'+
+        '<div style="font-size:13px;color:#94a3b8">读数在 0 和 100 之间碰边就炸</div>'+
+      '</div>'+
+      '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 报读数 → ② 你在区间内吗？在 = 喊「稳住」；低于下限 = 喊「加」；高于上限 = 喊「减」→ ③ 保持喊「稳住，别动！」到 8 秒。</div></div>';
+  }else if(S.mod==='vault'){
+    body=
+      '<div class="manual-card"><h3>🧠 记忆暗格 · 密码记录器</h3>'+
+      '<p class="mc">A 的保险柜密码<b>只显示 5 秒</b>，他必须靠嘴报给你。你是<b>密码记录员</b>：A 报一位、你在下面的<b>记录器按一位</b>，记满 6 位后原样报回给 A 输入（你听错 / 按错 = A 那边输错 -3s）。</p>'+
+      '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px">'+
+        '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:8px">密码记录器（A 报一位按一位）</div>'+
+        '<div style="display:flex;gap:8px;justify-content:center;margin:6px 0" id="vault-b"></div>'+
+        '<div id="vault-numpad"></div>'+
+        '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px"><button id="vault-clear" style="height:44px;font-size:15px;font-weight:800;border-radius:10px;border:2px solid #475569;background:#1e293b;color:#f87171;padding:0 18px">清空重记</button></div>'+
+      '</div>'+
+      '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 报密码 → ② 你按记录器记下 6 位 → ③ 原样报回给 A → ④ A 输入，对了开门、错了你俩对一下谁传错。</div></div>';
   }
   app.innerHTML= top + body;
   $('back').onclick=function(){ location.search=''; };
@@ -616,6 +848,22 @@ function renderManual(){
     var cv=$('maze-map'), cell=Math.min(44, Math.floor(420/MAZE.cols));
     cv.width=MAZE.cols*cell; cv.height=MAZE.rows*cell;
     drawMazeFull(cv.getContext('2d'), cell);
+  }
+  if(S.mod==='vault'){
+    var rec=[];
+    var box=$('vault-b'); box.innerHTML='';
+    var cells=[];
+    for(var i=0;i<6;i++){
+      var d=document.createElement('div');
+      d.style.cssText='width:54px;height:68px;background:#0f172a;border:2px dashed #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#f8fafc';
+      d.textContent='·';
+      cells.push(d); box.appendChild(d);
+    }
+    function renderRec(){ cells.forEach(function(d,i){ d.textContent=i<rec.length?rec[i]:'·'; }); }
+    makeNumpad($('vault-numpad'),
+      function(n){ if(rec.length<6){ rec.push(n); renderRec(); beep(520,0.05,'square',0.06); } },
+      function(){ rec.pop(); renderRec(); });
+    $('vault-clear').onclick=function(){ rec=[]; renderRec(); };
   }
 }
 
