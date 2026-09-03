@@ -120,7 +120,15 @@ var PLAYGROUNDS = [
     a:'保险柜 6 个转轮：你看到第 1 / 3 / 5 位数字（蓝色格），5 秒后全变问号！记住自己的 3 位报给 B，听 B 拼好的完整 6 位密码输入。错 -3s 重来。',
     b:'你看到第 2 / 4 / 6 位数字（橙色格），5 秒后全变问号！记住它，听 A 报他的 1 / 3 / 5 位，按顺序拼成完整 6 位密码报给 A 输入。' },
   { id:'catch', icon:'🧺', name:'物资空投', tag:'同屏 · 合力', time:60, mode:'same',
-    desc:'一台设备两人玩：A 按住<b>左半屏</b>（←）让接货员左移，B 按住<b>右半屏</b>（→）右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 10 个过关，接不满就失败。' }
+    desc:'一台设备两人玩：A 按住<b>左半屏</b>（←）让接货员左移，B 按住<b>右半屏</b>（→）右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关，接不满就失败。' },
+  { id:'shield', icon:'🛡️', name:'双人护盾', tag:'同屏 · 防守', time:60, mode:'same',
+    desc:'两台共用一台设备：A 管<b>左半区</b>、B 管<b>右半区</b>，各自按住自己的半屏升起护盾片挡住陨石。护盾片接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。漏了 B 的，A 也扣血——分工但要一起守！' },
+  { id:'beam', icon:'🏗️', name:'双人抬梁', tag:'同屏 · 平衡', time:60, mode:'same',
+    desc:'一根梁，A 按住<b>左半屏</b>抬左端、B 按住<b>右半屏</b>抬右端，保持梁水平接住下落的砖块。梁越歪砖越容易滑落（滑落 -1）。接住并稳住 1 秒才算收下，收够 20 块过关，砖砸地次数超限失败。' },
+  { id:'beat', icon:'🎵', name:'双人节拍', tag:'同屏 · 节奏', time:60, mode:'same',
+    desc:'音符从右向左滚，到判定线时按下：<b style="color:#60a5fa">蓝 = A 按</b>（左半屏）、<b style="color:#fb923c">橙 = B 按</b>（右半屏）、<b style="color:#c084fc">紫 = A、B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关，分数扣到 0 失败。紫色是友尽点——谁没跟上？' },
+  { id:'bridge', icon:'🌉', name:'双人架桥', tag:'同屏 · 运输', time:60, mode:'same',
+    desc:'A 按住<b>左半屏</b>让桥面左移、B 按住<b>右半屏</b>右移（合力控制桥面）。球从上方落下要落在桥面上，再平稳运到<b>右侧出口</b>才算收下；球落地 -1。运够 5 个过关，落地超限失败。快到门口被队友一按键又滑回去——就是这种友尽感。' }
 ];
 
 /* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
@@ -232,6 +240,10 @@ function showFB(d){
     closeFB();
     if(window._netMode==='host'){ hostReset(); }
     else if(window._netMode==='guest'){ guestReset(); }
+    else if(S.mod==='shield'){ renderShield(); }
+    else if(S.mod==='beam'){ renderBeam(); }
+    else if(S.mod==='beat'){ renderBeat(); }
+    else if(S.mod==='bridge'){ renderBridge(); }
     else if(S.mod==='catch'){ renderSame(); }
     else { renderPlay(); }
   };
@@ -260,6 +272,10 @@ function cut(n){
 function render(){
   if(!S.mod){ renderHall(); }
   else if(S.mod==='catch'){ renderCatchMenu(); }
+  else if(S.mod==='shield'){ renderShield(); }
+  else if(S.mod==='beam'){ renderBeam(); }
+  else if(S.mod==='beat'){ renderBeat(); }
+  else if(S.mod==='bridge'){ renderBridge(); }
   else if(!S.role){ renderPickRole(); }
   else if(S.role==='A'){ renderPlay(); }
   else if(S.role==='B'){ renderManual(); }
@@ -401,7 +417,7 @@ function runCatch(set){
   window._catchZones=[zL,zR];
   var physLoop=setInterval(loop,16); timers.push(physLoop);
   render();
-  window._catchMove=function(d){ if(d==='l'){ window._inL=true; } else if(d==='r'){ window._inR=true; } else if(d===0){ window._inL=window._inR=false; } };
+  window._catchMove=function(d){ if(d==='l'){ window._inL=true; window._inR=false; } else if(d==='r'){ window._inR=true; window._inL=false; } else if(d===0){ window._inL=window._inR=false; } };
   window._catchStop=function(){ window._inL=window._inR=false; };
 }
 
@@ -455,7 +471,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v8·单框输码';
+var APP_VER='v9·11玩法';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -715,6 +731,293 @@ function renderGuestUI(code){
   });
 }
 function guestReset(){ window._guestSetDir(0); try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in',v:0}); }catch(e){} }
+
+/* ============ 同屏合力玩法家族（一台设备双人各控半边） ============ */
+function dualFrame(badgeL,icon,name,badgeR,goalHtml){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">'+badgeL+'</span><span class="badge n">'+icon+' '+name+'</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">'+goalHtml+'</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
+    '<div class="panel"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+}
+function dualTips(l,r){
+  var pa=document.querySelector('#app .panel');
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">'+l+'</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">'+r+'</div>';
+  pa.appendChild(tip);
+}
+function dualBeep(f,du,type,vol){ try{ var ac=S.audio&&S.audio.ctx; if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=f; g.gain.value=vol||0.1; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+(du||0.1)); }catch(e){} }
+function dualMsg(kind,txt){ var m=document.getElementById('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+
+/* ---- 🛡️ 双人护盾：各守半屏 · 共享耐久 ---- */
+function renderShield(){
+  dualFrame('A 守左半区','🛡️','双人护盾','B 守右半区','能量 0 / 20');
+  var pa=document.querySelector('#app .panel');
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ↑ 升起左护盾</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B 按住右半屏 ↑ 升起右护盾</div>';
+  pa.appendChild(tip);
+  runShield();
+}
+function runShield(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400, GOAL=20;
+  var sl={x:20,w:140,y:340}, sr={x:180,w:140,y:340};
+  var rocks=[], next=280, energy=0, dur=3, done=false;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.strokeStyle='rgba(148,163,184,.35)'; ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    ctx.fillStyle='#60a5fa'; ctx.shadowColor='#60a5fa'; ctx.shadowBlur=10; ctx.fillRect(sl.x,sl.y-5,sl.w,10); ctx.shadowBlur=0;
+    ctx.fillStyle='#fb923c'; ctx.shadowColor='#fb923c'; ctx.shadowBlur=10; ctx.fillRect(sr.x,sr.y-5,sr.w,10); ctx.shadowBlur=0;
+    rocks.forEach(function(r){ ctx.fillStyle='#a78bfa'; ctx.beginPath(); ctx.arc(r.x,r.y,9,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('☄',r.x,r.y); });
+    ctx.fillStyle='#334155'; ctx.fillRect(8,H-20,52,8); ctx.fillStyle='#ef4444'; ctx.fillRect(8,H-20,52*dur/3,8);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('耐久 '+dur,8,H-25);
+  }
+  function loop(){
+    if(done||window._dead) return;
+    next-=16;
+    if(next<=0){ rocks.push({x:14+Math.random()*(W-28), y:-12, vy:1.5+energy*0.045+Math.random()*0.6}); next=Math.max(250, 620-energy*28)+Math.random()*220; }
+    sl.y += window._inL ? -3.4 : 2.0; sr.y += window._inR ? -3.4 : 2.0;
+    sl.y=Math.max(190,Math.min(360,sl.y)); sr.y=Math.max(190,Math.min(360,sr.y));
+    for(var i=rocks.length-1;i>=0;i--){
+      var r=rocks[i]; r.y+=r.vy; r.vy+=0.02;
+      var inL=r.x<W/2, sh=inL?sl:sr, guardUp=inL?window._inL:window._inR;
+      if(guardUp && r.y+8>=sh.y-5 && r.y-8<=sh.y+5 && Math.abs(r.x-(sh.x+sh.w/2))<=sh.w/2){
+        energy++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 挡下陨石！能量 '+energy+' / '+GOAL);
+        $('goal').textContent='能量 '+energy+' / '+GOAL; rocks.splice(i,1);
+        if(energy>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 能量满！防守成功！'); finish(true); return; }
+      } else if(r.y>H){
+        dur--; dualBeep(120,0.15,'square',0.15); dualMsg('err','💥 漏了陨石！耐久 -1（剩 '+dur+'）'); rocks.splice(i,1);
+        if(dur<=0){ explode('护盾被击穿'); return; }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
+  window._catchZones=[zl,zr];
+  S.started=Date.now(); S.time=60; startCountdown();
+  timers.push(setInterval(loop,16)); render();
+  window._shieldState=function(){ return {energy:energy,dur:dur,dead:window._dead}; };
+  window._shieldInject=function(x){ rocks.push({x:x,y:120,vy:1.0}); };
+  window._shieldMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
+  window._shieldStop=function(){ window._inL=window._inR=false; };
+}
+
+/* ---- 🏗️ 双人抬梁：两端独立 · 平衡接砖 ---- */
+function renderBeam(){
+  dualFrame('A 抬左端','🏗️','双人抬梁','B 抬右端','砖块 0 / 20');
+  var pa=document.querySelector('#app .panel');
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ↑ 抬左端</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B 按住右半屏 ↑ 抬右端</div>';
+  pa.appendChild(tip);
+  runBeam();
+}
+function runBeam(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400, X1=40, X2=300, GOAL=20, LIMIT=5;
+  var yL=300,yR=300, bricks=[], next=420, got=0, spills=0, done=false;
+  function lineY(x){ return yL+(yR-yL)*(x-X1)/(X2-X1); }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.strokeStyle='#94a3b8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(X1,yL); ctx.lineTo(X2,yR); ctx.stroke(); ctx.lineWidth=1;
+    ctx.fillStyle='#60a5fa'; ctx.beginPath(); ctx.arc(X1,yL,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fb923c'; ctx.beginPath(); ctx.arc(X2,yR,7,0,Math.PI*2); ctx.fill();
+    bricks.forEach(function(b){
+      var by = b.on ? lineY(b.x) : b.y;
+      ctx.fillStyle=b.on?'#f59e0b':'#e2e8f0'; ctx.fillRect(b.x-12,by-6,24,12);
+      ctx.strokeStyle='#64748b'; ctx.strokeRect(b.x-12,by-6,24,12);
+    });
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('失误 '+spills+' / '+LIMIT, 8, H-12);
+  }
+  function loop(){
+    if(done||window._dead) return;
+    next-=16;
+    if(next<=0){ bricks.push({x:60+Math.random()*(W-120), y:-12, vy:1.3+got*0.04+Math.random()*0.5, on:false, tOn:0}); next=Math.max(280, 640-got*30)+Math.random()*240; }
+    if(window._inL) yL-=3; else yL+=1.2;
+    if(window._inR) yR-=3; else yR+=1.2;
+    yL=Math.max(180,Math.min(340,yL)); yR=Math.max(180,Math.min(340,yR));
+    for(var i=bricks.length-1;i>=0;i--){
+      var b=bricks[i];
+      if(!b.on){
+        b.y+=b.vy; b.vy+=0.02;
+        if(b.y>=lineY(b.x) && b.x>=X1 && b.x<=X2){ b.on=true; b.tOn=0; dualBeep(440,0.06,'sine',0.08); }
+        else if(b.y>H){ bricks.splice(i,1); }
+      } else {
+        b.tOn+=16;
+        b.x += (yR-yL)/(X2-X1)*2.4;
+        if(b.x<X1-10 || b.x>X2+10){
+          bricks.splice(i,1); spills++; dualBeep(120,0.15,'square',0.15);
+          dualMsg('err','💥 砖滑落了！失误 '+spills+' / '+LIMIT);
+          if(spills>=LIMIT){ explode('梁塌了，砖全掉'); return; }
+        } else if(b.tOn>=1000){
+          got++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 收下砖块 '+got+' / '+GOAL);
+          $('goal').textContent='砖块 '+got+' / '+GOAL; bricks.splice(i,1);
+          if(got>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 砖块齐了！梁稳如山！'); finish(true); return; }
+        }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
+  window._catchZones=[zl,zr];
+  S.started=Date.now(); S.time=60; startCountdown();
+  timers.push(setInterval(loop,16)); render();
+  window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead}; };
+  window._beamInject=function(x){ bricks.push({x:x,y:100,vy:0.8,on:false,tOn:0}); };
+  window._beamMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
+  window._beamStop=function(){ window._inL=window._inR=false; };
+}
+
+/* ---- 🎵 双人节拍：交替 / 同时按 ---- */
+function renderBeat(){
+  dualFrame('A 按蓝','🎵','双人节拍','B 按橙','分数 0 / 30');
+  var pa=document.querySelector('#app .panel');
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按左半屏 · 蓝音符</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B 按右半屏 · 橙音符</div>';
+  pa.appendChild(tip);
+  var tip2=document.createElement('div'); tip2.style.cssText='text-align:center;margin:4px 0 8px;font-weight:800;font-size:14px;color:#c084fc';
+  tip2.textContent='紫色 = 两人同时按';
+  pa.appendChild(tip2);
+  runBeat();
+}
+function runBeat(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400, LINE=70, GOAL=30, LIVES=8;
+  var notes=[], next=420, score=0, lives=LIVES, done=false;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.fillStyle='#facc15'; ctx.fillRect(LINE-3,0,6,H);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('判定线',4,H-8);
+    notes.forEach(function(n){
+      var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
+      ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(n.x,200,14,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.type==='AB'?'AB':(n.type==='A'?'A':'B'), n.x, 200);
+    });
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('机会 '+lives+' / '+LIVES, 8, H-12);
+  }
+  function press(who){
+    if(done||window._dead) return;
+    var best=null, bestD=999;
+    for(var i=0;i<notes.length;i++){ var n=notes[i]; if(n.hit) continue;
+      if(n.x>=LINE-22 && n.x<=LINE+22){ var d=Math.abs(n.x-LINE); if(d<bestD){ best=n; bestD=d; } } }
+    if(!best){ dualBeep(80,0.06,'square',0.06); return; }
+    if(best.type==='AB'){
+      if(who==='A') best.hA=true; else best.hB=true;
+      if(best.hA&&best.hB){ best.hit=true; score+=2; dualBeep(660,0.1,'square',0.12); dualMsg('ok','✔ 双人同步！+2（'+score+' / '+GOAL+'）'); $('goal').textContent=score+' / '+GOAL; if(score>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 节奏大师！'); finish(true); return; } }
+    } else if(best.type===who){
+      best.hit=true; score++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 命中！+1（'+score+' / '+GOAL+'）'); $('goal').textContent=score+' / '+GOAL; if(score>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 节奏大师！'); finish(true); return; }
+    } else {
+      lives--; dualBeep(120,0.12,'square',0.15); dualMsg('err','✘ 按错了！机会剩 '+lives);
+      if(lives<=0){ explode('节拍乱了'); return; }
+    }
+  }
+  function loop(){
+    if(done||window._dead) return;
+    next-=16;
+    if(next<=0){ var r=Math.random(); var type = r<0.5?'A':(r<0.8?'B':'AB'); notes.push({x:W+16, hit:false, type:type}); next=Math.max(240, 560-score*10)+Math.random()*260; }
+    for(var i=notes.length-1;i>=0;i--){
+      var n=notes[i]; n.x-=2.4;
+      if(!n.hit && n.x<LINE-24){ n.hit=true; lives--; dualBeep(120,0.1,'square',0.12); dualMsg('err','✘ 漏了音符！机会剩 '+lives); if(lives<=0){ explode('节拍乱了'); return; } }
+      if(n.x<-20) notes.splice(i,1);
+    }
+    render();
+  }
+  function pressA(){ press('A'); }
+  function pressB(){ press('B'); }
+  var zl=makeZone('l',pressA), zr=makeZone('r',pressB);
+  window._catchZones=[zl,zr];
+  window._beatPress=function(who){ press(who==='A'?'A':'B'); };
+  S.started=Date.now(); S.time=60; startCountdown();
+  timers.push(setInterval(loop,16)); render();
+  window._beatState=function(){ return {score:score,lives:lives,notes:notes.length,dead:window._dead}; };
+  window._beatInject=function(type,x){ notes.push({x:x||80, hit:false, type:type||'A'}); };
+  window._beatReset=function(){ window._inL=window._inR=false; };
+}
+
+/* ---- 🌉 双人架桥：合力控桥面 · 接球运输 ---- */
+function renderBridge(){
+  dualFrame('A 移左','🌉','双人架桥','B 移右','送达 0 / 5');
+  var pa=document.querySelector('#app .panel');
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ← 桥面左移</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B 按住右半屏 → 桥面右移</div>';
+  pa.appendChild(tip);
+  runBridge();
+}
+function runBridge(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400, BOT=340, GOAL=5, LIMIT=5;
+  var px=W/2,pv=0,pW=110, EXIT=296, balls=[], next=460, delivered=0, drops=0, carrying=null, slide=0, prevDir=0, done=false;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.fillStyle='rgba(74,222,128,.25)'; ctx.fillRect(EXIT,0,W-EXIT,H);
+    ctx.fillStyle='#4ade80'; ctx.shadowColor='#4ade80'; ctx.shadowBlur=10; ctx.fillRect(px-pW/2, BOT-8, pW, 10); ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('桥', px, BOT-3);
+    ctx.strokeStyle='#22c55e'; ctx.beginPath(); ctx.moveTo(EXIT,0); ctx.lineTo(EXIT,H); ctx.stroke();
+    balls.forEach(function(b){ ctx.fillStyle='#38bdf8'; ctx.shadowColor='#38bdf8'; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(b.x,b.y,9,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; });
+    if(carrying){ ctx.fillStyle='#38bdf8'; ctx.shadowColor='#38bdf8'; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(px,BOT-16,9,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; }
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('落地 '+drops+' / '+LIMIT, 8, H-12);
+    ctx.fillStyle='#22c55e'; ctx.font='bold 11px sans-serif'; ctx.textAlign='right'; ctx.fillText('出口 →', W-8, H-12);
+  }
+  function loop(){
+    if(done||window._dead) return;
+    var dir=(window._inR?1:0)-(window._inL?1:0);
+    var dirFlip = prevDir!==0 && dir!==0 && dir!==prevDir;
+    prevDir = dir;
+    pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2,Math.min(W-pW/2,px));
+    if(carrying){
+      // 球随桥面移动；运球途中突然反向操作 → 球被甩落（友尽点）
+      if(dirFlip){
+        balls.push({x:carrying.x, y:BOT-10, vy:0.4}); carrying=null; slide=0;
+        drops++; dualBeep(120,0.15,'square',0.15); dualMsg('err','💥 球被甩掉了！失误 '+drops+' / '+LIMIT);
+        if(drops>=LIMIT){ explode('球全摔了'); return; }
+      } else if(px+pW/2>=EXIT){ delivered++; dualBeep(660,0.1,'square',0.12); dualMsg('ok','✔ 送达出口 '+delivered+' / '+GOAL); $('goal').textContent=delivered+' / '+GOAL; carrying=null; slide=0;
+        if(delivered>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 桥全通了！'); finish(true); return; } }
+    } else {
+      next-=16;
+      if(next<=0){ balls.push({x:18+Math.random()*(W-36), y:-10, vy:1.3}); next=Math.max(420, 1000-delivered*140)+Math.random()*300; }
+      for(var i=balls.length-1;i>=0;i--){
+        var b=balls[i]; b.y+=b.vy; b.vy+=0.02;
+        if(b.y+8>=BOT-8 && Math.abs(b.x-px)<=pW/2){ carrying=b; balls.splice(i,1); dualBeep(440,0.08,'square',0.1); dualMsg('warn','接住球！平缓运到右侧出口，别突然反向甩掉 →'); }
+        else if(b.y>H){ balls.splice(i,1); }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
+  window._catchZones=[zl,zr];
+  S.started=Date.now(); S.time=60; startCountdown();
+  timers.push(setInterval(loop,16)); render();
+  window._bridgeState=function(){ return {delivered:delivered,drops:drops,px:px,carrying:!!carrying,dead:window._dead}; };
+  window._bridgeInject=function(x){ balls.push({x:x||px,y:120,vy:0.8}); };
+  window._bridgeMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
+  window._bridgeStop=function(){ window._inL=window._inR=false; };
+}
 
 /* ---- 玩法已定：选角色 ---- */
 function renderPickRole(){
@@ -1357,11 +1660,18 @@ function drawMazeFull(ctx, cell){
 (function(){
   document.addEventListener('keydown', function(e){
     if(!S.mod) return;
-    if(S.mod==='catch'){
+    if(S.mod==='catch'||S.mod==='shield'||S.mod==='beam'||S.mod==='bridge'){
       var isL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
       var isR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
       if(isL) window._inL=true;
       if(isR){ if(window._guestSetDir) window._guestSetDir(1); else window._inR=true; }
+      return;
+    }
+    if(S.mod==='beat'){
+      var bL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
+      var bR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
+      if(bL && window._beatPress) window._beatPress('A');
+      if(bR && window._beatPress) window._beatPress('B');
       return;
     }
     if(!S.role || S.role!=='A') return;
@@ -1374,11 +1684,13 @@ function drawMazeFull(ctx, cell){
     else { window._lockHeld=false; }
   });
   document.addEventListener('keyup', function(e){
-    if(!S.mod || S.mod!=='catch') return;
-    var isL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
-    var isR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
-    if(isL) window._inL=false;
-    if(isR){ if(window._guestSetDir) window._guestSetDir(0); else window._inR=false; }
+    if(!S.mod) return;
+    if(S.mod==='catch'||S.mod==='shield'||S.mod==='beam'||S.mod==='bridge'){
+      var isL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
+      var isR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
+      if(isL) window._inL=false;
+      if(isR){ if(window._guestSetDir) window._guestSetDir(0); else window._inR=false; }
+    }
   });
 })();
 
