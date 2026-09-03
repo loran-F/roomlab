@@ -274,7 +274,7 @@ function render(){
   else if(S.mod==='catch'){ renderCatchMenu(); }
   else if(S.mod==='shield'){ renderShield(); }
   else if(S.mod==='beam'){ renderBeam(); }
-  else if(S.mod==='beat'){ renderBeat(); }
+  else if(S.mod==='beat'){ renderBeatMenu(); }
   else if(S.mod==='bridge'){ renderBridge(); }
   else if(!S.role){ renderPickRole(); }
   else if(S.role==='A'){ renderPlay(); }
@@ -490,13 +490,30 @@ function renderCatchMenu(){
   $('cm2').onclick=function(){ renderHost(); };
   $('cm3').onclick=function(){ renderJoin(); };
 }
+/* ---- 🎵 双人节拍：三入口菜单 ---- */
+function renderBeatMenu(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<h1>🎵 双人节拍 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
+    '<p class="sub">音符滚到判定线时按下：蓝=A 按、橙=B 按、紫=两人同时按（+2）。错按/漏掉扣机会，累计 <b>30</b> 分过关。自带 BGM 节拍器，跟着 ♩ 鼓点按。</p>'+
+    '<div class="howto">📡 <b>联网模式</b>：房主生成 4 位房间码，同伴输码加入。房主管蓝音符 + 紫的 A 侧、加入者管橙音符 + 紫的 B 侧，画面实时同步。<br>📱 <b>一台设备</b>：两人共用一台设备，A 按左半屏、B 按右半屏。</div>'+
+    '<div class="roles">'+
+      '<div class="rolecard a" id="cm1"><p class="rt" style="color:#60a5fa">📱 一台设备 · 双人同屏</p><p class="rd">两人共用一台设备，各按半边屏，零联网。</p></div>'+
+      '<div class="rolecard a" id="cm2"><p class="rt" style="color:#60a5fa">📡 联网 · 创建房间（我按蓝音符）</p><p class="rd">生成 4 位房间码发给同伴，等对方加入。</p></div>'+
+      '<div class="rolecard b" id="cm3"><p class="rt" style="color:#fb923c">📡 联网 · 加入房间（我按橙音符）</p><p class="rd">输入房主的房间码加入，接管你的橙音符。</p></div>'+
+    '</div>';
+  $('cm1').onclick=function(){ renderBeat(); };
+  $('cm2').onclick=function(){ renderHost(); };
+  $('cm3').onclick=function(){ renderJoin(); };
+}
 /* ---- 房主：创建房间 + 权威物理 + 广播 ---- */
 function renderHost(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='host'; window._guestSetDir=null;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<div class="topbar"><span class="badge A">房主 · 你控 ← 左移</span><span class="badge n">🧺 联网</span>'+
-    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+CATCH_GOAL+'</span>'+
+    '<div class="topbar"><span class="badge A">'+(S.mod==='beat'?'房主 · 你按蓝音符 A':'房主 · 你控 ← 左移')+'</span><span class="badge n">'+(S.mod==='beat'?'🎵 联网':'🧺 联网')+'</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+(S.mod==='beat'?30:CATCH_GOAL)+'</span>'+
     '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
@@ -533,8 +550,8 @@ function renderHost(){
         clearTimeout(t);
         conn.on('open', function(){
           PEER.conn=conn;
-          roomBox.className='msg ok'; roomBox.innerHTML='✔ 同伴已加入！开始！你控制 ← 左移，他控制 → 右移。';
-          conn.on('data', function(d){ if(d&&d.t==='in'){ PEER.gdir=d.v?1:0; } });
+          roomBox.className='msg ok'; roomBox.innerHTML=S.mod==='beat'?'✔ 同伴已加入！你按蓝音符，他按橙音符，紫色要两人同时按。':'✔ 同伴已加入！开始！你控制 ← 左移，他控制 → 右移。';
+          conn.on('data', function(d){ if(!d) return; if(d.t==='in'){ PEER.gdir=d.v?1:0; } else if(d.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(d.who); } });
           conn.on('close', function(){ var rb=document.querySelector('#stage .msg'); if(rb){ rb.className='msg err'; rb.innerHTML='✘ 同伴断开连接。'; } });
           startHostGame();
         });
@@ -548,6 +565,7 @@ function renderHost(){
   });
 }
 function startHostGame(){
+  if(S.mod==='beat'){ startHostBeat(); return; }
   var stg=$('stage'); stg.innerHTML='';
   var pa=$('playarea');
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
@@ -644,6 +662,107 @@ function startHostGame(){
   window._host._running=true;
 }
 function hostReset(){ if(window._host&&window._host.reset) window._host.reset(); }
+/* ---- 房主端节拍权威：跑音符物理，A 侧本地按，B 侧收加入者按键 ---- */
+function startHostBeat(){
+  var stg=$('stage'); stg.innerHTML='';
+  var pa=$('playarea');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400, LINE=70, GOAL=30, LIVES=8;
+  var notes=[], next=520, score=0, lives=LIVES, done=false, win=false;
+  var bpm=96, beatT=0, beatCount=0, t=0;
+  window._inL=false; window._dead=false;
+  window._host={ px:0, score:score, notes:notes, done:done };
+  function playKick(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='sine'; o.frequency.setValueAtTime(160,ac.currentTime); o.frequency.exponentialRampToValueAtTime(45,ac.currentTime+0.1); g.gain.setValueAtTime(0.42,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.25); }catch(e){} }
+  function playHat(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='square'; o.frequency.value=2400; g.gain.setValueAtTime(0.09,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.05); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.07); }catch(e){} }
+  function broadcast(finalWin){
+    if(PEER.conn&&PEER.conn.open){
+      try{ PEER.conn.send({t:'st', notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
+        score:score, lives:lives, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead}); }catch(e){}
+    }
+  }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.fillStyle='#facc15'; ctx.fillRect(LINE-3,0,6,H);
+    ctx.fillStyle='#a855f7'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='alphabetic'; ctx.fillText('♩ '+bpm+' BPM', W-8, 16);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('判定线',4,H-8);
+    notes.forEach(function(n){
+      var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
+      ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(n.x,200,14,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.type==='AB'?'AB':(n.type==='A'?'A':'B'), n.x, 200);
+    });
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('机会 '+lives+' / '+LIVES, 8, H-12);
+  }
+  function press(who){
+    if(done||window._dead) return;
+    var best=null, bestD=999;
+    for(var i=0;i<notes.length;i++){ var n=notes[i]; if(n.hit) continue;
+      if(n.x>=LINE-22 && n.x<=LINE+22){ var d=Math.abs(n.x-LINE); if(d<bestD){ best=n; bestD=d; } } }
+    if(!best){ dualBeep(80,0.06,'square',0.06); return; }
+    if(best.type==='AB'){
+      if(who==='A') best.hA=true; else best.hB=true;
+      if(best.hA&&best.hB){ best.hit=true; score+=2; dualBeep(660,0.1,'square',0.12); msg('ok','✔ 双人同步！+2（'+score+' / '+GOAL+'）'); $('goal').textContent=score+' / '+GOAL; if(score>=GOAL){ done=true; win=true; broadcast(true); dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); msg('ok','✔ 节奏大师！'); finish(true); return; } }
+    } else if(best.type===who){
+      best.hit=true; score++; dualBeep(660,0.08,'square',0.1); msg('ok','✔ 命中！+1（'+score+' / '+GOAL+'）'); $('goal').textContent=score+' / '+GOAL; if(score>=GOAL){ done=true; win=true; broadcast(true); dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); msg('ok','✔ 节奏大师！'); finish(true); return; }
+    } else {
+      lives--; dualBeep(120,0.12,'square',0.15); msg('err','✘ 按错了！机会剩 '+lives);
+      if(lives<=0){ explode('节拍乱了'); return; }
+    }
+  }
+  function loop(){
+    if(done||window._dead) return;
+    t+=16;
+    bpm=Math.min(150, 96+Math.floor(score/3)*3);
+    var beatMs=60000/bpm;
+    beatT+=16;
+    if(beatT>=beatMs){ beatT-=beatMs; beatCount++; playKick(); if(beatCount%2===0) playHat(); }
+    next-=16;
+    if(next<=0){ var r=Math.random(); var type=r<0.5?'A':(r<0.8?'B':'AB'); notes.push({x:W+16,hit:false,type:type}); next=beatMs*2; }
+    for(var i=notes.length-1;i>=0;i--){
+      var n=notes[i]; n.x-=2.4;
+      if(!n.hit && n.x<LINE-24){ n.hit=true; lives--; dualBeep(120,0.1,'square',0.12); msg('err','✘ 漏了音符！机会剩 '+lives); if(lives<=0){ explode('节拍乱了'); return; } }
+      if(n.x<-20) notes.splice(i,1);
+    }
+    render();
+  }
+  function msg(kind,txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你：蓝音符按左半屏（或 ← / A 键）</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴：在他屏上按橙音符</div>';
+  pa.appendChild(tip);
+  var zL=makeZone('l', function(v){ if(v) press('A'); });
+  window._netZones=[zL];
+  window._beatPress=function(who){ if(who==='A') press('A'); };
+  window._hostBeatPress=function(who){ press(who==='B'?'B':'A'); };
+  S.started=Date.now(); S.time=60;
+  startCountdown();
+  var physLoop=setInterval(loop,16); timers.push(physLoop);
+  var br=setInterval(function(){ broadcast(); },66); timers.push(br);
+  render();
+  window._hostState=function(){ return {score:score,lives:lives,notes:notes.length,dead:window._dead}; };
+  window._hostInject=function(type,x){ notes.push({x:x||80,hit:false,type:type||'A'}); };
+  window._host.px=0; window._host.score=score; window._host.notes=notes;
+  window._host.reset=function(){
+    done=false; win=false; score=0; lives=LIVES; notes.length=0; next=520; bpm=96; beatT=0; beatCount=0; t=0;
+    window._dead=false; S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+GOAL;
+    startCountdown();
+    try{ PEER.conn.send({t:'rst'}); }catch(e){}
+    var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局！'; }
+    if(window._host._loops){ window._host._loops.forEach(function(id){ clearInterval(id); }); }
+    window._host._loops=[];
+    window._host._loops.push(setInterval(loop,16));
+    window._host._loops.push(setInterval(function(){ broadcast(); },66));
+    timers.push(window._host._loops[0], window._host._loops[1]);
+    window._host.score=score; window._host.notes=notes; window._host.done=done;
+  };
+  window._host._loops=[setInterval(loop,16), setInterval(function(){ broadcast(); },66)];
+  timers.push(window._host._loops[0], window._host._loops[1]);
+  window._host._running=true;
+}
 /* ---- 加入者：输入房间码加入 + 渲染同步 + 发送右移输入 ---- */
 function renderJoin(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='guest';
@@ -680,6 +799,7 @@ function startGuest(code){
   });
 }
 function renderGuestUI(code){
+  if(S.mod==='beat'){ renderGuestBeat(code); return; }
   var app=document.getElementById('app');
   app.innerHTML=
     '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 房间 '+code+'</span>'+
@@ -733,6 +853,63 @@ function renderGuestUI(code){
   });
 }
 function guestReset(){ window._guestSetDir(0); try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in',v:0}); }catch(e){} }
+/* ---- 加入者端节拍：渲染同步画面 + 按橙/紫B侧上报 ---- */
+function renderGuestBeat(code){
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你按橙音符 B</span><span class="badge n">🎵 房间 '+code+'</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / 30</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你：橙音符按右半屏（或 → / L 键）；紫色要两人同时按</div>';
+  $('playarea').appendChild(tip);
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; $('stage').appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var started=false, ended=false, last=null;
+  function draw(d){
+    ctx.clearRect(0,0,340,400);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=340;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,400); ctx.stroke(); }
+    ctx.fillStyle='#facc15'; ctx.fillRect(70-3,0,6,400);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('判定线',4,392);
+    (d.notes||[]).forEach(function(n){
+      if(n.hit) return;
+      var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
+      ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
+      ctx.beginPath(); ctx.arc(n.x,200,14,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.type==='AB'?'AB':(n.type==='A'?'A':'B'), n.x, 200);
+    });
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('机会 '+(d.lives!=null?d.lives:'--')+' / 8', 8, 16);
+  }
+  function sendPress(who){
+    try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'press', who:who}); }catch(e){}
+    dualBeep(660,0.08,'square',0.1);
+  }
+  window._beatPress=function(who){ if(who==='B') sendPress('B'); };
+  var zR=makeZone('r', function(v){ if(v) sendPress('B'); });
+  window._netZones=[zR];
+  window._guestSetDir=null;
+  window._guestState=function(){ return last; };
+  PEER.conn.on('data', function(d){
+    if(!d) return;
+    if(d.t==='st'){
+      last=d;
+      if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你按橙音符（B），紫色要两人同时按。'; } }
+      var c=$('count'); if(c) c.textContent=d.time+'s';
+      var g=$('goal'); if(g) g.textContent=d.score+' / 30';
+      draw(d);
+      if(!ended && (d.win || d.dead)){
+        ended=true;
+        showFB({ok:!!d.win, duration:0, timeLeft:d.time, role:'Guest'});
+      }
+    }
+    if(d.t==='rst'){ ended=false; last=null; var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+  });
+}
 
 /* ============ 同屏合力玩法家族（一台设备双人各控半边） ============ */
 function dualFrame(badgeL,icon,name,badgeR,goalHtml){
