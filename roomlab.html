@@ -437,6 +437,23 @@ function loadPeerLib(cb){
     document.head.appendChild(s);
   })();
 }
+/* PeerJS 信令服务器配置：默认公共云 0.peerjs.com；
+   自建信令（国内稳定）可通过 URL ?peer=host&peerPort=&peerPath= 或
+   window._PEER_HOST 切换（见 README「联网模式」） */
+function peerOpts(id){
+  var o={debug:1};
+  var q=location.search;
+  var h=(q.match(/[?&]peer=([^&]+)/)||[])[1] || window._PEER_HOST || '';
+  if(h){
+    o.host=h;
+    o.port=parseInt((q.match(/[?&]peerPort=(\d+)/)||[])[1]||window._PEER_PORT||443,10);
+    o.path=(q.match(/[?&]peerPath=([^&]+)/)||[])[1]||window._PEER_PATH||'/';
+    o.secure=((q.match(/[?&]peerSecure=([^&]+)/)||[])[1]||'1')!=='0';
+  }
+  if(id) o._id=id;
+  return o;
+}
+function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
@@ -473,7 +490,7 @@ function renderHost(){
     if(!P){ roomBox.innerHTML='<span class="err">❌ 联网组件加载失败，请检查网络后重试。</span>'; return; }
     var code=Math.floor(1000+Math.random()*9000);
     function tryHost(){
-      var p=new Peer('room'+code, {debug:1});
+      var p=newPeerId('room'+code, peerOpts());
       var t=setTimeout(function(){ try{ p.destroy(); }catch(e){} roomBox.innerHTML='⏳ 连接超时，正在重试…'; code=(code%9000)+1000; tryHost(); }, 15000);
       p.on('open', function(id){
         clearTimeout(t);
@@ -622,7 +639,7 @@ function startGuest(code){
   jm.innerHTML='<div class="msg warn" style="margin-top:8px">⏳ 正在连接房间 '+code+'…</div>';
   loadPeerLib(function(P){
     if(!P){ jm.innerHTML='<div class="msg err">❌ 联网组件加载失败，检查网络后重试。</div>'; return; }
-    var p=new Peer({debug:1});
+    var p=newPeerId(null, peerOpts());
     var t=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 连接超时，检查房间码或网络。</div>'; try{p.destroy();}catch(e){} }, 15000);
     p.on('open', function(){
       var conn=p.connect('room'+code, {reliable:true});
