@@ -495,7 +495,20 @@ function renderHost(){
       p.on('open', function(id){
         clearTimeout(t);
         PEER.peer=p; PEER.room=code; PEER.isHost=true;
-        roomBox.innerHTML='📡 <b style="font-size:22px">房间码：'+code+'</b><br>让同伴点「加入房间」输入这个码。<br><span style="color:#94a3b8">等待同伴加入…（你控制 ← 左移）</span>';
+        roomBox.innerHTML='📡 <b style="font-size:22px">房间码：'+code+'</b> <button id="copycode" type="button" style="font-size:13px;padding:6px 10px;border:none;border-radius:8px;background:#1e3a8a;color:#fff;cursor:pointer">复制</button><br>让同伴点「加入房间」输入这个码。<br><span style="color:#94a3b8">等待同伴加入…（你控制 ← 左移）</span>';
+        var cc=$('copycode');
+        if(cc) cc.onclick=function(){
+          function done(){ cc.textContent='已复制 ✓'; setTimeout(function(){ cc.textContent='复制'; },2000); }
+          function fb(){
+            var ta=document.createElement('textarea'); ta.value=String(code);
+            ta.style.position='fixed'; ta.style.opacity='0';
+            document.body.appendChild(ta); ta.select();
+            try{ document.execCommand('copy'); }catch(e){}
+            document.body.removeChild(ta); done();
+          }
+          if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(String(code)).then(done, fb); }
+          else fb();
+        };
       });
       p.on('connection', function(conn){
         clearTimeout(t);
@@ -620,16 +633,35 @@ function renderJoin(){
     '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 联网</span><button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
     '<div class="panel"><h3>📡 输入房主的房间码</h3>'+
     '<div style="display:flex;gap:8px;margin:10px 0">'+
-      Array(4).fill(0).map(function(_,k){ return '<input id="rc'+k+'" maxlength="1" inputmode="numeric" style="flex:1;height:64px;font-size:28px;font-weight:800;text-align:center;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc">'; }).join('')+
+      Array(4).fill(0).map(function(_,k){ return '<input id="rc'+k+'" inputmode="numeric" maxlength="4" style="flex:1;height:64px;font-size:28px;font-weight:800;text-align:center;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc">'; }).join('')+
     '</div>'+
     '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
     '<div id="jmsg"></div></div>';
   $('back').onclick=function(){ location.search=''; };
-  for(var k=0;k<4;k++){ (function(kk){ var inp=$('rc'+kk);
-    inp.oninput=function(){ inp.value=inp.value.replace(/[^0-9]/g,''); if(inp.value&&kk<3) $('rc'+(kk+1)).focus(); };
-  })(k); }
+  /* 统一输码处理：支持整串粘贴自动分配 / 逐位输入自动跳格 / 退格回跳 */
+  function joinInp(e){
+    var inp=e.target;
+    var idx=parseInt(inp.id.slice(2),10);
+    var d=inp.value.replace(/\D/g,'');
+    if(d.length>1){
+      for(var k=0;k<4;k++) $('rc'+k).value=d[k]||'';
+      var nxt=-1; for(var k=0;k<4;k++){ if(!$('rc'+k).value){ nxt=k; break; } }
+      if(nxt>=0) $('rc'+nxt).focus();
+    }else{
+      inp.value=d;
+      if(d && idx<3) $('rc'+(idx+1)).focus();
+    }
+  }
+  function joinKey(e){
+    if(e.key==='Backspace'){
+      var inp=e.target; var idx=parseInt(inp.id.slice(2),10);
+      if(!inp.value && idx>0){ e.preventDefault(); $('rc'+(idx-1)).focus(); }
+    }
+  }
+  for(var k=0;k<4;k++){ var inp=$('rc'+k); inp.oninput=joinInp; inp.onkeydown=joinKey; }
   $('joing').onclick=function(){
     var code=''; for(var k=0;k<4;k++) code+=$('rc'+k).value||'';
+    code=code.replace(/\D/g,'');
     if(code.length!==4){ $('jmsg').innerHTML='<div class="msg err" style="margin-top:8px">请输入 4 位房间码</div>'; return; }
     startGuest(code);
   };
