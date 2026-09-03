@@ -769,7 +769,7 @@ function runShield(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400, GOAL=20;
-  var sl={x:20,w:140,y:340}, sr={x:180,w:140,y:340};
+  var sl={x:8,w:164,y:340}, sr={x:168,w:164,y:340};
   var rocks=[], next=280, energy=0, dur=3, done=false;
   function render(){
     ctx.clearRect(0,0,W,H);
@@ -790,14 +790,18 @@ function runShield(){
     sl.y=Math.max(190,Math.min(360,sl.y)); sr.y=Math.max(190,Math.min(360,sr.y));
     for(var i=rocks.length-1;i>=0;i--){
       var r=rocks[i]; r.y+=r.vy; r.vy+=0.02;
-      var inL=r.x<W/2, sh=inL?sl:sr, guardUp=inL?window._inL:window._inR;
-      if(guardUp && r.y+8>=sh.y-5 && r.y-8<=sh.y+5 && Math.abs(r.x-(sh.x+sh.w/2))<=sh.w/2){
+      // 按护盾片实际覆盖范围归属（两片无缝+重叠覆盖全宽，中间也能挡）
+      var sh = (r.x>=sl.x && r.x<=sl.x+sl.w) ? sl : ((r.x>=sr.x && r.x<=sr.x+sr.w) ? sr : null);
+      if(sh){
+        var guardUp=(sh===sl)?window._inL:window._inR;
+        if(guardUp && r.y+8>=sh.y-5 && r.y-8<=sh.y+5){
         energy++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 挡下陨石！能量 '+energy+' / '+GOAL);
         $('goal').textContent='能量 '+energy+' / '+GOAL; rocks.splice(i,1);
         if(energy>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 能量满！防守成功！'); finish(true); return; }
       } else if(r.y>H){
         dur--; dualBeep(120,0.15,'square',0.15); dualMsg('err','💥 漏了陨石！耐久 -1（剩 '+dur+'）'); rocks.splice(i,1);
         if(dur<=0){ explode('护盾被击穿'); return; }
+      }
       }
     }
     render();
