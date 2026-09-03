@@ -228,7 +228,7 @@ function showFB(d){
   $('fb').style.display='flex';
   var score=0;
   box.querySelectorAll('.s').forEach(function(s){ s.onclick=function(){ score=+s.dataset.v; box.querySelectorAll('.s').forEach(function(x){x.classList.toggle('on',+x.dataset.v<=score);}); }; });
-  $('fb-restart').onclick=function(){ closeFB(); renderPlay(); };
+  $('fb-restart').onclick=function(){ closeFB(); if(S.mod==='catch'){ renderSame(); } else { renderPlay(); } };
   $('fb-next').onclick=function(){ recSave({result:d.ok?'win':'lose', role:d.role, duration:d.duration, timeLeft:d.timeLeft, score:score, comment:$('fb-comment').value}); closeFB(); location.search=''; };
 }
 function closeFB(){ var f=$('fb'); if(f) f.style.display='none'; }
