@@ -455,11 +455,12 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
+var APP_VER='v8·单框输码';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<h1>🧺 物资空投</h1>'+
+    '<h1>🧺 物资空投 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
     '<p class="sub">双人合力控制一个接货员，接好物 +1、金箱 +2、躲坏物（-3s），限时接够 <b>'+CATCH_GOAL+'</b> 个过关。</p>'+
     '<div class="howto">📡 <b>联网模式</b>：房主生成 4 位房间码，同伴输码加入。房主控 ← 左移、加入者控 → 右移，画面实时同步。<br>📱 <b>一台设备</b>：两人共用一台设备各按半边屏。</div>'+
     '<div class="roles">'+
@@ -631,7 +632,7 @@ function renderJoin(){
   var app=document.getElementById('app');
   app.innerHTML=
     '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 联网</span><button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
-    '<div class="panel"><h3>📡 输入房主的房间码</h3>'+
+    '<div class="panel"><h3>📡 输入房主的房间码 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h3>'+
     '<div style="margin:10px 0"><input id="rc" inputmode="numeric" maxlength="4" placeholder="输入 4 位房间码" style="width:100%;height:64px;font-size:28px;font-weight:800;text-align:center;letter-spacing:8px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc;box-sizing:border-box;outline:none"></div>'+
     '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
     '<div id="jmsg"></div></div>';
