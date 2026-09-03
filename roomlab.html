@@ -124,7 +124,7 @@ var PLAYGROUNDS = [
   { id:'shield', icon:'🛡️', name:'双人护盾', tag:'同屏 · 防守', time:60, mode:'same',
     desc:'两台共用一台设备：A 管<b>左半区</b>、B 管<b>右半区</b>，各自按住自己的半屏升起护盾片挡住陨石。护盾片接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。漏了 B 的，A 也扣血——分工但要一起守！' },
   { id:'beam', icon:'🏗️', name:'双人抬梁', tag:'同屏 · 平衡', time:60, mode:'same',
-    desc:'一根梁，A 按住<b>左半屏</b>抬左端、B 按住<b>右半屏</b>抬右端，保持梁水平接住下落的砖块。梁越歪砖越容易滑落（滑落 -1）。接住并稳住 1 秒才算收下，收够 20 块过关，砖砸地次数超限失败。' },
+    desc:'一根梁，A 按住<b>左半屏</b>抬左端、B 按住<b>右半屏</b>抬右端。砖落到梁上会向<b>低的一侧滚动</b>——两人要一起倾斜梁，把每块砖<b>滚进梁正中间的收集口</b>才算收下。梁平着不动砖就停住收不了，滚过头滑出两端会失误。收够 20 块过关，滑落 5 次失败。' },
   { id:'beat', icon:'🎵', name:'双人节拍', tag:'同屏 · 节奏', time:60, mode:'same',
     desc:'音符从右向左滚，到判定线时按下：<b style="color:#60a5fa">蓝 = A 按</b>（左半屏）、<b style="color:#fb923c">橙 = B 按</b>（右半屏）、<b style="color:#c084fc">紫 = A、B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关，分数扣到 0 失败。紫色是友尽点——谁没跟上？' },
   { id:'bridge', icon:'🌉', name:'双人架桥', tag:'同屏 · 运输', time:60, mode:'same',
@@ -218,7 +218,7 @@ function recSave(d){
 
 /* ============ 音效 / 震动 ============ */
 var AC = null;
-function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+function audio(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==='suspended'){ try{ AC.resume(); }catch(e){} } return AC; }
 function beep(freq,dur,type,vol){ var ac=audio(); if(!ac)return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=freq; g.gain.value=vol||0.12; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+dur); }
 function boom(){ var ac=audio(); if(!ac)return; var dur=0.9, buf=ac.createBuffer(1,ac.sampleRate*dur,ac.sampleRate), d=buf.getChannelData(0); for(var i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); } var src=ac.createBufferSource(); src.buffer=buf; var g=ac.createGain(); g.gain.value=0.6; src.connect(g); g.connect(ac.destination); src.start(); }
 function buzz(){ if(navigator.vibrate) navigator.vibrate(90); }
@@ -358,7 +358,9 @@ function runCatch(set){
     nextSpawn-=16;
     if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
     var dir=(window._inR?1:0)-(window._inL?1:0);
-    pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
+    // 系统阻力：无人操作时接货员被"气流"推着左右游走（双方都不动也停不下来，需持续对抗）
+    var drift=Math.sin(t*0.0009)*0.15+Math.sin(t*0.00034+1.3)*0.13;
+    pv+=dir*0.7+drift; pv*=0.72; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
     for(var i=items.length-1;i>=0;i--){
       var it=items[i];
       it.vy+=0.02; it.x+=(wind*0.7+it.vx); it.vx*=0.98; it.y+=it.vy;
@@ -751,7 +753,7 @@ function dualTips(l,r){
     '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">'+r+'</div>';
   pa.appendChild(tip);
 }
-function dualBeep(f,du,type,vol){ try{ var ac=S.audio&&S.audio.ctx; if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=f; g.gain.value=vol||0.1; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+(du||0.1)); }catch(e){} }
+function dualBeep(f,du,type,vol){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=f; g.gain.value=vol||0.1; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+(du||0.1)); }catch(e){} }
 function dualMsg(kind,txt){ var m=document.getElementById('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
 
 /* ---- 🛡️ 双人护盾：各守半屏 · 共享耐久 ---- */
@@ -824,6 +826,9 @@ function renderBeam(){
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ↑ 抬左端</div>'+
     '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B 按住右半屏 ↑ 抬右端</div>';
   pa.appendChild(tip);
+  var tip2=document.createElement('div'); tip2.style.cssText='text-align:center;margin:4px 0 8px;font-weight:800;font-size:14px;color:#64748b';
+  tip2.textContent='砖会向低的一侧滚 → 一起把砖送进中间收集口 ▼';
+  pa.appendChild(tip2);
   runBeam();
 }
 function runBeam(){
@@ -831,7 +836,8 @@ function runBeam(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400, X1=40, X2=300, GOAL=20, LIMIT=5;
-  var yL=300,yR=300, bricks=[], next=420, got=0, spills=0, done=false;
+  var yL=300,yR=300, bricks=[], next=420, got=0, spills=0, t=0, done=false;
+  var CENTER=(X1+X2)/2, HOLE=18;
   function lineY(x){ return yL+(yR-yL)*(x-X1)/(X2-X1); }
   function render(){
     ctx.clearRect(0,0,W,H);
@@ -840,6 +846,8 @@ function runBeam(){
     ctx.strokeStyle='#94a3b8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(X1,yL); ctx.lineTo(X2,yR); ctx.stroke(); ctx.lineWidth=1;
     ctx.fillStyle='#60a5fa'; ctx.beginPath(); ctx.arc(X1,yL,7,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#fb923c'; ctx.beginPath(); ctx.arc(X2,yR,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(250,204,21,.5)'; ctx.fillRect(CENTER-HOLE, 352, HOLE*2, 8);
+    ctx.fillStyle='#a16207'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText('收集口', CENTER, 372);
     bricks.forEach(function(b){
       var by = b.on ? lineY(b.x) : b.y;
       ctx.fillStyle=b.on?'#f59e0b':'#e2e8f0'; ctx.fillRect(b.x-12,by-6,24,12);
@@ -849,28 +857,29 @@ function runBeam(){
   }
   function loop(){
     if(done||window._dead) return;
+    t+=16;
     next-=16;
-    if(next<=0){ bricks.push({x:60+Math.random()*(W-120), y:-12, vy:1.3+got*0.04+Math.random()*0.5, on:false, tOn:0}); next=Math.max(280, 640-got*30)+Math.random()*240; }
-    if(window._inL) yL-=3; else yL+=1.2;
-    if(window._inR) yR-=3; else yR+=1.2;
+    if(next<=0){ bricks.push({x:60+Math.random()*(W-120), y:-12, vy:1.3+got*0.04+Math.random()*0.5, on:false}); next=Math.max(280, 640-got*30)+Math.random()*240; }
+    // 自然失衡：梁自带轻微跷跷板摆动（按住可盖过，不按则慢慢晃）
+    var sway=Math.sin(t*0.0013)*0.3+Math.sin(t*0.0005+2.1)*0.4;
+    if(window._inL) yL-=3; else yL+=1.2+sway;
+    if(window._inR) yR-=3; else yR+=1.2-sway;
     yL=Math.max(180,Math.min(340,yL)); yR=Math.max(180,Math.min(340,yR));
     for(var i=bricks.length-1;i>=0;i--){
       var b=bricks[i];
       if(!b.on){
         b.y+=b.vy; b.vy+=0.02;
-        if(b.y>=lineY(b.x) && b.x>=X1 && b.x<=X2){ b.on=true; b.tOn=0; dualBeep(440,0.06,'sine',0.08); }
+        if(b.y>=lineY(b.x) && b.x>=X1 && b.x<=X2){ b.on=true; dualBeep(440,0.06,'sine',0.08); }
         else if(b.y>H){ bricks.splice(i,1); }
       } else {
-        b.tOn+=16;
+        // 砖在梁上向低端滚（梁斜则滚、梁平则停）
         b.x += (yR-yL)/(X2-X1)*2.4;
-        if(b.x<X1-10 || b.x>X2+10){
+        if(Math.abs(b.x-CENTER)<=HOLE){ got++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 砖滚进收集口！'+got+' / '+GOAL); $('goal').textContent='砖块 '+got+' / '+GOAL; bricks.splice(i,1);
+          if(got>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 砖块全进了！梁稳如山！'); finish(true); return; } }
+        else if(b.x<X1-10 || b.x>X2+10){
           bricks.splice(i,1); spills++; dualBeep(120,0.15,'square',0.15);
-          dualMsg('err','💥 砖滑落了！失误 '+spills+' / '+LIMIT);
+          dualMsg('err','💥 砖滚出梁了！失误 '+spills+' / '+LIMIT);
           if(spills>=LIMIT){ explode('梁塌了，砖全掉'); return; }
-        } else if(b.tOn>=1000){
-          got++; dualBeep(660,0.08,'square',0.1); dualMsg('ok','✔ 收下砖块 '+got+' / '+GOAL);
-          $('goal').textContent='砖块 '+got+' / '+GOAL; bricks.splice(i,1);
-          if(got>=GOAL){ done=true; dualBeep(660,0.15,'square',0.1); setTimeout(function(){dualBeep(880,0.2,'square',0.1);},150); setTimeout(function(){dualBeep(1100,0.25,'square',0.1);},300); dualMsg('ok','✔ 砖块齐了！梁稳如山！'); finish(true); return; }
         }
       }
     }
@@ -904,13 +913,17 @@ function runBeat(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400, LINE=70, GOAL=30, LIVES=8;
-  var notes=[], next=420, score=0, lives=LIVES, done=false;
+  var notes=[], next=520, score=0, lives=LIVES, done=false;
+  var bpm=96, beatT=0, beatCount=0;
+  function playKick(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='sine'; o.frequency.setValueAtTime(160,ac.currentTime); o.frequency.exponentialRampToValueAtTime(45,ac.currentTime+0.1); g.gain.setValueAtTime(0.42,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.25); }catch(e){} }
+  function playHat(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='square'; o.frequency.value=2400; g.gain.setValueAtTime(0.09,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.05); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.07); }catch(e){} }
   function render(){
     ctx.clearRect(0,0,W,H);
     ctx.strokeStyle='rgba(51,65,85,.5)';
     for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
     ctx.fillStyle='#facc15'; ctx.fillRect(LINE-3,0,6,H);
-    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('判定线',4,H-8);
+    ctx.fillStyle='#a855f7'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='alphabetic'; ctx.fillText('♩ '+bpm+' BPM', W-8, 16);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('判定线',4,H-8);
     notes.forEach(function(n){
       var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
       ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
@@ -938,8 +951,13 @@ function runBeat(){
   }
   function loop(){
     if(done||window._dead) return;
+    // BGM 节拍器：BPM 随分数加快（96→150），每拍 kick+hat，音符间隔与拍长同步
+    bpm=Math.min(150, 96+Math.floor(score/3)*3);
+    var beatMs=60000/bpm;
+    beatT+=16;
+    if(beatT>=beatMs){ beatT-=beatMs; beatCount++; playKick(); if(beatCount%2===0) playHat(); }
     next-=16;
-    if(next<=0){ var r=Math.random(); var type = r<0.5?'A':(r<0.8?'B':'AB'); notes.push({x:W+16, hit:false, type:type}); next=Math.max(240, 560-score*10)+Math.random()*260; }
+    if(next<=0){ var r=Math.random(); var type = r<0.5?'A':(r<0.8?'B':'AB'); notes.push({x:W+16, hit:false, type:type}); next=beatMs*2; }
     for(var i=notes.length-1;i>=0;i--){
       var n=notes[i]; n.x-=2.4;
       if(!n.hit && n.x<LINE-24){ n.hit=true; lives--; dualBeep(120,0.1,'square',0.12); dualMsg('err','✘ 漏了音符！机会剩 '+lives); if(lives<=0){ explode('节拍乱了'); return; } }
