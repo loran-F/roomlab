@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>玩法试炼场 · roomlab-v7（单玩法沙盒）</title>
+<title>玩法试炼场 · roomlab-v9（单玩法沙盒）</title>
 <style>
   :root{
     --a:#2563eb; --a-bg:#eff6ff;
@@ -94,8 +94,8 @@
 <body>
 <div class="wrap" id="app"></div>
 <script>
-/* ============ 规则集：roomlab-v7（单玩法沙盒） ============ */
-var RULESET_ID = 'roomlab-v7';
+/* ============ 规则集：roomlab-v9（单玩法沙盒） ============ */
+var RULESET_ID = 'roomlab-v9';
 var CATCH_GOAL = 20; // 物资空投：限时接够 20 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
@@ -284,7 +284,7 @@ function render(){
 /* ---- 大厅：选玩法 ---- */
 function renderHall(){
   document.getElementById('app').innerHTML=
-    '<h1>🎮 玩法试炼场 · roomlab-v7</h1>'+
+    '<h1>🎮 玩法试炼场 · roomlab-v9</h1>'+
     '<p class="sub">把单个玩法独立试玩，测「好不好玩」；确定哪些好玩，再按密室主题嵌套组合。</p>'+
     '<div class="howto">📱 <b>怎么玩</b>：① <b>协作玩法</b>：两台设备各打开<b>同一个链接</b> → 挑玩法 → 各选「当 A / 当 B」→ 开语音协作（零服务器）。② <b>同屏玩法（🧺 物资空投）</b>：一台设备，两人各按住半边屏幕。<b>绝对不要看对方屏幕</b>。</div>'+
     '<div class="pg-grid">'+
