@@ -228,7 +228,13 @@ function showFB(d){
   $('fb').style.display='flex';
   var score=0;
   box.querySelectorAll('.s').forEach(function(s){ s.onclick=function(){ score=+s.dataset.v; box.querySelectorAll('.s').forEach(function(x){x.classList.toggle('on',+x.dataset.v<=score);}); }; });
-  $('fb-restart').onclick=function(){ closeFB(); if(S.mod==='catch'){ renderSame(); } else { renderPlay(); } };
+  $('fb-restart').onclick=function(){
+    closeFB();
+    if(window._netMode==='host'){ hostReset(); }
+    else if(window._netMode==='guest'){ guestReset(); }
+    else if(S.mod==='catch'){ renderSame(); }
+    else { renderPlay(); }
+  };
   $('fb-next').onclick=function(){ recSave({result:d.ok?'win':'lose', role:d.role, duration:d.duration, timeLeft:d.timeLeft, score:score, comment:$('fb-comment').value}); closeFB(); location.search=''; };
 }
 function closeFB(){ var f=$('fb'); if(f) f.style.display='none'; }
@@ -253,7 +259,7 @@ function cut(n){
 /* ============ 渲染分派 ============ */
 function render(){
   if(!S.mod){ renderHall(); }
-  else if(S.mod==='catch'){ renderSame(); }
+  else if(S.mod==='catch'){ renderCatchMenu(); }
   else if(!S.role){ renderPickRole(); }
   else if(S.role==='A'){ renderPlay(); }
   else if(S.role==='B'){ renderManual(); }
@@ -398,6 +404,290 @@ function runCatch(set){
   window._catchMove=function(d){ if(d==='l'){ window._inL=true; } else if(d==='r'){ window._inR=true; } else if(d===0){ window._inL=window._inR=false; } };
   window._catchStop=function(){ window._inL=window._inR=false; };
 }
+
+/* ============ 联网：物资空投（PeerJS 双机 · 房主权威同步） ============ */
+var PEER = { peer:null, conn:null, isHost:false, room:'', gdir:0 };
+function closePeer(){
+  try{ if(PEER.conn){ PEER.conn.close(); } }catch(e){}
+  try{ if(PEER.peer){ PEER.peer.destroy(); } }catch(e){}
+  PEER={ peer:null, conn:null, isHost:false, room:'', gdir:0 };
+}
+function clearNetZones(){
+  if(window._netZones){ window._netZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._netZones=null; }
+}
+function makeZone(side,setOn){
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;'+(side==='l'?'left:0;width:50%;':'right:0;width:50%;')+'bottom:0;height:42%;z-index:5;background:transparent;';
+  d.addEventListener('pointerdown',function(e){ e.preventDefault(); setOn(true); });
+  d.addEventListener('pointerup',function(){ setOn(false); });
+  d.addEventListener('pointercancel',function(){ setOn(false); });
+  d.addEventListener('pointerleave',function(){ setOn(false); });
+  document.body.appendChild(d);
+  return d;
+}
+function loadPeerLib(cb){
+  if(window.Peer){ return cb(window.Peer); }
+  var urls=['https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js'];
+  var i=0;
+  (function tryNext(){
+    if(i>=urls.length){ return cb(null); }
+    var s=document.createElement('script'); s.src=urls[i];
+    s.onload=function(){ cb(window.Peer||null); };
+    s.onerror=function(){ i++; tryNext(); };
+    document.head.appendChild(s);
+  })();
+}
+/* 入口选择：单机同屏 / 联网创建 / 联网加入 */
+function renderCatchMenu(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<h1>🧺 物资空投</h1>'+
+    '<p class="sub">双人合力控制一个接货员，接好物 +1、金箱 +2、躲坏物（-3s），限时接够 <b>'+CATCH_GOAL+'</b> 个过关。</p>'+
+    '<div class="howto">📡 <b>联网模式</b>：房主生成 4 位房间码，同伴输码加入。房主控 ← 左移、加入者控 → 右移，画面实时同步。<br>📱 <b>一台设备</b>：两人共用一台设备各按半边屏。</div>'+
+    '<div class="roles">'+
+      '<div class="rolecard a" id="cm1"><p class="rt" style="color:#60a5fa">📱 一台设备 · 双人同屏</p><p class="rd">两人共用一台设备，各按住半边屏，零联网。</p></div>'+
+      '<div class="rolecard a" id="cm2"><p class="rt" style="color:#60a5fa">📡 联网 · 创建房间（我控 ← 左移）</p><p class="rd">生成 4 位房间码发给同伴，等对方加入。</p></div>'+
+      '<div class="rolecard b" id="cm3"><p class="rt" style="color:#fb923c">📡 联网 · 加入房间（我控 → 右移）</p><p class="rd">输入房主的房间码加入，接住你的半屏。</p></div>'+
+    '</div>';
+  $('cm1').onclick=function(){ renderSame(); };
+  $('cm2').onclick=function(){ renderHost(); };
+  $('cm3').onclick=function(){ renderJoin(); };
+}
+/* ---- 房主：创建房间 + 权威物理 + 广播 ---- */
+function renderHost(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='host'; window._guestSetDir=null;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">房主 · 你控 ← 左移</span><span class="badge n">🧺 联网</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+CATCH_GOAL+'</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  var stg=$('stage');
+  var roomBox=document.createElement('div'); roomBox.className='msg warn'; roomBox.style.cssText='text-align:center;font-size:15px;font-weight:700;margin:0';
+  roomBox.innerHTML='⏳ 正在连接服务…';
+  stg.appendChild(roomBox);
+  loadPeerLib(function(P){
+    if(!P){ roomBox.innerHTML='<span class="err">❌ 联网组件加载失败，请检查网络后重试。</span>'; return; }
+    var code=Math.floor(1000+Math.random()*9000);
+    function tryHost(){
+      var p=new Peer('room'+code, {debug:1});
+      var t=setTimeout(function(){ try{ p.destroy(); }catch(e){} roomBox.innerHTML='⏳ 连接超时，正在重试…'; code=(code%9000)+1000; tryHost(); }, 15000);
+      p.on('open', function(id){
+        clearTimeout(t);
+        PEER.peer=p; PEER.room=code; PEER.isHost=true;
+        roomBox.innerHTML='📡 <b style="font-size:22px">房间码：'+code+'</b><br>让同伴点「加入房间」输入这个码。<br><span style="color:#94a3b8">等待同伴加入…（你控制 ← 左移）</span>';
+      });
+      p.on('connection', function(conn){
+        clearTimeout(t);
+        conn.on('open', function(){
+          PEER.conn=conn;
+          roomBox.className='msg ok'; roomBox.innerHTML='✔ 同伴已加入！开始！你控制 ← 左移，他控制 → 右移。';
+          conn.on('data', function(d){ if(d&&d.t==='in'){ PEER.gdir=d.v?1:0; } });
+          conn.on('close', function(){ var rb=document.querySelector('#stage .msg'); if(rb){ rb.className='msg err'; rb.innerHTML='✘ 同伴断开连接。'; } });
+          startHostGame();
+        });
+      });
+      p.on('error', function(e){
+        if(e.type==='unavailable-id'){ try{ p.destroy(); }catch(_){}
+          code=(code%9000)+1000; tryHost(); }
+      });
+    }
+    tryHost();
+  });
+}
+function startHostGame(){
+  var stg=$('stage'); stg.innerHTML='';
+  var pa=$('playarea');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400,BOT=360,px=W/2,pv=0,pW=64,score=0,t=0,done=false,win=false,items=[],nextSpawn=400,wind=0,windT=0;
+  window._inL=false; window._dead=false;
+  window._host={ px:px, score:score, items:items, done:done };
+  function broadcast(finalWin){
+    if(PEER.conn&&PEER.conn.open){
+      try{ PEER.conn.send({t:'st', px:px, score:score, time:S.time,
+        items:items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
+        goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:window._dead}); }catch(e){}
+    }
+  }
+  function spawn(){
+    var r=Math.random(), type;
+    if(score<4) type = r<0.7 ? 'good' : 'gold';
+    else type = r<0.5 ? 'good' : (r<0.82 ? 'bad' : 'gold');
+    items.push({x:18+Math.random()*(W-36), y:-18, vy:1.5+score*0.04+Math.random()*0.8, type:type, vx:0});
+  }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)'; ctx.lineWidth=1;
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.fillStyle='rgba(148,163,184,.3)'; ctx.fillRect(0,BOT+4,W,3);
+    ctx.fillStyle='#4ade80'; ctx.shadowColor='#4ade80'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(px,BOT-10,pW/2,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⚡',px,BOT-10);
+    items.forEach(function(it){
+      if(it.type==='good'){ ctx.fillStyle='#22c55e'; ctx.fillRect(it.x-9,it.y-9,18,18); ctx.strokeStyle='#f8fafc'; ctx.strokeRect(it.x-9,it.y-9,18,18); }
+      else if(it.type==='gold'){ ctx.fillStyle='#eab308'; ctx.beginPath(); ctx.moveTo(it.x,it.y-11); ctx.lineTo(it.x+10,it.y+8); ctx.lineTo(it.x-10,it.y+8); ctx.closePath(); ctx.fill(); }
+      else { ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(it.x,it.y,10,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('✕',it.x,it.y); }
+    });
+  }
+  function loop(){
+    if(done||window._dead) return;
+    t+=16; windT+=16;
+    wind=Math.sin(windT*0.0011)*0.5+Math.sin(windT*0.00047+1.3)*0.4;
+    nextSpawn-=16;
+    if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
+    var dir=(PEER.gdir?1:0)-(window._inL?1:0);
+    pv+=dir*0.75; pv*=0.8; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
+    for(var i=items.length-1;i>=0;i--){
+      var it=items[i];
+      it.vy+=0.02; it.x+=(wind*0.7+it.vx); it.vx*=0.98; it.y+=it.vy;
+      if(it.x<4)it.x=4; if(it.x>W-4)it.x=W-4;
+      if(it.y>=BOT){
+        if(Math.abs(it.x-px)<=pW/2+8){
+          if(it.type==='good'){ score++; beep(660,0.08,'square',0.1); msg('ok','✔ 好物 +1（'+score+' / '+CATCH_GOAL+'）'); $('goal').textContent=score+' / '+CATCH_GOAL;
+            if(score>=CATCH_GOAL){ done=true; win=true; broadcast(true); beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); msg('ok','✔ 接够 '+CATCH_GOAL+' 个！玩法完成！'); finish(true); return; } }
+          else if(it.type==='gold'){ score+=2; beep(880,0.1,'square',0.12); msg('ok','⭐ 金箱 +2（'+score+' / '+CATCH_GOAL+'）'); $('goal').textContent=score+' / '+CATCH_GOAL;
+            if(score>=CATCH_GOAL){ done=true; win=true; broadcast(true); beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); msg('ok','✔ 接够 '+CATCH_GOAL+' 个！玩法完成！'); finish(true); return; } }
+          else { cut(3); boom(); msg('err','💥 接了个坏物 -3s！'); }
+        }else{
+          if(it.type==='bad') msg('warn','😮💨 坏物落地，躲过了');
+        }
+        items.splice(i,1);
+      }
+    }
+    render();
+  }
+  function msg(kind,txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你 ← 按住左半屏左移（或 ← / A 键）</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴 → 在他屏上右移</div>';
+  pa.appendChild(tip);
+  var zL=makeZone('l',function(v){ window._inL=v; });
+  window._netZones=[zL];
+  S.started=Date.now(); S.time=60;
+  startCountdown();
+  var physLoop=setInterval(loop,16); timers.push(physLoop);
+  var br=setInterval(function(){ broadcast(); },66); timers.push(br);
+  render();
+  window._hostState=function(){ return {px:px,score:score,win:win,dead:window._dead,items:items.length}; };
+  window._hostInject=function(type,x){ items.push({x:x,y:BOT-6,vy:0.4,type:type,vx:0}); };
+  window._host.px=px; window._host.score=score; window._host.items=items;
+  window._host.reset=function(){
+    done=false; win=false; score=0; items.length=0; px=W/2; pv=0; nextSpawn=400;
+    window._dead=false; window._inL=false; PEER.gdir=0;
+    S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+CATCH_GOAL;
+    startCountdown();
+    try{ PEER.conn.send({t:'rst'}); }catch(e){}
+    var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局！'; }
+    // finish/explode 已清 timers，重启物理循环与广播
+    if(window._host._loops){ window._host._loops.forEach(function(id){ clearInterval(id); }); }
+    window._host._loops=[];
+    window._host._loops.push(setInterval(loop,16));
+    window._host._loops.push(setInterval(function(){ broadcast(); },66));
+    timers.push(window._host._loops[0], window._host._loops[1]);
+    window._host.px=px; window._host.score=score; window._host.items=items; window._host.done=done;
+  };
+  window._host._loops=[setInterval(loop,16), setInterval(function(){ broadcast(); },66)];
+  timers.push(window._host._loops[0], window._host._loops[1]);
+  window._host._running=true;
+}
+function hostReset(){ if(window._host&&window._host.reset) window._host.reset(); }
+/* ---- 加入者：输入房间码加入 + 渲染同步 + 发送右移输入 ---- */
+function renderJoin(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='guest';
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 联网</span><button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<div class="panel"><h3>📡 输入房主的房间码</h3>'+
+    '<div style="display:flex;gap:8px;margin:10px 0">'+
+      Array(4).fill(0).map(function(_,k){ return '<input id="rc'+k+'" maxlength="1" inputmode="numeric" style="flex:1;height:64px;font-size:28px;font-weight:800;text-align:center;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc">'; }).join('')+
+    '</div>'+
+    '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
+    '<div id="jmsg"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  for(var k=0;k<4;k++){ (function(kk){ var inp=$('rc'+kk);
+    inp.oninput=function(){ inp.value=inp.value.replace(/[^0-9]/g,''); if(inp.value&&kk<3) $('rc'+(kk+1)).focus(); };
+  })(k); }
+  $('joing').onclick=function(){
+    var code=''; for(var k=0;k<4;k++) code+=$('rc'+k).value||'';
+    if(code.length!==4){ $('jmsg').innerHTML='<div class="msg err" style="margin-top:8px">请输入 4 位房间码</div>'; return; }
+    startGuest(code);
+  };
+}
+function startGuest(code){
+  var jm=$('jmsg');
+  jm.innerHTML='<div class="msg warn" style="margin-top:8px">⏳ 正在连接房间 '+code+'…</div>';
+  loadPeerLib(function(P){
+    if(!P){ jm.innerHTML='<div class="msg err">❌ 联网组件加载失败，检查网络后重试。</div>'; return; }
+    var p=new Peer({debug:1});
+    var t=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 连接超时，检查房间码或网络。</div>'; try{p.destroy();}catch(e){} }, 15000);
+    p.on('open', function(){
+      var conn=p.connect('room'+code, {reliable:true});
+      PEER.peer=p; PEER.conn=conn; PEER.room=code; PEER.isHost=false;
+      var ct=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 找不到房间，请核对房间码。</div>'; try{conn.close(); p.destroy();}catch(e){} }, 12000);
+      conn.on('open', function(){ clearTimeout(ct); clearTimeout(t); renderGuestUI(code); });
+      conn.on('error', function(){ clearTimeout(ct); jm.innerHTML='<div class="msg err">✘ 连接失败，检查房间码后重试。</div>'; });
+    });
+    p.on('error', function(e){ jm.innerHTML='<div class="msg err">✘ 连接出错（'+e.type+'）。</div>'; });
+  });
+}
+function renderGuestUI(code){
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 房间 '+code+'</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+CATCH_GOAL+'</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  var tip=document.createElement('div'); tip.style.cssText='display:flex;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你 → 按住右半屏右移（或 → / L 键）</div>';
+  $('playarea').appendChild(tip);
+  var zR=makeZone('r',function(v){ setGuestDir(v); });
+  window._netZones=[zR];
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; $('stage').appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var started=false, ended=false, last=null;
+  function draw(d){
+    ctx.clearRect(0,0,340,400);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=340;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,400); ctx.stroke(); }
+    ctx.fillStyle='rgba(148,163,184,.3)'; ctx.fillRect(0,364,340,3);
+    ctx.fillStyle='#4ade80'; ctx.shadowColor='#4ade80'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(d.px,350,32,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('⚡',d.px,350);
+    (d.items||[]).forEach(function(it){
+      if(it.type==='good'){ ctx.fillStyle='#22c55e'; ctx.fillRect(it.x-9,it.y-9,18,18); ctx.strokeStyle='#f8fafc'; ctx.strokeRect(it.x-9,it.y-9,18,18); }
+      else if(it.type==='gold'){ ctx.fillStyle='#eab308'; ctx.beginPath(); ctx.moveTo(it.x,it.y-11); ctx.lineTo(it.x+10,it.y+8); ctx.lineTo(it.x-10,it.y+8); ctx.closePath(); ctx.fill(); }
+      else { ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(it.x,it.y,10,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('✕',it.x,it.y); }
+    });
+  }
+  function setGuestDir(v){
+    PEER.gdir=v?1:0;
+    try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in', v:PEER.gdir}); }catch(e){}
+  }
+  window._guestSetDir=setGuestDir;
+  window._guestState=function(){ return last; };
+  PEER.conn.on('data', function(d){
+    if(!d) return;
+    if(d.t==='st'){
+      last=d;
+      if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你控制 → 右移。'; } }
+      var c=$('count'); if(c) c.textContent=d.time+'s';
+      var g=$('goal'); if(g) g.textContent=d.score+' / '+d.goal;
+      draw(d);
+      if(!ended && (d.win || d.dead)){
+        ended=true;
+        showFB({ok:!!d.win, duration:0, timeLeft:d.time, role:'Guest'});
+      }
+    }
+    if(d.t==='rst'){ ended=false; last=null; var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+  });
+}
+function guestReset(){ window._guestSetDir(0); try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in',v:0}); }catch(e){} }
 
 /* ---- 玩法已定：选角色 ---- */
 function renderPickRole(){
@@ -1041,8 +1331,10 @@ function drawMazeFull(ctx, cell){
   document.addEventListener('keydown', function(e){
     if(!S.mod) return;
     if(S.mod==='catch'){
-      if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') window._inL=true;
-      else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') window._inR=true;
+      var isL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
+      var isR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
+      if(isL) window._inL=true;
+      if(isR){ if(window._guestSetDir) window._guestSetDir(1); else window._inR=true; }
       return;
     }
     if(!S.role || S.role!=='A') return;
@@ -1056,8 +1348,10 @@ function drawMazeFull(ctx, cell){
   });
   document.addEventListener('keyup', function(e){
     if(!S.mod || S.mod!=='catch') return;
-    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') window._inL=false;
-    else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') window._inR=false;
+    var isL=e.key==='ArrowLeft'||e.key==='a'||e.key==='A';
+    var isR=e.key==='ArrowRight'||e.key==='d'||e.key==='D';
+    if(isL) window._inL=false;
+    if(isR){ if(window._guestSetDir) window._guestSetDir(0); else window._inR=false; }
   });
 })();
 
@@ -1068,6 +1362,12 @@ function explode(reason){
   window._mazeMove=null; window._wireKey=null; window._wirePick=null; window._dialLock=null;
   window._inL=false; window._inR=false; window._catchMove=null; window._catchStop=null;
   if(window._catchZones){ window._catchZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._catchZones=null; }
+  // 联网房主：爆炸时主动广播最终失败状态给同伴
+  if(window._netMode==='host' && PEER.conn && window._host){
+    try{ PEER.conn.send({t:'st', px:window._host.px, score:window._host.score, time:S.time,
+      items:window._host.items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
+      goal:CATCH_GOAL, win:false, dead:true}); }catch(e){}
+  }
   boom(); buzz();
   var flash=document.createElement('div');
   flash.style.cssText='position:fixed;inset:0;background:rgba(220,38,38,.4);z-index:40;display:flex;align-items:center;justify-content:center;font-size:64px;color:#fff;';
