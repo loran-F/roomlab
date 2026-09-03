@@ -96,7 +96,7 @@
 <script>
 /* ============ 规则集：roomlab-v7（单玩法沙盒） ============ */
 var RULESET_ID = 'roomlab-v7';
-var CATCH_GOAL = 10; // 物资空投：限时接够 10 个过关
+var CATCH_GOAL = 20; // 物资空投：限时接够 20 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
    id 唯一；time = 单局倒计时；a = A 端说明；b = B 端手册说明 */
@@ -342,7 +342,7 @@ function runCatch(set){
     nextSpawn-=16;
     if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
     var dir=(window._inR?1:0)-(window._inL?1:0);
-    pv+=dir*0.75; pv*=0.8; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
+    pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
     for(var i=items.length-1;i>=0;i--){
       var it=items[i];
       it.vy+=0.02; it.x+=(wind*0.7+it.vx); it.vx*=0.98; it.y+=it.vy;
@@ -571,7 +571,7 @@ function startHostGame(){
     nextSpawn-=16;
     if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
     var dir=(PEER.gdir?1:0)-(window._inL?1:0);
-    pv+=dir*0.75; pv*=0.8; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
+    pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
     for(var i=items.length-1;i>=0;i--){
       var it=items[i];
       it.vy+=0.02; it.x+=(wind*0.7+it.vx); it.vx*=0.98; it.y+=it.vy;
