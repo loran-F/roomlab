@@ -96,6 +96,7 @@
 <script>
 /* ============ 规则集：roomlab-v7（单玩法沙盒） ============ */
 var RULESET_ID = 'roomlab-v7';
+var CATCH_GOAL = 10; // 物资空投：限时接够 10 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
    id 唯一；time = 单局倒计时；a = A 端说明；b = B 端手册说明 */
@@ -117,7 +118,9 @@ var PLAYGROUNDS = [
     b:'你持有「安全区间」（如 40~60），A 看不到。听 A 报当前读数，判断在不在区间内，指挥他加 / 减 / 稳住。累计 8 秒就赢，别让 A 撞爆表。' },
   { id:'vault', icon:'🧠', name:'记忆暗格', tag:'记忆', time:120,
     a:'保险柜 6 个转轮：你看到第 1 / 3 / 5 位数字（蓝色格），5 秒后全变问号！记住自己的 3 位报给 B，听 B 拼好的完整 6 位密码输入。错 -3s 重来。',
-    b:'你看到第 2 / 4 / 6 位数字（橙色格），5 秒后全变问号！记住它，听 A 报他的 1 / 3 / 5 位，按顺序拼成完整 6 位密码报给 A 输入。' }
+    b:'你看到第 2 / 4 / 6 位数字（橙色格），5 秒后全变问号！记住它，听 A 报他的 1 / 3 / 5 位，按顺序拼成完整 6 位密码报给 A 输入。' },
+  { id:'catch', icon:'🧺', name:'物资空投', tag:'同屏 · 合力', time:60, mode:'same',
+    desc:'一台设备两人玩：A 按住<b>左半屏</b>（←）让接货员左移，B 按住<b>右半屏</b>（→）右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 10 个过关，接不满就失败。' }
 ];
 
 /* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
@@ -198,6 +201,7 @@ function $(id){ return document.getElementById(id); }
 function PG(){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===S.mod) return PLAYGROUNDS[i]; } return PLAYGROUNDS[0]; }
 function setGame(id, role){ var u=new URL(location.href); u.searchParams.set('m',id); u.searchParams.set('role',role); location.href=u.href; }
 function setRole(r){ var u=new URL(location.href); u.searchParams.set('role',r); location.href=u.href; }
+function setSame(id){ var u=new URL(location.href); u.searchParams.set('m',id); u.searchParams.delete('role'); location.href=u.href; }
 function recSave(d){
   var arr=[]; try{ arr=JSON.parse(localStorage.getItem('roomlab_records')||'[]'); }catch(e){}
   arr.push(Object.assign({ts:Date.now(), ruleset:RULESET_ID, mod:S.mod}, d));
@@ -217,7 +221,7 @@ function showFB(d){
   var stars=''; for(var i=1;i<=5;i++){ stars+='<span class="s" data-v="'+i+'">★</span>'; }
   box.innerHTML=
     '<div class="big">'+(d.ok?'<span class="ok">✔ 玩法完成！</span>':'<span class="err">💥 失败</span>')+'</div>'+
-    '<div class="sub" style="color:#94a3b8;margin:6px 0">'+PG().icon+' '+PG().name+' · 耗时 '+d.duration+'s · 剩余 '+d.timeLeft+'s · 角色 '+d.role+'</div>'+
+    '<div class="sub" style="color:#94a3b8;margin:6px 0">'+PG().icon+' '+PG().name+' · 耗时 '+d.duration+'s · 剩余 '+d.timeLeft+'s · 角色 '+(d.role||'双人同屏')+'</div>'+
     '<div class="stars" id="stars">'+stars+'</div>'+
     '<textarea id="fb-comment" placeholder="好玩吗？紧张吗？哪里卡住了？"></textarea>'+
     '<div class="frow"><button class="btn" id="fb-restart">再来一局</button><button class="btn primary" id="fb-next">换玩法</button></div>';
@@ -249,6 +253,7 @@ function cut(n){
 /* ============ 渲染分派 ============ */
 function render(){
   if(!S.mod){ renderHall(); }
+  else if(S.mod==='catch'){ renderSame(); }
   else if(!S.role){ renderPickRole(); }
   else if(S.role==='A'){ renderPlay(); }
   else if(S.role==='B'){ renderManual(); }
@@ -259,20 +264,139 @@ function renderHall(){
   document.getElementById('app').innerHTML=
     '<h1>🎮 玩法试炼场 · roomlab-v7</h1>'+
     '<p class="sub">把单个玩法独立试玩，测「好不好玩」；确定哪些好玩，再按密室主题嵌套组合。</p>'+
-    '<div class="howto">📱 <b>怎么玩</b>：两台设备各打开<b>同一个链接</b> → 挑一个玩法 → 各选「当 A / 当 B」→ 开语音协作（全程口头同步，零服务器）。<b>绝对不要看对方屏幕</b>。</div>'+
+    '<div class="howto">📱 <b>怎么玩</b>：① <b>协作玩法</b>：两台设备各打开<b>同一个链接</b> → 挑玩法 → 各选「当 A / 当 B」→ 开语音协作（零服务器）。② <b>同屏玩法（🧺 物资空投）</b>：一台设备，两人各按住半边屏幕。<b>绝对不要看对方屏幕</b>。</div>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
+      var desc = p.mode==='same'
+        ? '<div class="pg-desc">'+p.desc+'</div>'
+        : '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>';
+      var act = p.mode==='same'
+        ? '<button class="btn primary" data-same="'+p.id+'">▶ 双人同屏 · 一台设备</button>'
+        : '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>';
       return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+p.time+'s</span></div>'+
-        '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div>'+
-        '<div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
-        '<div class="pg-actions">'+
-          '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button>'+
-          '<button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
-        '</div></div>';
+        desc + act +
+        '</div>';
     }).join('')+
     '</div>';
   document.querySelectorAll('[data-a]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.a,'A'); }; });
   document.querySelectorAll('[data-b]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.b,'B'); }; });
+  document.querySelectorAll('[data-same]').forEach(function(b){ b.onclick=function(){ setSame(this.dataset.same); }; });
+}
+
+/* ---- 同屏玩法：不分 A/B，一台设备直接进 ---- */
+function renderSame(){
+  var app=document.getElementById('app');
+  var p=PG();
+  var set=newSet();
+  clearTimers();
+  window._dead=false;
+  S.started=Date.now();
+  S.time=p.time;
+  app.innerHTML=
+    '<div class="topbar"><span class="badge n">'+p.icon+' '+p.name+'</span><span class="badge A">同屏 · 合力</span>'+
+      '<span class="count" id="count">'+S.time+'s</span>'+
+      '<span class="badge n" id="goal">0 / '+CATCH_GOAL+'</span>'+
+      '<button class="btn sm" id="back" style="margin-left:auto">换玩法</button>'+
+      '<button class="btn sm" id="again">再来一局</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ location.search=''; };
+  $('again').onclick=function(){ renderSame(); };
+  startCountdown();
+  runCatch(set);
+}
+
+/* ---- 玩法 7：物资空投（单设备双人同屏 · A 控左 / B 控右 合力接物） ---- */
+function runCatch(set){
+  if(window._catchZones){ window._catchZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._catchZones=null; }
+  var stage=$('stage');
+  var pa=$('playarea');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stage.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340, H=400, BOT=360;
+  var px=W/2, pv=0, pW=64, score=0, t=0, done=false;
+  var items=[];
+  var nextSpawn=400, wind=0, windT=0;
+  window._inL=false; window._inR=false;
+  window._catchState=function(){ return {px:px,score:score,t:Math.round(t/1000),items:items.length,dead:window._dead}; };
+  window._catchInject=function(type,x){ items.push({x:x,y:BOT-6,vy:0.4,type:type,vx:0}); };
+
+  function spawn(){
+    var r=Math.random(), type;
+    if(score<4) type = r<0.7 ? 'good' : 'gold';
+    else type = r<0.5 ? 'good' : (r<0.82 ? 'bad' : 'gold');
+    items.push({x:18+Math.random()*(W-36), y:-18, vy:1.5+score*0.04+Math.random()*0.8, type:type, vx:0});
+  }
+  function msg(kind, txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  function loop(){
+    if(done||window._dead) return;
+    t+=16;
+    windT+=16;
+    wind=Math.sin(windT*0.0011)*0.5+Math.sin(windT*0.00047+1.3)*0.4;
+    nextSpawn-=16;
+    if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
+    var dir=(window._inR?1:0)-(window._inL?1:0);
+    pv+=dir*0.75; pv*=0.8; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
+    for(var i=items.length-1;i>=0;i--){
+      var it=items[i];
+      it.vy+=0.02; it.x+=(wind*0.7+it.vx); it.vx*=0.98; it.y+=it.vy;
+      if(it.x<4)it.x=4; if(it.x>W-4)it.x=W-4;
+      if(it.y>=BOT){
+        if(Math.abs(it.x-px)<=pW/2+8){
+          if(it.type==='good'){ score++; beep(660,0.08,'square',0.1); msg('ok','✔ 好物 +1（'+score+' / '+CATCH_GOAL+'）'); $('goal').textContent=score+' / '+CATCH_GOAL; if(score>=CATCH_GOAL){ done=true; beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); msg('ok','✔ 接够 '+CATCH_GOAL+' 个！物资齐了，玩法完成！'); finish(true); return; } }
+          else if(it.type==='gold'){ score+=2; beep(880,0.1,'square',0.12); msg('ok','⭐ 金箱 +2（'+score+' / '+CATCH_GOAL+'）'); $('goal').textContent=score+' / '+CATCH_GOAL; if(score>=CATCH_GOAL){ done=true; beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); msg('ok','✔ 接够 '+CATCH_GOAL+' 个！玩法完成！'); finish(true); return; } }
+          else { cut(3); boom(); msg('err','💥 接了个坏物 -3s！下次躲开它！'); }
+        }else{
+          if(it.type==='bad') msg('warn','😮💨 坏物落地，躲过了');
+        }
+        items.splice(i,1);
+      }
+    }
+    render();
+  }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    // 背景网格
+    ctx.strokeStyle='rgba(51,65,85,.5)'; ctx.lineWidth=1;
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    // 接收线
+    ctx.fillStyle='rgba(148,163,184,.3)'; ctx.fillRect(0,BOT+4,W,3);
+    // 接货员（顶部标签 A/B 合力）
+    ctx.fillStyle='#4ade80'; ctx.shadowColor='#4ade80'; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(px,BOT-10,pW/2,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('⚡', px, BOT-10);
+    // 物品
+    items.forEach(function(it){
+      if(it.type==='good'){ ctx.fillStyle='#22c55e'; ctx.fillRect(it.x-9,it.y-9,18,18); ctx.strokeStyle='#f8fafc'; ctx.strokeRect(it.x-9,it.y-9,18,18); }
+      else if(it.type==='gold'){ ctx.fillStyle='#eab308'; ctx.beginPath(); ctx.moveTo(it.x,it.y-11); ctx.lineTo(it.x+10,it.y+8); ctx.lineTo(it.x-10,it.y+8); ctx.closePath(); ctx.fill(); }
+      else { ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(it.x,it.y,10,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('✕', it.x, it.y); }
+    });
+  }
+  // 左右控制提示
+  var tip=document.createElement('div');
+  tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A ← 按住左半屏（或 ← / A 键）</div>'+
+    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">B → 按住右半屏（或 → / L 键）</div>';
+  pa.appendChild(tip);
+  // 底部左右触摸区（覆盖屏幕下半）
+  function zone(side, setOn){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;'+(side==='l'?'left:0;width:50%;':'right:0;width:50%;')+'bottom:0;height:42%;z-index:5;background:transparent;';
+    d.addEventListener('pointerdown',function(e){ e.preventDefault(); setOn(true); });
+    d.addEventListener('pointerup',function(){ setOn(false); });
+    d.addEventListener('pointercancel',function(){ setOn(false); });
+    d.addEventListener('pointerleave',function(){ setOn(false); });
+    document.body.appendChild(d);
+    return d;
+  }
+  var zL=zone('l',function(v){ window._inL=v; });
+  var zR=zone('r',function(v){ window._inR=v; });
+  window._catchZones=[zL,zR];
+  var physLoop=setInterval(loop,16); timers.push(physLoop);
+  render();
+  window._catchMove=function(d){ if(d==='l'){ window._inL=true; } else if(d==='r'){ window._inR=true; } else if(d===0){ window._inL=window._inR=false; } };
+  window._catchStop=function(){ window._inL=window._inR=false; };
 }
 
 /* ---- 玩法已定：选角色 ---- */
@@ -915,8 +1039,13 @@ function drawMazeFull(ctx, cell){
 /* ---- 键盘分发 ---- */
 (function(){
   document.addEventListener('keydown', function(e){
-    if(!S.mod || !S.role) return;
-    if(S.role!=='A') return;
+    if(!S.mod) return;
+    if(S.mod==='catch'){
+      if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') window._inL=true;
+      else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') window._inR=true;
+      return;
+    }
+    if(!S.role || S.role!=='A') return;
     if(e.key==='ArrowUp'||e.key==='w'||e.key==='W'){ if(window._mazeMove) window._mazeMove(-1,0); }
     else if(e.key==='ArrowDown'||e.key==='s'||e.key==='S'){ if(window._mazeMove) window._mazeMove(1,0); }
     else if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'){ if(window._mazeMove) window._mazeMove(0,-1); }
@@ -925,6 +1054,11 @@ function drawMazeFull(ctx, cell){
     if(e.key===' '||e.key==='Enter'){ if(window._dialLock && !window._lockHeld){ window._lockHeld=true; window._dialLock(); } }
     else { window._lockHeld=false; }
   });
+  document.addEventListener('keyup', function(e){
+    if(!S.mod || S.mod!=='catch') return;
+    if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A') window._inL=false;
+    else if(e.key==='ArrowRight'||e.key==='d'||e.key==='D') window._inR=false;
+  });
 })();
 
 /* ---- 爆炸 / 通关 ---- */
@@ -932,6 +1066,8 @@ function explode(reason){
   clearTimers();
   window._dead=true;
   window._mazeMove=null; window._wireKey=null; window._wirePick=null; window._dialLock=null;
+  window._inL=false; window._inR=false; window._catchMove=null; window._catchStop=null;
+  if(window._catchZones){ window._catchZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._catchZones=null; }
   boom(); buzz();
   var flash=document.createElement('div');
   flash.style.cssText='position:fixed;inset:0;background:rgba(220,38,38,.4);z-index:40;display:flex;align-items:center;justify-content:center;font-size:64px;color:#fff;';
