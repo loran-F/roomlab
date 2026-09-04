@@ -226,6 +226,19 @@ function buzz(){ if(navigator.vibrate) navigator.vibrate(90); }
 /* ============ 反馈面板 ============ */
 function showFB(d){
   var box=$('fb-box');
+  /* 密室爬塔模式：结算只回地图，由地图层处理扣血/解锁 */
+  if(window._dungeon){
+    if(window._netMode==='guest'){ return; } // 加入者不自己结算，等房主的 dgEnd 广播同步
+    if(window._netMode==='host'){ closeFB(); dungeonEnd(!!d.ok); return; } // 房主权威自动结算并广播
+    var p=PG();
+    box.innerHTML=
+      '<div class="big">'+(d.ok?'<span class="ok">✔ 玩法完成！</span>':'<span class="err">💥 失败</span>')+'</div>'+
+      '<div class="sub" style="color:#94a3b8;margin:6px 0">'+p.icon+' '+p.name+' · '+(d.ok?'关卡通过，推进地图':'❤️ 全队 -1（可再挑战，胜利才解锁）')+'</div>'+
+      '<div class="frow"><button class="btn primary" id="fb-dg" style="flex:1">'+(d.ok?'▶ 返回地图':'↺ 返回地图')+'</button></div>';
+    $('fb').style.display='flex';
+    $('fb-dg').onclick=function(){ closeFB(); dungeonEnd(!!d.ok); };
+    return;
+  }
   var stars=''; for(var i=1;i<=5;i++){ stars+='<span class="s" data-v="'+i+'">★</span>'; }
   box.innerHTML=
     '<div class="big">'+(d.ok?'<span class="ok">✔ 玩法完成！</span>':'<span class="err">💥 失败</span>')+'</div>'+
@@ -306,17 +319,19 @@ function introGo(broadcastCd, cb){
   ov.innerHTML='<div id="intro-num" style="font-size:112px;font-weight:900;color:#f8fafc;line-height:1;text-shadow:0 0 28px rgba(148,163,184,.5)"></div><div id="intro-tip" style="font-size:17px;color:#94a3b8"></div>';
   document.body.appendChild(ov);
   var num=document.getElementById('intro-num'), tip=document.getElementById('intro-tip'), n=3;
+  // 兜底：无论倒计时广播是否正常到达，4.5s 内一定移除遮罩，避免残留挡住触控
+  setTimeout(function(){ var o=document.getElementById('intro-ov'); if(o) o.remove(); window._introLock=false; }, 4500);
   function step(){
     if(n>0){ num.textContent=n; tip.textContent='准备…'; try{beep(440,0.08,'square',0.1);}catch(e){} if(broadcastCd) broadcastCd(n); n--; setTimeout(step,1000); }
     else { num.textContent='GO!'; tip.textContent='开始！'; try{beep(880,0.16,'square',0.12);}catch(e){} if(broadcastCd) broadcastCd(0); setTimeout(function(){ ov.remove(); window._introLock=false; if(cb) cb(); },450); }
   }
   step();
 }
-/* 加入者端倒计时同步：n>0 显示数字，n=0 收尾 */
+/* 加入者端倒计时同步：n>0 显示数字，n=0 收尾；带 4.5s 兜底移除防止残留挡触控 */
 function guestIntro(n){
   var ov=document.getElementById('intro-ov');
   if(n>0){
-    if(!ov){ var o2=document.createElement('div'); o2.id='intro-ov'; o2.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(6,10,23,.84);'; o2.innerHTML='<div id="intro-num" style="font-size:112px;font-weight:900;color:#f8fafc;line-height:1"></div><div id="intro-tip" style="font-size:17px;color:#94a3b8"></div>'; document.body.appendChild(o2); }
+    if(!ov){ var o2=document.createElement('div'); o2.id='intro-ov'; o2.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(6,10,23,.84);'; o2.innerHTML='<div id="intro-num" style="font-size:112px;font-weight:900;color:#f8fafc;line-height:1"></div><div id="intro-tip" style="font-size:17px;color:#94a3b8"></div>'; document.body.appendChild(o2); setTimeout(function(){ var o3=document.getElementById('intro-ov'); if(o3) o3.remove(); },4500); }
     var num=document.getElementById('intro-num'), tip=document.getElementById('intro-tip');
     if(num) num.textContent=n; if(tip) tip.textContent='准备…';
     try{beep(440,0.08,'square',0.1);}catch(e){}
@@ -328,6 +343,7 @@ function guestIntro(n){
 /* ============ 渲染分派 ============ */
 function render(){
   if(!S.mod){ renderHall(); }
+  else if(S.mod==='dungeon'){ renderDungeon(); }
   else if(S.mod==='catch'){ renderCatchMenu(); }
   else if(S.mod==='shield'){ renderShield(); }
   else if(S.mod==='beam'){ renderBeam(); }
@@ -343,6 +359,7 @@ function renderHall(){
   document.getElementById('app').innerHTML=
     '<h1>🎮 玩法试炼场 · roomlab-v9</h1>'+
     '<p class="sub">把单个玩法独立试玩，测「好不好玩」；确定哪些好玩，再按密室主题嵌套组合。</p>'+
+    '<div class="howto">🏰 <b>新模式 · 密室爬塔</b>：把多个玩法串成一条<b>分支地图</b>，双人站到同一节点进入玩法，共用血条，走到终点 Boss。<button class="btn primary" id="dg-enter" style="margin-top:8px">▶ 进入密室爬塔</button></div>'+
     '<div class="howto">📱 <b>怎么玩</b>：① <b>协作玩法</b>：两台设备各打开<b>同一个链接</b> → 挑玩法 → 各选「当 A / 当 B」→ 开语音协作（零服务器）。② <b>同屏玩法（🧺 物资空投）</b>：一台设备，两人各按住半边屏幕。<b>绝对不要看对方屏幕</b>。</div>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
@@ -357,6 +374,7 @@ function renderHall(){
         '</div>';
     }).join('')+
     '</div>';
+  var dg=$('dg-enter'); if(dg) dg.onclick=function(){ location.href='?m=dungeon'; };
   document.querySelectorAll('[data-a]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.a,'A'); }; });
   document.querySelectorAll('[data-b]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.b,'B'); }; });
   document.querySelectorAll('[data-same]').forEach(function(b){ b.onclick=function(){ setSame(this.dataset.same); }; });
@@ -379,9 +397,532 @@ function renderSame(){
       '<button class="btn sm" id="again">再来一局</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   $('again').onclick=function(){ renderSame(); };
   introGo(null, function(){ startCountdown(); runCatch(set); });
+}
+
+/* ============ 🏰 密室爬塔（地图层） ============
+   参考杀戮尖塔：多分支节点地图 → 双人站同一节点 + 3 秒读条进入玩法 → 共用血条。
+   胜利解锁后续节点；失败扣 1 血（可重开，胜利才解锁）；血尽 = 密室失败退出。
+   休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
+var DUNGEON=null;
+var EV_POOL=['catch','shield','beam','beat','bridge'];
+function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
+function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
+function dgNodeLabel(n){
+  if(n.type==='rest') return '休息点';
+  if(n.type==='boss') return 'Boss';
+  if(n.type==='start') return '起点';
+  var p=dgPG(n.mode); return p?p.icon+' '+p.name:n.mode;
+}
+function dgReachable(id){
+  var n=dgNode(id);
+  if(!n || n.done || n.type==='start') return false;
+  if(DUNGEON.locked[id]) return false; // 已选别的分支，此路封死
+  return n.prev.some(function(pid){ var p=dgNode(pid); return p && p.done; });
+}
+function newDungeon(){
+  var nodes=[], idc=0;
+  function N(layer,type,extra){ var o=Object.assign({id:'n'+(idc++),layer:layer,type:type,x:0,y:0,done:false,next:[],prev:[],mode:null},extra||{}); nodes.push(o); return o; }
+  function L(a,b){ a.next.push(b.id); b.prev.push(a.id); }
+  var start=N(0,'start',{done:true});
+  var L1=[N(1,'event',{mode:rnd(EV_POOL)}),N(1,'event',{mode:rnd(EV_POOL)}),N(1,'event',{mode:rnd(EV_POOL)})];
+  var L2=[N(2,'event',{mode:rnd(EV_POOL)}),N(2,'rest'),N(2,'event',{mode:rnd(EV_POOL)})];
+  var L3=[N(3,'event',{mode:rnd(EV_POOL)}),N(3,'event',{mode:rnd(EV_POOL)})];
+  var boss=N(4,'boss');
+  L1.forEach(function(n){ L(start,n); });
+  L1.forEach(function(n,i){ L2.forEach(function(m,j){ if(j===i||j===i+1) L(n,m); }); });
+  L2.forEach(function(n,i){ L3.forEach(function(m,j){ if(i===j||i===j+1) L(n,m); }); });
+  L3.forEach(function(n){ L(n,boss); });
+  // 纵向树状布局：起点在底部(y88)，Boss 在顶部(y16)，层内节点横向均分
+  nodes.forEach(function(n){
+    var arr=nodes.filter(function(o){return o.layer===n.layer;});
+    var idx=arr.indexOf(n), cnt=arr.length;
+    n.x = cnt===1 ? 50 : (16 + idx*(68/(cnt-1)));
+    n.y = [88,71,54,37,20][n.layer];
+  });
+  DUNGEON={ hp:5, maxHp:5, nodes:nodes, start:start.id, boss:boss.id, cur:'A', posA:start.id, posB:start.id, locked:{}, over:false, win:false, _t:null };
+  // 连通性自检：从起点可达全部节点，且每个节点最终都能到 Boss（分支不允许是死路），不满足则重开一局图
+  window._dgTries=(window._dgTries||0)+1;
+  if(window._dgTries>5) return; // 防死循环
+  function reachFrom(id,dir){ var seen={},st=[id]; while(st.length){ var c=st.pop(); if(seen[c]) continue; seen[c]=1; var nd=dgNode(c); (dir==='up'?nd.next:nd.prev).forEach(function(x){ if(!seen[x]) st.push(x); }); } return seen; }
+  var fromStart=reachFrom(DUNGEON.start,'up'), toBoss=reachFrom(DUNGEON.boss,'down'), ok=true;
+  DUNGEON.nodes.forEach(function(n){ if(!fromStart[n.id]||!toBoss[n.id]) ok=false; });
+  if(!ok){ newDungeon(); return; }
+  window._dgTries=0;
+}
+function dgMsg(html){ var m=$('dgmsg'); if(m){ m.innerHTML=html; m.style.display='block'; } }
+function dgMoveIcons(){
+  var ia=$('dg-iconA'), ib=$('dg-iconB'), box=$('dgmap');
+  var bw=box?box.clientWidth:360, bh=540;
+  var na=dgNode(DUNGEON.posA), nb=dgNode(DUNGEON.posB);
+  if(ia&&na){ ia.style.left=(na.x/100*bw-22)+'px'; ia.style.top=(na.y/100*bh-13)+'px'; }
+  if(ib&&nb){ ib.style.left=(nb.x/100*bw+1)+'px'; ib.style.top=(nb.y/100*bh-11)+'px'; }
+  var c=$('dg-cur'); if(c) c.textContent = window._netMode==='host' ? '你控 A 🔵' : (window._netMode==='guest' ? '你控 B 🟠' : '操作：'+(DUNGEON.cur==='A'?'A 🔵':'B 🟠'));
+  if(ia){ if(window._netMode==='guest'){ ia.onclick=null; ia.style.opacity=.55; } else { ia.onclick=function(){ DUNGEON.cur='A'; dgMoveIcons(); }; ia.style.opacity=DUNGEON.cur==='A'?1:.45; } }
+  if(ib){ if(window._netMode==='host'){ ib.onclick=null; ib.style.opacity=.55; } else { ib.onclick=function(){ DUNGEON.cur='B'; dgMoveIcons(); }; ib.style.opacity=DUNGEON.cur==='B'?1:.45; } }
+}
+function dgDrawMap(){
+  var box=$('dgmap'); if(!box) return;
+  box.style.cssText='position:relative;width:100%;max-width:430px;height:540px;margin:0 auto;background:linear-gradient(180deg,#fdf6e3,#f3e9d2);border-radius:14px;overflow:hidden';
+  var boxW=box.clientWidth||360, boxH=540, NS=52; // 节点正圆直径 52px
+  function cx(n){ return n.x/100*boxW; }
+  function cy(n){ return n.y/100*boxH; }
+  // 连线：显示全部结构（决策用），颜色区分状态——已通关绿 / 当前可走橙 / 未解锁淡灰虚线
+  var lines=[];
+  DUNGEON.nodes.forEach(function(n){
+    n.prev.forEach(function(pid){ var p=dgNode(pid); if(!p) return;
+      var x1=cx(p), y1=cy(p)+NS/2, x2=cx(n), y2=cy(n)-NS/2, mid=(y1+y2)/2;
+      var isActive=p.done&&dgReachable(n.id), isDone=p.done&&n.done;
+      var stroke=isActive?'rgba(245,158,11,.9)':(isDone?'rgba(82,196,26,.7)':'rgba(168,162,158,.35)');
+      var w=isActive?3:2, dash=(!isActive&&!isDone)?' stroke-dasharray="4 5"':'';
+      lines.push('<path d="M '+x1.toFixed(1)+' '+y1.toFixed(1)+' C '+x1.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+y2.toFixed(1)+'" fill="none" stroke="'+stroke+'" stroke-width="'+w+'" stroke-linecap="round"'+dash+'/>');
+    });
+  });
+  box.innerHTML='<svg style="position:absolute;left:0;top:0;width:100%;height:100%">'+lines.join('')+'</svg>';
+  DUNGEON.nodes.forEach(function(n){
+    var lbl = n.type==='start'?'🚪':(n.type==='rest'?'🏕️':(n.type==='boss'?'👑':dgPG(n.mode).icon));
+    var can=dgReachable(n.id);
+    var d=document.createElement('div');
+    d.dataset.id=n.id;
+    d.style.cssText='position:absolute;left:'+(cx(n)-NS/2)+'px;top:'+(cy(n)-NS/2)+'px;width:'+NS+'px;height:'+NS+'px;display:flex;align-items:center;justify-content:center;font-size:26px;border-radius:50%;cursor:'+(can?'pointer':'default')+';background:'+(n.done?'rgba(82,196,26,.32)':(can?'rgba(255,255,255,.96)':'rgba(255,255,255,.42)'))+';box-shadow:0 0 0 '+(can?'2.5px':'1px')+' '+(can?'#f59e0b':'#d6d3d1')+';opacity:'+(can||n.done?1:.42);
+    d.innerHTML=lbl;
+    if(n.type==='event'&&can){ var nm=document.createElement('div'); nm.style.cssText='position:absolute;left:50%;bottom:100%;margin-bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#78716c;white-space:nowrap;background:rgba(255,255,255,.92);padding:2px 6px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.1)'; nm.textContent=dgPG(n.mode).name; d.appendChild(nm); }
+    if(n.type==='event'&&!can&&!n.done){ var lk=document.createElement('div'); lk.style.cssText='position:absolute;left:50%;top:-5px;transform:translateX(-50%);font-size:11px'; lk.textContent='🔒'; d.appendChild(lk); }
+    if(can){ var ring=document.createElement('div'); ring.id='ring-'+n.id; ring.style.cssText='position:absolute;left:-9px;top:-9px;right:-9px;bottom:-9px;border-radius:50%;pointer-events:none;display:none;filter:drop-shadow(0 0 6px rgba(245,158,11,.9));'; ring.innerHTML='<svg width="100%" height="100%" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5" fill="none" stroke="rgba(245,158,11,.95)" stroke-width="5" stroke-linecap="round" stroke-dasharray="110" stroke-dashoffset="110" transform="rotate(-90 20 20)"><animate attributeName="stroke-dashoffset" from="110" to="0" dur="3s" fill="freeze"/></circle></svg>'; d.appendChild(ring); }
+    d.onclick=function(){ dgTap(n.id); };
+    box.appendChild(d);
+  });
+  var ia=document.createElement('div'); ia.id='dg-iconA'; ia.style.cssText='position:absolute;z-index:6;width:24px;height:24px;font-size:20px;line-height:24px;text-align:center;transition:left .25s,top .25s;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));cursor:pointer'; ia.textContent='🔵'; box.appendChild(ia);
+  var ib=document.createElement('div'); ib.id='dg-iconB'; ib.style.cssText='position:absolute;z-index:7;width:22px;height:22px;font-size:18px;line-height:22px;text-align:center;transition:left .25s,top .25s;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));cursor:pointer'; ib.textContent='🟠'; box.appendChild(ib);
+  var leg=document.createElement('div'); leg.style.cssText='position:absolute;left:0;right:0;bottom:5px;text-align:center;font-size:10.5px;color:#a8a29e;line-height:1.6';
+  leg.innerHTML='<span style="color:#f59e0b;font-weight:800">━</span> 可走 &nbsp;<span style="color:#52c41a">━</span> 已通 &nbsp;<span style="color:#c4bfb8">┅</span> 未解锁<br>'+(window._netMode==='host'?'你控 A 🔵，点节点移动；同伴控 B 🟠':(window._netMode==='guest'?'你控 B 🟠，点节点移动；同伴控 A 🔵':'🔵/🟠 点图标切换 · 点节点移动 · 同点 3 秒进入'))+'</div>';
+  box.appendChild(leg);
+  dgMoveIcons();
+  dgMsg('从底部起点出发，两人轮流把自己的图标沿连线向上移动，站到同一个可进节点 3 秒进入玩法。❤️ 失败 -1，胜利才解锁。');
+}
+function renderDungeon(){
+  if(DUNGEON && DUNGEON.over){ renderDungeonOver(DUNGEON.win); return; }
+  if(!DUNGEON){ renderDungeonMenu(); return; }
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._dungeon=true; S.mod='dungeon';
+  var app=document.getElementById('app');
+  var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge n">🏰 密室爬塔</span><span class="badge A" id="dg-hp">'+hpStr+'</span>'+
+    '<span class="count" style="font-size:13px" id="dg-cur">操作：A</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
+    '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ if(window._netMode){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; DUNGEON=null; location.search=''; } else { window._dungeon=false; location.search=''; } };
+  dgDrawMap();
+}
+/* ============ 密室爬塔 · 联网房间（host 权威 / guest 同步） ============ */
+function renderDungeonMenu(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._dgStarted=false; DUNGEON=null;
+  S.mod='dungeon';
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<h1>🏰 密室爬塔 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
+    '<p class="sub">双人把多个合作玩法串成一条分支地图：各自控制自己的小人沿连线走，站到同一个节点 3 秒进入玩法，共用 ❤️ 血条（失败 -1 / 休息 +1），一路爬到 Boss。走错分支会被锁定，考验路线决策。</p>'+
+    '<div class="howto">📡 <b>联网模式</b>：房主创建房间，同伴输码加入，<b>房主管 A 🔵、加入者管 B 🟠</b>，各在自己手机上控制自己，画面实时同步、结算同时。<br>📱 <b>一台设备</b>：两人共用一台设备轮流操作。</div>'+
+    '<div class="roles">'+
+      '<div class="rolecard a" id="dm1"><p class="rt" style="color:#60a5fa">📱 一台设备 · 双人轮流</p><p class="rd">两人共用一台设备，点图标切换 A/B 轮流走位，零联网。</p></div>'+
+      '<div class="rolecard a" id="dm2"><p class="rt" style="color:#60a5fa">📡 联网 · 创建房间（我控 A 🔵）</p><p class="rd">生成 4 位房间码发给同伴，等对方加入后一起爬塔。</p></div>'+
+      '<div class="rolecard b" id="dm3"><p class="rt" style="color:#fb923c">📡 联网 · 加入房间（我控 B 🟠）</p><p class="rd">输入房主的房间码加入，接管你的橙色小人。</p></div>'+
+    '</div>';
+  $('dm1').onclick=function(){ newDungeon(); renderDungeon(); };
+  $('dm2').onclick=function(){ renderHostDungeon(); };
+  $('dm3').onclick=function(){ renderDungeonJoin(); };
+}
+function dgSnapshot(){ return { hp:DUNGEON.hp, maxHp:DUNGEON.maxHp, posA:DUNGEON.posA, posB:DUNGEON.posB, over:DUNGEON.over, win:DUNGEON.win,
+  nodes:DUNGEON.nodes.map(function(n){ return {id:n.id, done:n.done, locked:!!DUNGEON.locked[n.id]}; }) }; }
+function dgBroadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'dg', d:dgSnapshot()}); }catch(e){} } }
+function applyDungeon(dd){
+  if(!DUNGEON) newDungeon();
+  DUNGEON.hp=dd.hp; DUNGEON.maxHp=dd.maxHp; DUNGEON.posA=dd.posA; DUNGEON.posB=dd.posB; DUNGEON.over=dd.over; DUNGEON.win=dd.win;
+  DUNGEON.locked={};
+  dd.nodes.forEach(function(sn){ var n=dgNode(sn.id); if(n){ n.done=sn.done; if(sn.locked) DUNGEON.locked[sn.id]=true; } });
+}
+function renderDungeonHostMap(){
+  window._dungeon=true; S.mod='dungeon';
+  var app=document.getElementById('app');
+  var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 密室爬塔</span>'+
+    '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
+    '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; DUNGEON=null; location.search=''; };
+  dgDrawMap();
+}
+function renderDungeonGuestMap(code){
+  window._dungeon=true; S.mod='dungeon';
+  var app=document.getElementById('app');
+  var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你控 B 🟠</span><span class="badge n">🏰 房间 '+code+'</span>'+
+    '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
+    '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; DUNGEON=null; location.search=''; };
+  dgDrawMap();
+}
+function dgHostOnData(dd){
+  if(dd.t==='mvB'){ hostMoveB(dd.id); }
+  else if(dd.t==='in'){ PEER.gdir=dd.v?1:0; }
+  else if(dd.t==='in2'){ hostSetInput(dd.which, dd.v); }
+  else if(dd.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(dd.who); }
+  else if(dd.t==='dgAbort'){ dungeonAbort(); }
+  else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; setTimeout(function(){ location.search=''; },800); }
+}
+function renderHostDungeon(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='host'; window._dgStarted=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 密室联网</span><button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
+    '<div class="panel" id="dgroom"></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=gobackMenu;
+  var room=$('dgroom');
+  room.innerHTML='<div class="msg warn" style="text-align:center;font-size:15px;font-weight:700;margin:0">⏳ 正在连接服务…</div>';
+  loadPeerLib(function(P){
+    if(!P){ room.innerHTML='<div class="msg err">❌ 联网组件加载失败，检查网络后重试。</div>'; return; }
+    var code=Math.floor(1000+Math.random()*9000);
+    function tryHost(){
+      var p=newPeerId('room'+code, peerOpts());
+      var t=setTimeout(function(){ try{ p.destroy(); }catch(e){} room.innerHTML='<div class="msg warn">⏳ 连接超时，正在重试…</div>'; code=(code%9000)+1000; tryHost(); },15000);
+      p.on('open', function(){
+        clearTimeout(t);
+        PEER.peer=p; PEER.room=code; PEER.isHost=true;
+        room.innerHTML='📡 <b style="font-size:22px">房间码：'+code+'</b> <button id="copycode" type="button" style="font-size:13px;padding:6px 10px;border:none;border-radius:8px;background:#1e3a8a;color:#fff;cursor:pointer">复制</button><br>让同伴点「加入房间」输入这个码。<br><span style="color:#94a3b8">等待同伴加入…（你控 A 🔵）</span>';
+        var cc=$('copycode'); if(cc) cc.onclick=function(){ try{ navigator.clipboard.writeText(String(code)).then(function(){ cc.textContent='已复制 ✓'; setTimeout(function(){ cc.textContent='复制'; },2000); }); }catch(e){} };
+      });
+      p.on('connection', function(conn){
+        clearTimeout(t);
+        conn.on('open', function(){
+          PEER.conn=conn;
+          newDungeon();
+          dgBroadcast();
+          conn.on('data', function(dd){ if(!dd) return;
+            dgHostOnData(dd);
+          });
+          conn.on('close', function(){ if(window._netMode==='host'){ window._netMode=null; DUNGEON=null; window._dgStarted=false; } });
+          renderDungeonHostMap();
+        });
+      });
+      p.on('error', function(e){ if(e.type==='unavailable-id'){ try{p.destroy();}catch(_){} code=(code%9000)+1000; tryHost(); } });
+    }
+    tryHost();
+  });
+}
+function renderDungeonJoin(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='guest'; window._dgStarted=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你控 B 🟠</span><span class="badge n">🏰 联网</span><button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
+    '<div class="panel"><h3>📡 输入房主的房间码</h3>'+
+    '<div style="margin:10px 0"><input id="rc" inputmode="numeric" maxlength="4" placeholder="输入 4 位房间码" style="width:100%;height:64px;font-size:28px;font-weight:800;text-align:center;letter-spacing:8px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc;box-sizing:border-box;outline:none"></div>'+
+    '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
+    '<div id="jmsg"></div></div>';
+  $('back').onclick=gobackMenu;
+  $('rc').oninput=function(){ this.value=this.value.replace(/\D/g,''); };
+  $('joing').onclick=function(){
+    var code=($('rc').value||'').replace(/\D/g,'');
+    if(code.length!==4){ $('jmsg').innerHTML='<div class="msg err" style="margin-top:8px">请输入 4 位房间码</div>'; return; }
+    startDungeonGuest(code);
+  };
+}
+function dgGuestOnData(dd){
+  if(dd.t==='dg'){ applyDungeon(dd.d); }
+  else if(dd.t==='dgcd'){ if(dd.n>0){ showDgBar(dd.id); } else { hideDgBar(); } }
+  else if(dd.t==='dgEnd'){ window._dungeon=false; if(dd.d) applyDungeon(dd.d); if(dd.over){ renderDungeonOver(!!dd.win); } else { S.mod='dungeon'; renderDungeonGuestMap(String(PEER.room||'')); } }
+  else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; renderDungeonMenu(); }
+  else if(dd.t==='dgAbort'){ dungeonAbort(); }
+  else if(dd.t==='cd'){ guestIntro(dd.n); }
+  else if(dd.t==='st2'){ window._guestTwinState=dd.state; if(window._renderTwin) window._renderTwin(); }
+}
+function startDungeonGuest(code){
+  var jm=$('jmsg');
+  jm.innerHTML='<div class="msg warn" style="margin-top:8px">⏳ 正在连接房间 '+code+'…</div>';
+  loadPeerLib(function(P){
+    if(!P){ jm.innerHTML='<div class="msg err">❌ 联网组件加载失败。</div>'; return; }
+    var p=newPeerId(null, peerOpts());
+    var t=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 连接超时。</div>'; try{p.destroy();}catch(e){} },15000);
+    p.on('open', function(){
+      var conn=p.connect('room'+code, {reliable:true});
+      PEER.peer=p; PEER.conn=conn; PEER.room=code; PEER.isHost=false;
+      var ct=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 找不到房间。</div>'; try{conn.close();p.destroy();}catch(e){} },12000);
+      conn.on('open', function(){ clearTimeout(ct); clearTimeout(t);
+        conn.on('data', function(dd){ if(!dd) return;
+          dgGuestOnData(dd);
+          if(dd.t==='dg' && S.mod==='dungeon'){ renderDungeonGuestMap(code); }
+          else if(dd.t==='enter'){
+            window._dungeon=true;
+            if(dd.mode==='rest'){ applyDungeon(dd.d); renderDungeonGuestMap(code); return; }
+            if(dd.mode==='boss'){ renderGuestBoss(code); return; }
+            window._dgNode=dd.node; S.mod=dd.mode;
+            if(dd.mode==='catch') renderGuestUI(String(code));
+            else if(dd.mode==='beat') renderGuestBeat(String(code));
+            else if(dd.mode==='shield') renderGuestShield(String(code));
+            else if(dd.mode==='beam') renderGuestBeam(String(code));
+            else if(dd.mode==='bridge') renderGuestBridge(String(code));
+          }
+        });
+      });
+      conn.on('error', function(){ clearTimeout(ct); jm.innerHTML='<div class="msg err">✘ 连接失败。</div>'; });
+    });
+    p.on('error', function(e){ jm.innerHTML='<div class="msg err">✘ 连接出错（'+e.type+'）。</div>'; });
+  });
+}
+function dgTapHost(id){
+  var n=dgNode(id); if(!n) return;
+  var cur=dgNode(DUNGEON.posA);
+  var adjacent=cur && (cur.next.indexOf(id)>=0||cur.prev.indexOf(id)>=0);
+  if(!adjacent){ dgMsg('只能沿着地图<b>连线</b>走，不能跳到别的分支。'); return; }
+  var moveable=n.done||dgReachable(id);
+  if(!moveable){ dgMsg('这里还不能去（需先通关它前面的关卡）。'); return; }
+  dgBreakRing();
+  DUNGEON.posA=id; dgMoveIcons(); dgBroadcast();
+  dgCheckRing();
+}
+function dgTapGuest(id){
+  var n=dgNode(id); if(!n) return;
+  var cur=dgNode(DUNGEON.posB);
+  var adjacent=cur && (cur.next.indexOf(id)>=0||cur.prev.indexOf(id)>=0);
+  if(!adjacent){ dgMsg('只能沿着地图<b>连线</b>走，不能跳到别的分支。'); return; }
+  netSend({t:'mvB', id:id});
+}
+function hostMoveB(id){
+  var n=dgNode(id); if(!n) return;
+  var cur=dgNode(DUNGEON.posB);
+  var adjacent=cur && (cur.next.indexOf(id)>=0||cur.prev.indexOf(id)>=0);
+  if(!adjacent) return;
+  var moveable=n.done||dgReachable(id);
+  if(!moveable) return;
+  dgBreakRing();
+  DUNGEON.posB=id; dgMoveIcons(); dgBroadcast();
+  dgCheckRing();
+}
+function dgBreakRing(){
+  clearTimeout(DUNGEON._t); DUNGEON._t=null;
+  hideDgBar();
+  netSend({t:'dgcd', n:0});
+  DUNGEON.nodes.forEach(function(x){ var r=document.getElementById('ring-'+x.id); if(r) r.style.display='none'; });
+}
+function dgCheckRing(){
+  var id=DUNGEON.posA;
+  if(id!==DUNGEON.posB) return;
+  var n=dgNode(id); if(!n) return;
+  if(n.done || !dgReachable(id)) return;
+  var ring=document.getElementById('ring-'+id); if(ring) ring.style.display='block';
+  showDgBar(id);
+  dgMsg('两人已到 <b>'+dgNodeLabel(n)+'</b>，正在读条进入…（移动会取消）');
+  netSend({t:'dgcd', id:id, n:3});
+  var c=3;
+  var iv=setInterval(function(){ c--; if(c>0) netSend({t:'dgcd', id:id, n:c}); else clearInterval(iv); },1000);
+  DUNGEON._t=setTimeout(function(){
+    if(DUNGEON.posA!==id||DUNGEON.posB!==id) return;
+    hideDgBar();
+    var r2=document.getElementById('ring-'+id); if(r2) r2.style.display='none';
+    netSend({t:'dgcd', n:0});
+    dgEnterHost(id);
+  },3000);
+}
+function dgEnterHost(id){
+  var n=dgNode(id);
+  if(n.type==='boss'){ dgBossHost(); return; }
+  DUNGEON.nodes.forEach(function(x){ if(x.layer===n.layer && x.id!==id && !x.done){ DUNGEON.locked[x.id]=true; } });
+  if(n.type==='rest'){ dgRestHost(id); return; }
+  window._dungeon=true; window._dgNode=id; S.mod=n.mode;
+  dgBroadcast();
+  netSend({t:'enter', node:id, mode:n.mode});
+  if(n.mode==='catch'||n.mode==='beat'){ renderHost(); }
+  else if(n.mode==='shield'){ renderShieldHost(); }
+  else if(n.mode==='beam'){ renderBeamHost(); }
+  else if(n.mode==='bridge'){ renderBridgeHost(); }
+}
+function dgRestHost(id){
+  var n=dgNode(id);
+  if(DUNGEON.hp<DUNGEON.maxHp) DUNGEON.hp++;
+  n.done=true;
+  dgBroadcast();
+  netSend({t:'enter', node:id, mode:'rest', d:dgSnapshot()});
+  renderDungeonHostMap();
+  dgMsg('🏕️ 休息完毕！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
+}
+function dgBossHost(){
+  window._dungeon=true;
+  netSend({t:'enter', node:null, mode:'boss'});
+  renderDungeonBossUI();
+}
+function dgBossWin(){
+  DUNGEON.over=true; DUNGEON.win=true;
+  dgBroadcast();
+  netSend({t:'dgEnd', ok:true, over:true, win:true, d:dgSnapshot()});
+  renderDungeonOver(true);
+}
+function renderDungeonBossUI(){
+  window._dungeon=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge n">👑 Boss 密室</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
+    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
+    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
+    '<div style="color:#94a3b8;margin-bottom:20px">先把前面的密室流程跑通，Boss 玩法后面再定。</div>'+
+    '<button class="btn primary" id="boss-win" style="margin-right:8px">✔ 暂视为通关</button></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; DUNGEON=null; location.search=''; };
+  $('boss-win').onclick=function(){ dgBossWin(); };
+}
+function renderGuestBoss(code){
+  window._dungeon=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">👑 Boss 密室</span><span class="badge n">🏰 房间 '+code+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
+    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
+    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
+    '<div style="color:#94a3b8">等房主确认通关…</div></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; DUNGEON=null; location.search=''; };
+}
+function hostSetInput(which, v){
+  if(which==='r'){ window._inR=v; }
+  else if(which==='l'){ window._inL=v; }
+  else if(which==='bp'){ window._beatPressB=v; }
+}
+function showDgBar(id){
+  hideDgBar();
+  var el=document.querySelector('#dgmap [data-id="'+id+'"]');
+  var map=document.getElementById('dgmap');
+  if(!el||!map) return;
+  var pr=document.createElement('div');
+  pr.id='dg-nodeprogress';
+  pr.style.cssText='position:absolute;z-index:9;left:'+(parseFloat(el.style.left)-6)+'px;top:'+(parseFloat(el.style.top)+52+4)+'px;width:'+(52+12)+'px;height:10px;background:rgba(0,0,0,.16);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.28)';
+  pr.innerHTML='<div id="dg-np-fill" style="height:100%;width:0;background:linear-gradient(90deg,#fbbf24,#ea580c)"></div>'+
+    '<div id="dg-np-n" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:900;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.7)">3</div>';
+  map.appendChild(pr);
+  var f=$('dg-np-fill'); if(f){ f.style.transition='width 3s linear'; setTimeout(function(){ f.style.width='100%'; },30); }
+  clearInterval(window._dgBarIv);
+  var n=3;
+  window._dgBarIv=setInterval(function(){
+    n--; if(n>0){ var e=$('dg-np-n'); if(e) e.textContent=n; try{beep(760,0.07,'square',0.14);}catch(err){} } else { clearInterval(window._dgBarIv); }
+  },1000);
+}
+function hideDgBar(){ var b=document.getElementById('dg-nodeprogress'); if(b) b.remove(); clearInterval(window._dgBarIv); }
+function dgTap(id){
+  if(window._netMode==='host'){ dgTapHost(id); return; }
+  if(window._netMode==='guest'){ dgTapGuest(id); return; }
+  var n=dgNode(id);
+  if(!n) return;
+  // 先判断是否"真的会移动"：不满足则只提示、不打断正在进行的读条
+  var curId=(DUNGEON.cur==='A')?DUNGEON.posA:DUNGEON.posB;
+  var cur=dgNode(curId);
+  var adjacent=cur && (cur.next.indexOf(id)>=0 || cur.prev.indexOf(id)>=0);
+  if(!adjacent){ dgMsg('只能沿着地图<b>连线</b>走，不能跳到别的分支。'); return; }
+  var moveable = n.done || dgReachable(id);
+  if(!moveable){ dgMsg('这里还不能去（需先通关它前面的关卡）。'); return; }
+  // 确认要移动 → 才打断活跃读条
+  clearTimeout(DUNGEON._t); DUNGEON._t=null;
+  hideDgBar();
+  DUNGEON.nodes.forEach(function(x){ var r=document.getElementById('ring-'+x.id); if(r) r.style.display='none'; });
+  if(DUNGEON.cur==='A') DUNGEON.posA=id; else DUNGEON.posB=id;
+  dgMoveIcons();
+  var enterable = !n.done && dgReachable(id);
+  if(DUNGEON.posA===id && DUNGEON.posB===id && enterable){
+    var ring=document.getElementById('ring-'+id); if(ring) ring.style.display='block';
+    showDgBar(id);
+    dgMsg('两人已到 <b>'+dgNodeLabel(n)+'</b>，正在读条进入…（移动会取消）');
+    DUNGEON._t=setTimeout(function(){
+      if(DUNGEON.posA!==id || DUNGEON.posB!==id) return;
+      hideDgBar();
+      var r2=document.getElementById('ring-'+id); if(r2) r2.style.display='none';
+      dgEnter(id);
+    },3000);
+  } else if(DUNGEON.posA===id && DUNGEON.posB===id){
+    dgMsg('两人已在「<b>'+dgNodeLabel(n)+'</b>」，这里已通关或还不能进。');
+  } else {
+    dgMsg('还没站一起：<b>'+dgNodeLabel(n)+'</b> 需要两人都移过来。');
+  }
+}
+function dgEnter(id){
+  var n=dgNode(id);
+  if(n.type==='boss'){ dgBoss(); return; }
+  // 进入任意节点 = 选定这条分支：锁定同层其余未完成分支，避免回头改道
+  DUNGEON.nodes.forEach(function(x){ if(x.layer===n.layer && x.id!==id && !x.done){ DUNGEON.locked[x.id]=true; } });
+  if(n.type==='rest'){ dgRest(id); return; }
+  window._dungeon=true; window._dgNode=id;
+  S.mod=n.mode;
+  if(n.mode==='catch') renderSame();
+  else if(n.mode==='shield') renderShield();
+  else if(n.mode==='beam') renderBeam();
+  else if(n.mode==='beat') renderBeat();
+  else if(n.mode==='bridge') renderBridge();
+  var back=$('back'); if(back){ back.onclick=function(){ dungeonAbort(); }; back.textContent='返回地图'; }
+  var again=$('again'); if(again){ again.onclick=function(){ dungeonAbort(); }; }
+}
+function gobackMenu(){ if(window._dungeon){ dungeonAbort(); } else { location.search=''; } }
+function dungeonAbort(){
+  clearTimers();
+  if(window._netMode){ netSend({t:'dgAbort'}); }
+  if(window._netMode==='host'){ renderDungeonHostMap(); return; }
+  if(window._netMode==='guest'){ renderDungeonGuestMap(String(PEER.room||'')); return; }
+  window._dungeon=false; S.mod='dungeon';
+  renderDungeon();
+}
+function dungeonEnd(ok){
+  window._dungeon=false;
+  var n=dgNode(window._dgNode);
+  if(n && ok){ n.done=true; }
+  else if(n && !ok){
+    DUNGEON.hp--;
+    // 失败：退回进入该玩法前的上一节点（只能重走当前已锁定的分支）
+    var back=null;
+    for(var i=0;i<n.prev.length;i++){ var p=dgNode(n.prev[i]); if(p && p.done){ back=p.id; break; } }
+    if(back){ DUNGEON.posA=back; DUNGEON.posB=back; }
+    if(DUNGEON.hp<=0){ DUNGEON.over=true; DUNGEON.win=false;
+      if(window._netMode==='host'){ dgBroadcast(); netSend({t:'dgEnd', ok:ok, over:true, win:false, d:dgSnapshot()}); }
+      renderDungeonOver(false); return; }
+  }
+  S.mod='dungeon';
+  if(window._netMode==='host'){ dgBroadcast(); netSend({t:'dgEnd', ok:ok, over:false, d:dgSnapshot()}); renderDungeonHostMap(); }
+  else if(window._netMode==='guest'){ return; } // guest 由 host 的 dgEnd 驱动
+  else { renderDungeon(); }
+  if(!ok && n) dgMsg('💔 全队 -1！已退回「'+dgNodeLabel(back?dgNode(back):dgNode(DUNGEON.start))+'」，只能重走这条分支。');
+}
+function dgRest(id){
+  var n=dgNode(id);
+  if(DUNGEON.hp<DUNGEON.maxHp) DUNGEON.hp++;
+  n.done=true;
+  renderDungeon();
+  dgMsg('🏕️ 休息完毕！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
+}
+function dgBoss(){
+  window._dungeon=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge n">👑 Boss 密室</span><span class="count">--s</span><button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
+    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
+    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
+    '<div style="color:#94a3b8;margin-bottom:20px">先把前面的密室流程跑通，Boss 玩法后面再定。</div>'+
+    '<button class="btn primary" id="boss-win" style="margin-right:8px">✔ 暂视为通关</button><button class="btn" id="boss-back">返回地图</button></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=function(){ dungeonAbort(); };
+  $('boss-win').onclick=function(){ DUNGEON.over=true; DUNGEON.win=true; renderDungeonOver(true); };
+  $('boss-back').onclick=function(){ dungeonAbort(); };
+}
+function renderDungeonOver(win){
+  window._dungeon=false; S.mod='dungeon';
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div style="max-width:420px;margin:0 auto;text-align:center;padding:70px 20px">'+
+    '<div style="font-size:64px">'+(win?'🏆':'💔')+'</div>'+
+    '<div style="font-size:22px;font-weight:800;margin:14px 0">'+(win?'密室通关！':'密室失败…')+'</div>'+
+    '<div style="color:#94a3b8;margin-bottom:22px">'+(win?'你俩成功站到 Boss 面前——Boss 玩法待开发，先到这里。':'全队血条见底，双人被逐出密室。')+'</div>'+
+    '<button class="btn primary" id="dg-re">▶ 再来一局</button> <button class="btn" id="dg-hall">回大厅</button></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('dg-re').onclick=function(){ if(window._netMode==='host'){ newDungeon(); dgBroadcast(); renderDungeonHostMap(); return; } DUNGEON=null; renderDungeon(); };
+  $('dg-hall').onclick=function(){ if(window._netMode){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; } DUNGEON=null; window._dungeon=false; location.search=''; };
 }
 
 /* ---- 玩法 7：物资空投（单设备双人同屏 · A 控左 / B 控右 合力接物） ---- */
@@ -501,7 +1042,7 @@ function makeZone(side,setOn){
 }
 function loadPeerLib(cb){
   if(window.Peer){ return cb(window.Peer); }
-  var urls=['https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js'];
+  var urls=['peerjs.min.js','https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js','https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js'];
   var i=0;
   (function tryNext(){
     if(i>=urls.length){ return cb(null); }
@@ -522,7 +1063,11 @@ function peerOpts(id){
     o.host=h;
     o.port=parseInt((q.match(/[?&]peerPort=(\d+)/)||[])[1]||window._PEER_PORT||443,10);
     o.path=(q.match(/[?&]peerPath=([^&]+)/)||[])[1]||window._PEER_PATH||'/';
-    o.secure=((q.match(/[?&]peerSecure=([^&]+)/)||[])[1]||'1')!=='0';
+    // 安全默认：局域网 IP / localhost 走明文 ws（自建信令多为明文）；公网域名默认 wss。
+    // 显式 ?peerSecure=0/1 始终优先。
+    var secParam=(q.match(/[?&]peerSecure=([^&]+)/)||[])[1]||window._PEER_SECURE;
+    var hostIsLocal=/^(\d{1,3}\.){3}\d{1,3}$/.test(h)||h==='localhost'||h==='127.0.0.1';
+    o.secure= secParam!=null ? (String(secParam)!=='0') : !hostIsLocal;
   }
   if(id) o._id=id;
   return o;
@@ -565,19 +1110,27 @@ function renderBeatMenu(){
 }
 /* ---- 房主：创建房间 + 权威物理 + 广播 ---- */
 function renderHost(){
-  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='host'; window._guestSetDir=null;
+  clearTimers();
+  if(!window._dungeon){ closePeer(); }
+  clearNetZones(); window._dead=false; window._netMode='host'; window._guestSetDir=null;
   var app=document.getElementById('app');
   app.innerHTML=
     '<div class="topbar"><span class="badge A">'+(S.mod==='beat'?'房主 · 你按蓝音符 A':'房主 · 你控 ← 左移')+'</span><span class="badge n">'+(S.mod==='beat'?'🎵 联网':'🧺 联网')+'</span>'+
     '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+(S.mod==='beat'?30:CATCH_GOAL)+'</span>'+
-    '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">'+(window._dungeon?'返回地图':'回菜单')+'</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   var stg=$('stage');
   var roomBox=document.createElement('div'); roomBox.className='msg warn'; roomBox.style.cssText='text-align:center;font-size:15px;font-weight:700;margin:0';
   roomBox.innerHTML='⏳ 正在连接服务…';
   stg.appendChild(roomBox);
+  // 密室宿主：复用已有房间连接，不新建房间
+  if(window._dungeon && PEER.conn && PEER.conn.open){
+    roomBox.className='msg ok'; roomBox.innerHTML='✔ 已连接同伴，开局！';
+    startHostGame();
+    return;
+  }
   loadPeerLib(function(P){
     if(!P){ roomBox.innerHTML='<span class="err">❌ 联网组件加载失败，请检查网络后重试。</span>'; return; }
     var code=Math.floor(1000+Math.random()*9000);
@@ -608,9 +1161,8 @@ function renderHost(){
           PEER.conn=conn;
           roomBox.className='msg ok'; roomBox.innerHTML=S.mod==='beat'?'✔ 同伴已加入！你按蓝音符，他按橙音符，紫色要两人同时按。':'✔ 同伴已加入！开始！你控制 ← 左移，他控制 → 右移。';
           conn.on('data', function(d){ if(!d) return;
-            if(d.t==='in'){ PEER.gdir=d.v?1:0; }
-            else if(d.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(d.who); }
-            else if(d.t==='ask'){ netConfirmRestart(); }
+            dgHostOnData(d);
+            if(d.t==='ask'){ netConfirmRestart(); }
             else if(d.t==='ok'){ window._restartAwait=false; netStartNewRound(); }
             else if(d.t==='no'){ window._restartAwait=false; netAskCancel(); }
           });
@@ -799,8 +1351,8 @@ function startHostBeat(){
   }
   function msg(kind,txt){ window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
-  tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你：蓝音符按左半屏（或 ← / A 键）</div>'+
-    '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴：在他屏上按橙音符</div>';
+  tip.innerHTML='<div style="flex:1.3;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">🎮 你的按钮：蓝音符 · 按屏幕左半区<br><span style="font-weight:400;font-size:13px">（或 ← / A 键）</span></div>'+
+    '<div style="flex:0.7;text-align:center;background:#f8fafc;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:10px;padding:10px;font-size:12px">📱 同伴在他自己的手机上按橙音符</div>';
   pa.appendChild(tip);
   var zL=makeZone('l', function(v){ if(v) press('A'); });
   window._netZones=[zL];
@@ -846,7 +1398,7 @@ function renderJoin(){
     '<div style="margin:10px 0"><input id="rc" inputmode="numeric" maxlength="4" placeholder="输入 4 位房间码" style="width:100%;height:64px;font-size:28px;font-weight:800;text-align:center;letter-spacing:8px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc;box-sizing:border-box;outline:none"></div>'+
     '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
     '<div id="jmsg"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   $('rc').oninput=function(){ var v=this.value.replace(/\D/g,''); this.value=v; };
   $('joing').onclick=function(){
     var code=($('rc').value||'').replace(/\D/g,'');
@@ -880,7 +1432,7 @@ function renderGuestUI(code){
     '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   var tip=document.createElement('div'); tip.style.cssText='display:flex;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你 → 按住右半屏右移（或 → / L 键）</div>';
   $('playarea').appendChild(tip);
@@ -911,6 +1463,7 @@ function renderGuestUI(code){
   window._guestState=function(){ return last; };
   PEER.conn.on('data', function(d){
     if(!d) return;
+    dgGuestOnData(d);
     if(d.t==='st'){
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你控制 → 右移。'; } }
@@ -940,9 +1493,9 @@ function renderGuestBeat(code){
     '<button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   var tip=document.createElement('div'); tip.style.cssText='display:flex;margin:10px 0 4px';
-  tip.innerHTML='<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你：橙音符按右半屏（或 → / L 键）；紫色要两人同时按</div>';
+  tip.innerHTML='<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">🎮 你的按钮：橙音符 · 按屏幕右半区<br><span style="font-weight:400;font-size:13px">紫色要两人同时按</span></div>';
   $('playarea').appendChild(tip);
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; $('stage').appendChild(cv);
   var ctx=cv.getContext('2d');
@@ -974,6 +1527,7 @@ function renderGuestBeat(code){
   window._guestState=function(){ return last; };
   PEER.conn.on('data', function(d){
     if(!d) return;
+    dgGuestOnData(d);
     if(d.t==='st'){
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你按橙音符（B），紫色要两人同时按。'; } }
@@ -1004,7 +1558,7 @@ function dualFrame(badgeL,icon,name,badgeR,goalHtml){
     '<button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
     '<div class="panel"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
 }
 function dualTips(l,r){
   var pa=document.querySelector('#app .panel');
@@ -1300,6 +1854,249 @@ function runBridge(){
   window._bridgeMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
   window._bridgeStop=function(){ window._inL=window._inR=false; };
 }
+/* ============ 密室联网 · 同屏玩法 host/guest（实时同步） ============ */
+function dgPlayMsg(kind,txt){ window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+function dgTwinHostUI(badge,icon,name,goalHtml){
+  window._dungeon=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">'+badge+'</span><span class="badge n">'+icon+' '+name+' · 联网</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">'+goalHtml+'</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=gobackMenu;
+}
+function renderShieldHost(){ S.mod='shield'; dgTwinHostUI('房主 · 你守左半屏','🛡️','双人护盾','能量 0 / 20'); runShieldHost(); }
+function runShieldHost(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400,GOAL=20;
+  var sl={x:8,w:164,y:340},sr={x:168,w:164,y:340};
+  var rocks=[],next=280,energy=0,dur=3,done=false;
+  window._dead=false; window._inL=false; window._inR=false;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.strokeStyle='rgba(148,163,184,.35)'; ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    ctx.fillStyle='#60a5fa'; ctx.shadowColor='#60a5fa'; ctx.shadowBlur=10; ctx.fillRect(sl.x,sl.y-5,sl.w,10); ctx.shadowBlur=0;
+    ctx.fillStyle='#fb923c'; ctx.shadowColor='#fb923c'; ctx.shadowBlur=10; ctx.fillRect(sr.x,sr.y-5,sr.w,10); ctx.shadowBlur=0;
+    rocks.forEach(function(r){ ctx.fillStyle='#a78bfa'; ctx.beginPath(); ctx.arc(r.x,r.y,9,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('☄',r.x,r.y); });
+    ctx.fillStyle='#334155'; ctx.fillRect(8,H-20,52,8); ctx.fillStyle='#ef4444'; ctx.fillRect(8,H-20,52*dur/3,8);
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('耐久 '+dur,8,H-25);
+  }
+  function broadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'st2',mode:'shield',state:{sl:sl,sr:sr,rocks:rocks.map(function(r){return{x:r.x,y:r.y};}),energy:energy,dur:dur,done:done,dead:window._dead,msg:window._lastMsg||null,goal:GOAL}}); }catch(e){} } }
+  function loop(){
+    if(done||window._dead) return;
+    next-=16;
+    if(next<=0){ rocks.push({x:14+Math.random()*(W-28),y:-12,vy:1.5+energy*0.045+Math.random()*0.6}); next=Math.max(250,620-energy*28)+Math.random()*220; }
+    sl.y += window._inL?-3.4:2.0; sr.y += window._inR?-3.4:2.0;
+    sl.y=Math.max(190,Math.min(360,sl.y)); sr.y=Math.max(190,Math.min(360,sr.y));
+    for(var i=rocks.length-1;i>=0;i--){
+      var r=rocks[i]; r.y+=r.vy; r.vy+=0.02;
+      var sh=(r.x>=sl.x&&r.x<=sl.x+sl.w)?sl:((r.x>=sr.x&&r.x<=sr.x+sr.w)?sr:null);
+      if(sh){
+        var guardUp=(sh===sl)?window._inL:window._inR;
+        if(guardUp&&r.y+8>=sh.y-5&&r.y-8<=sh.y+5){
+          energy++; beep(660,0.08,'square',0.1); dgPlayMsg('ok','✔ 挡下陨石！能量 '+energy+' / '+GOAL);
+          $('goal').textContent='能量 '+energy+' / '+GOAL; rocks.splice(i,1);
+          if(energy>=GOAL){ done=true; finish(true); return; }
+        } else if(r.y>H){
+          dur--; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 漏了陨石！耐久 -1（剩 '+dur+'）'); rocks.splice(i,1);
+          if(dur<=0){ explode('护盾被击穿'); return; }
+        }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; });
+  window._netZones=[zl];
+  S.started=Date.now(); S.time=60;
+  introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+    startCountdown();
+    timers.push(setInterval(loop,16));
+    timers.push(setInterval(broadcast,66));
+  });
+  window._shieldState=function(){ return {energy:energy,dur:dur,dead:window._dead}; };
+  window._hostInject=function(x){ rocks.push({x:x,y:120,vy:1.0}); };
+}
+function renderBeamHost(){ S.mod='beam'; dgTwinHostUI('房主 · 你抬左端','🏗️','双人抬梁','砖块 0 / 20'); runBeamHost(); }
+function runBeamHost(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400,X1=40,X2=300,GOAL=20,LIMIT=5,CENTER=(40+300)/2,HOLE=18;
+  var yL=300,yR=300,bricks=[],next=420,got=0,spills=0,t=0,done=false;
+  window._dead=false; window._inL=false; window._inR=false;
+  function lineY(x){ return yL+(yR-yL)*(x-X1)/(X2-X1); }
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.strokeStyle='#94a3b8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(X1,yL); ctx.lineTo(X2,yR); ctx.stroke(); ctx.lineWidth=1;
+    ctx.fillStyle='#60a5fa'; ctx.beginPath(); ctx.arc(X1,yL,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fb923c'; ctx.beginPath(); ctx.arc(X2,yR,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(250,204,21,.5)'; ctx.fillRect(CENTER-HOLE,352,HOLE*2,8);
+    ctx.fillStyle='#a16207'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText('收集口',CENTER,372);
+    bricks.forEach(function(b){ var by=b.on?lineY(b.x):b.y; ctx.fillStyle=b.on?'#f59e0b':'#e2e8f0'; ctx.fillRect(b.x-12,by-6,24,12); ctx.strokeStyle='#64748b'; ctx.strokeRect(b.x-12,by-6,24,12); });
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('失误 '+spills+' / '+LIMIT,8,H-12);
+  }
+  function broadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'st2',mode:'beam',state:{yL:yL,yR:yR,bricks:bricks.map(function(b){return{x:b.x,y:b.y,on:b.on};}),got:got,spills:spills,done:done,dead:window._dead,msg:window._lastMsg||null,goal:GOAL,LIMIT:LIMIT,CENTER:CENTER,X1:X1,X2:X2,HOLE:HOLE}}); }catch(e){} } }
+  function loop(){
+    if(done||window._dead) return;
+    t+=16; next-=16;
+    if(next<=0){ bricks.push({x:60+Math.random()*(W-120),y:-12,vy:1.3+got*0.04+Math.random()*0.5,on:false}); next=Math.max(280,640-got*30)+Math.random()*240; }
+    var sway=Math.sin(t*0.0013)*0.3+Math.sin(t*0.0005+2.1)*0.4;
+    if(window._inL) yL-=3; else yL+=1.2+sway;
+    if(window._inR) yR-=3; else yR+=1.2-sway;
+    yL=Math.max(180,Math.min(340,yL)); yR=Math.max(180,Math.min(340,yR));
+    for(var i=bricks.length-1;i>=0;i--){
+      var b=bricks[i];
+      if(!b.on){
+        b.y+=b.vy; b.vy+=0.02;
+        if(b.y>=lineY(b.x)&&b.x>=X1&&b.x<=X2){ b.on=true; beep(440,0.06,'sine',0.08); }
+        else if(b.y>H){ bricks.splice(i,1); }
+      } else {
+        b.x += (yR-yL)/(X2-X1)*2.4;
+        if(Math.abs(b.x-CENTER)<=HOLE){ got++; beep(660,0.08,'square',0.1); dgPlayMsg('ok','✔ 砖滚进收集口！'+got+' / '+GOAL); $('goal').textContent='砖块 '+got+' / '+GOAL; bricks.splice(i,1);
+          if(got>=GOAL){ done=true; finish(true); return; } }
+        else if(b.x<X1-10||b.x>X2+10){ bricks.splice(i,1); spills++; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 砖滚出梁了！失误 '+spills+' / '+LIMIT);
+          if(spills>=LIMIT){ explode('梁塌了，砖全掉'); return; } }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; });
+  window._netZones=[zl];
+  S.started=Date.now(); S.time=60;
+  introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+    startCountdown();
+    timers.push(setInterval(loop,16));
+    timers.push(setInterval(broadcast,66));
+  });
+  window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead}; };
+  window._hostInject=function(x){ bricks.push({x:x,y:100,vy:0.8,on:false,tOn:0}); };
+}
+function renderBridgeHost(){ S.mod='bridge'; dgTwinHostUI('房主 · 你控 ← 左移','🌉','双人架桥','送达 0 / 5'); runBridgeHost(); }
+function runBridgeHost(){
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400,BOT=340,GOAL=5,LIMIT=5,EXIT=296;
+  var px=W/2,pv=0,pW=110,balls=[],next=460,delivered=0,drops=0,carrying=null,slide=0,prevDir=0,done=false;
+  window._dead=false; window._inL=false; window._inR=false;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    ctx.fillStyle='rgba(74,222,128,.25)'; ctx.fillRect(EXIT,0,W-EXIT,H);
+    ctx.fillStyle='#4ade80'; ctx.shadowColor='#4ade80'; ctx.shadowBlur=10; ctx.fillRect(px-pW/2,BOT-8,pW,10); ctx.shadowBlur=0;
+    ctx.fillStyle='#0b1220'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('桥',px,BOT-3);
+    ctx.strokeStyle='#22c55e'; ctx.beginPath(); ctx.moveTo(EXIT,0); ctx.lineTo(EXIT,H); ctx.stroke();
+    balls.forEach(function(b){ ctx.fillStyle='#38bdf8'; ctx.shadowColor='#38bdf8'; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(b.x,b.y,9,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; });
+    if(carrying){ ctx.fillStyle='#38bdf8'; ctx.shadowColor='#38bdf8'; ctx.shadowBlur=8; ctx.beginPath(); ctx.arc(px,BOT-16,9,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0; }
+    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('落地 '+drops+' / '+LIMIT,8,H-12);
+    ctx.fillStyle='#22c55e'; ctx.font='bold 11px sans-serif'; ctx.textAlign='right'; ctx.fillText('出口 →',W-8,H-12);
+  }
+  function broadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'st2',mode:'bridge',state:{px:px,pW:pW,balls:balls.map(function(b){return{x:b.x,y:b.y};}),carrying:!!carrying,delivered:delivered,drops:drops,done:done,dead:window._dead,msg:window._lastMsg||null,goal:GOAL,LIMIT:LIMIT,EXIT:EXIT,BOT:BOT}}); }catch(e){} } }
+  function loop(){
+    if(done||window._dead) return;
+    var dir=(window._inR?1:0)-(window._inL?1:0);
+    var dirFlip=prevDir!==0&&dir!==0&&dir!==prevDir;
+    prevDir=dir;
+    pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2,Math.min(W-pW/2,px));
+    if(carrying){
+      if(dirFlip){ balls.push({x:carrying.x,y:BOT-10,vy:0.4}); carrying=null; slide=0; drops++; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 球被甩掉了！失误 '+drops+' / '+LIMIT);
+        if(drops>=LIMIT){ explode('球全摔了'); return; } }
+      else if(px+pW/2>=EXIT){ delivered++; beep(660,0.1,'square',0.12); dgPlayMsg('ok','✔ 送达出口 '+delivered+' / '+GOAL); $('goal').textContent=delivered+' / '+GOAL; carrying=null; slide=0;
+        if(delivered>=GOAL){ done=true; finish(true); return; } }
+    } else {
+      next-=16;
+      if(next<=0){ balls.push({x:18+Math.random()*(W-36),y:-10,vy:1.3}); next=Math.max(420,1000-delivered*140)+Math.random()*300; }
+      for(var i=balls.length-1;i>=0;i--){
+        var b=balls[i]; b.y+=b.vy; b.vy+=0.02;
+        if(b.y+8>=BOT-8&&Math.abs(b.x-px)<=pW/2){ carrying=b; balls.splice(i,1); beep(440,0.08,'square',0.1); dgPlayMsg('warn','接住球！平缓运到右侧出口，别突然反向甩掉 →'); }
+        else if(b.y>H){ balls.splice(i,1); }
+      }
+    }
+    render();
+  }
+  var zl=makeZone('l',function(v){ window._inL=v; });
+  window._netZones=[zl];
+  S.started=Date.now(); S.time=60;
+  introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+    startCountdown();
+    timers.push(setInterval(loop,16));
+    timers.push(setInterval(broadcast,66));
+  });
+  window._bridgeState=function(){ return {delivered:delivered,drops:drops,px:px,carrying:!!carrying,dead:window._dead}; };
+  window._hostInject=function(x){ balls.push({x:x||px,y:120,vy:0.8}); };
+}
+/* 加入者：同屏玩法通用渲染（收 host st2 广播） */
+function renderGuestTwin(code, mode){
+  window._dungeon=true;
+  var app=document.getElementById('app');
+  app.innerHTML=
+    '<div class="topbar"><span class="badge B">加入者 · 你控 B</span><span class="badge n">'+({shield:'🛡️ 双人护盾',beam:'🏗️ 双人抬梁',bridge:'🌉 双人架桥'}[mode])+' · 房间 '+code+'</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">--</span>'+
+    '<button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
+    '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=gobackMenu;
+  var stg=$('stage');
+  var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
+  var ctx=cv.getContext('2d');
+  var W=340,H=400;
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(51,65,85,.5)';
+    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    var st=window._guestTwinState||null;
+    if(!st){ return; }
+    var g=$('goal');
+    if(mode==='shield'){
+      ctx.strokeStyle='rgba(148,163,184,.35)'; ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+      ctx.fillStyle='#60a5fa'; ctx.fillRect(st.sl.x,st.sl.y-5,st.sl.w,10);
+      ctx.fillStyle='#fb923c'; ctx.fillRect(st.sr.x,st.sr.y-5,st.sr.w,10);
+      st.rocks.forEach(function(r){ ctx.fillStyle='#a78bfa'; ctx.beginPath(); ctx.arc(r.x,r.y,9,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('☄',r.x,r.y); });
+      ctx.fillStyle='#334155'; ctx.fillRect(8,H-20,52,8); ctx.fillStyle='#ef4444'; ctx.fillRect(8,H-20,52*st.dur/3,8);
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('耐久 '+st.dur,8,H-25);
+      if(g) g.textContent='能量 '+st.energy+' / '+st.goal;
+    } else if(mode==='beam'){
+      function lineY(x){ return st.yL+(st.yR-st.yL)*(x-st.X1)/(st.X2-st.X1); }
+      ctx.strokeStyle='#94a3b8'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(st.X1,st.yL); ctx.lineTo(st.X2,st.yR); ctx.stroke(); ctx.lineWidth=1;
+      ctx.fillStyle='#60a5fa'; ctx.beginPath(); ctx.arc(st.X1,st.yL,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fb923c'; ctx.beginPath(); ctx.arc(st.X2,st.yR,7,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(250,204,21,.5)'; ctx.fillRect(st.CENTER-st.HOLE,352,st.HOLE*2,8);
+      ctx.fillStyle='#a16207'; ctx.font='bold 10px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText('收集口',st.CENTER,372);
+      st.bricks.forEach(function(b){ var by=b.on?lineY(b.x):b.y; ctx.fillStyle=b.on?'#f59e0b':'#e2e8f0'; ctx.fillRect(b.x-12,by-6,24,12); ctx.strokeStyle='#64748b'; ctx.strokeRect(b.x-12,by-6,24,12); });
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('失误 '+st.spills+' / '+st.LIMIT,8,H-12);
+      if(g) g.textContent='砖块 '+st.got+' / '+st.goal;
+    } else {
+      ctx.fillStyle='rgba(74,222,128,.25)'; ctx.fillRect(st.EXIT,0,W-st.EXIT,H);
+      ctx.fillStyle='#4ade80'; ctx.fillRect(st.px-st.pW/2,st.BOT-8,st.pW,10);
+      ctx.fillStyle='#0b1220'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('桥',st.px,st.BOT-3);
+      ctx.strokeStyle='#22c55e'; ctx.beginPath(); ctx.moveTo(st.EXIT,0); ctx.lineTo(st.EXIT,H); ctx.stroke();
+      st.balls.forEach(function(b){ ctx.fillStyle='#38bdf8'; ctx.beginPath(); ctx.arc(b.x,b.y,9,0,Math.PI*2); ctx.fill(); });
+      if(st.carrying){ ctx.fillStyle='#38bdf8'; ctx.beginPath(); ctx.arc(st.px,st.BOT-16,9,0,Math.PI*2); ctx.fill(); }
+      ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('落地 '+st.drops+' / '+st.LIMIT,8,H-12);
+      ctx.fillStyle='#22c55e'; ctx.font='bold 11px sans-serif'; ctx.textAlign='right'; ctx.fillText('出口 →',W-8,H-12);
+      if(g) g.textContent=st.delivered+' / '+st.goal;
+    }
+    if(st.msg){ var m=$('msg'); if(m){ m.className='msg '+(st.msg.kind||'warn'); m.textContent=st.msg.txt; } }
+  }
+  window._renderTwin=function(){ render(); };
+  var zr=makeZone('r',function(v){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'in2',which:'r',v:v}); }catch(e){} } });
+  window._netZones=[zr];
+  timers.push(setInterval(render,66));
+  window._guestTwinState=null;
+}
+function renderGuestShield(code){ renderGuestTwin(code,'shield'); }
+function renderGuestBeam(code){ renderGuestTwin(code,'beam'); }
+function renderGuestBridge(code){ renderGuestTwin(code,'bridge'); }
+
 
 /* ---- 玩法已定：选角色 ---- */
 function renderPickRole(){
@@ -1335,7 +2132,7 @@ function renderPlay(){
       '<button data-d="up">▲</button><button data-d="l">◀</button><button data-d="d">▼</button><button data-d="r">▶</button>'+
     '</div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   $('again').onclick=function(){ renderPlay(); };
   // 键盘
   window._keys={};
@@ -1869,7 +2666,7 @@ function renderManual(){
       '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 报密码 → ② 你按记录器记下 6 位 → ③ 原样报回给 A → ④ A 输入，对了开门、错了你俩对一下谁传错。</div></div>';
   }
   app.innerHTML= top + body;
-  $('back').onclick=function(){ location.search=''; };
+  $('back').onclick=gobackMenu;
   if(S.mod==='maze'){
     var cv=$('maze-map'), cell=Math.min(44, Math.floor(420/MAZE.cols));
     cv.width=MAZE.cols*cell; cv.height=MAZE.rows*cell;
@@ -2003,6 +2800,7 @@ function finish(ok){
   var dur=Math.round((Date.now()-S.started)/1000);
   setTimeout(function(){
     closeFB();
+    if(window._dungeon && (window._netMode==='host'||window._netMode==='guest')){ dungeonEnd(ok); return; }
     showFB({ok:ok, duration:dur, timeLeft:S.time, role:S.role});
   }, 700);
 }
