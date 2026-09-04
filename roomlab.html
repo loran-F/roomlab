@@ -296,6 +296,7 @@ function startCountdown(){
   var iv=setInterval(function(){
     S.time--;
     if(S.time<=0){ S.time=0; clearInterval(iv); timers=[]; explode('时间到'); return; }
+    if(window._dungeon && window._netMode==='host'){ netSend({t:'dgT', time:S.time}); }
     var c=$('count'); if(c){ c.textContent=S.time+'s'; c.classList.toggle('warn', S.time<=15); }
     if(S.time<=10) beep(880,0.05,'square',0.06);
   },1000);
@@ -408,6 +409,7 @@ function renderSame(){
    休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
 var DUNGEON=null;
 var EV_POOL=['catch','shield','beam','beat','bridge'];
+var EV_POOL_NET=['catch','shield','beam','beat','bridge','maze','dial','wires','code','pressure','vault'];
 function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
 function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
 function dgNodeLabel(n){
@@ -426,10 +428,11 @@ function newDungeon(){
   var nodes=[], idc=0;
   function N(layer,type,extra){ var o=Object.assign({id:'n'+(idc++),layer:layer,type:type,x:0,y:0,done:false,next:[],prev:[],mode:null},extra||{}); nodes.push(o); return o; }
   function L(a,b){ a.next.push(b.id); b.prev.push(a.id); }
+  var pool = (window._netMode==='host') ? EV_POOL_NET : EV_POOL;
   var start=N(0,'start',{done:true});
-  var L1=[N(1,'event',{mode:rnd(EV_POOL)}),N(1,'event',{mode:rnd(EV_POOL)}),N(1,'event',{mode:rnd(EV_POOL)})];
-  var L2=[N(2,'event',{mode:rnd(EV_POOL)}),N(2,'rest'),N(2,'event',{mode:rnd(EV_POOL)})];
-  var L3=[N(3,'event',{mode:rnd(EV_POOL)}),N(3,'event',{mode:rnd(EV_POOL)})];
+  var L1=[N(1,'event',{mode:rnd(pool)}),N(1,'event',{mode:rnd(pool)}),N(1,'event',{mode:rnd(pool)})];
+  var L2=[N(2,'event',{mode:rnd(pool)}),N(2,'rest'),N(2,'event',{mode:rnd(pool)})];
+  var L3=[N(3,'event',{mode:rnd(pool)}),N(3,'event',{mode:rnd(pool)})];
   var boss=N(4,'boss');
   L1.forEach(function(n){ L(start,n); });
   L1.forEach(function(n,i){ L2.forEach(function(m,j){ if(j===i||j===i+1) L(n,m); }); });
@@ -640,6 +643,8 @@ function dgGuestOnData(dd){
   else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; renderDungeonMenu(); }
   else if(dd.t==='dgAbort'){ dungeonAbort(); }
   else if(dd.t==='cd'){ guestIntro(dd.n); }
+  else if(dd.t==='dgT'){ var _c=$('count'); if(_c) _c.textContent=dd.time+'s'; }
+  else if(dd.t==='dgMsg'){ var _m=$('msg'); if(_m){ _m.className='msg '+dd.kind; _m.textContent=dd.txt; } }
   else if(dd.t==='st2'){ window._guestTwinState=dd.state; if(window._renderTwin) window._renderTwin(); }
 }
 function startDungeonGuest(code){
@@ -667,6 +672,7 @@ function startDungeonGuest(code){
             else if(dd.mode==='shield') renderGuestShield(String(code));
             else if(dd.mode==='beam') renderGuestBeam(String(code));
             else if(dd.mode==='bridge') renderGuestBridge(String(code));
+            else { renderManual(); }
           }
         });
       });
@@ -741,6 +747,7 @@ function dgEnterHost(id){
   else if(n.mode==='shield'){ renderShieldHost(); }
   else if(n.mode==='beam'){ renderBeamHost(); }
   else if(n.mode==='bridge'){ renderBridgeHost(); }
+  else { renderPlayDungeonHost(); }
 }
 function dgRestHost(id){
   var n=dgNode(id);
@@ -2113,6 +2120,49 @@ function renderPickRole(){
   $('rcB').onclick=function(){ setRole('B'); };
 }
 
+/* ============ 密室联网 · host A 端（信息不对称玩法：host 现场操作 / guest 后方手册） ============ */
+function hookDgMsgGateway(){
+  var el=$('msg');
+  if(!el || !(window._dungeon && window._netMode==='host')) return;
+  if(window._dgMsgObs) window._dgMsgObs.disconnect();
+  var last='';
+  window._dgMsgObs=new MutationObserver(function(){
+    var k=(el.className||'').replace('msg','').trim()||'warn';
+    var t=el.textContent||'';
+    var key=k+'|'+t;
+    if(key===last) return;
+    last=key;
+    netSend({t:'dgMsg', kind:k, txt:t});
+  });
+  window._dgMsgObs.observe(el, {childList:true, characterData:true, subtree:true, attributes:true, attributeFilter:['class']});
+}
+function renderPlayDungeonHost(){
+  var app=document.getElementById('app');
+  var p=PG();
+  var set=newSet();
+  clearTimers();
+  window._dead=false;
+  S.started=Date.now();
+  S.time=p.time;
+  app.innerHTML=
+    '<div class="topbar"><span class="badge A">房主 · 你控 A · 现场</span><span class="badge n">'+p.icon+' '+p.name+' · 联网</span>'+
+      '<span class="count" id="count">'+S.time+'s</span>'+
+      '<button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
+    '<div class="panel" id="playarea"></div>'+
+    '<div class="dpad" id="dpad">'+
+      '<button data-d="up">▲</button><button data-d="l">◀</button><button data-d="d">▼</button><button data-d="r">▶</button>'+
+    '</div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  $('back').onclick=gobackMenu;
+  window._keys={};
+  window.onkeydown=function(e){ window._keys[e.key]=true; };
+  window.onkeyup=function(e){ window._keys[e.key]=false; };
+  introGo(function(n){ netSend({t:'cd',n:n}); }, function(){
+    startCountdown();
+    runModule(set);
+    hookDgMsgGateway();
+  });
+}
 /* ============ A 端：实时操作（单玩法） ============ */
 function renderPlay(){
   var app=document.getElementById('app');
@@ -2604,8 +2654,12 @@ function runVault(set){
 function renderManual(){
   var app=document.getElementById('app');
   var p=PG();
-  var top='<div class="topbar"><span class="badge B">角色 B · 后方</span><span class="badge n">'+p.icon+' '+p.name+'</span>'+
-    '<button class="btn sm" id="back" style="margin-left:auto">换玩法</button></div>';
+  var dgG=(window._dungeon && window._netMode==='guest');
+  var top= dgG
+    ? '<div class="topbar"><span class="badge B">加入者 · 你控 B · 后方</span><span class="badge n">'+p.icon+' '+p.name+' · 联网</span>'+
+      '<span class="count" id="count">--s</span><button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'
+    : '<div class="topbar"><span class="badge B">角色 B · 后方</span><span class="badge n">'+p.icon+' '+p.name+'</span>'+
+      '<button class="btn sm" id="back" style="margin-left:auto">换玩法</button></div>';
   var body='';
   if(S.mod==='maze'){
     body=
@@ -2665,7 +2719,7 @@ function renderManual(){
       '</div>'+
       '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 报密码 → ② 你按记录器记下 6 位 → ③ 原样报回给 A → ④ A 输入，对了开门、错了你俩对一下谁传错。</div></div>';
   }
-  app.innerHTML= top + body;
+  app.innerHTML= top + body + (dgG?'<div id="msg" class="msg" style="margin:10px 0 0"></div>':'');
   $('back').onclick=gobackMenu;
   if(S.mod==='maze'){
     var cv=$('maze-map'), cell=Math.min(44, Math.floor(420/MAZE.cols));
