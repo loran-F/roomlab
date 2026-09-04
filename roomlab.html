@@ -234,13 +234,13 @@ function showFB(d){
     '<textarea id="fb-comment" placeholder="好玩吗？紧张吗？哪里卡住了？"></textarea>'+
     '<div class="frow"><button class="btn" id="fb-restart">再来一局</button><button class="btn primary" id="fb-next">换玩法</button></div>';
   $('fb').style.display='flex';
+  window._fbState=d;
   var score=0;
   box.querySelectorAll('.s').forEach(function(s){ s.onclick=function(){ score=+s.dataset.v; box.querySelectorAll('.s').forEach(function(x){x.classList.toggle('on',+x.dataset.v<=score);}); }; });
   $('fb-restart').onclick=function(){
     closeFB();
-    if(window._netMode==='host'){ hostReset(); }
-    else if(window._netMode==='guest'){ guestReset(); }
-    else if(S.mod==='shield'){ renderShield(); }
+    if(window._netMode==='host'||window._netMode==='guest'){ netAskRestart(); return; }
+    if(S.mod==='shield'){ renderShield(); }
     else if(S.mod==='beam'){ renderBeam(); }
     else if(S.mod==='beat'){ renderBeat(); }
     else if(S.mod==='bridge'){ renderBridge(); }
@@ -250,6 +250,32 @@ function showFB(d){
   $('fb-next').onclick=function(){ recSave({result:d.ok?'win':'lose', role:d.role, duration:d.duration, timeLeft:d.timeLeft, score:score, comment:$('fb-comment').value}); closeFB(); location.search=''; };
 }
 function closeFB(){ var f=$('fb'); if(f) f.style.display='none'; }
+
+/* ============ 联网「再来一局」双方确认 ============ */
+function netSend(m){ try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send(m); }catch(e){} }
+function netAskRestart(){
+  if(window._restartAwait) return;
+  window._restartAwait=true;
+  netSend({t:'ask'});
+  var m=$('msg'); if(m){ m.className='msg warn'; m.textContent='⏳ 已请求再来一局，等对方确认…'; }
+}
+function netStartNewRound(){
+  window._restartAwait=false;
+  if(window._host&&window._host.reset){ window._host.reset(); }
+}
+function netConfirmRestart(){
+  window._restartAwait=true;
+  var f=$('fb'), box=$('fb-box');
+  if(!f||!box) return;
+  f.style.display='flex';
+  box.innerHTML='<div class="big" style="font-size:20px">♻️ 对方想再来一局</div>'+
+    '<div class="frow" style="justify-content:center"><button class="btn primary" id="net-yes" style="padding:12px 26px">✔ 同意</button>'+
+    '<button class="btn" id="net-no" style="padding:12px 26px">✘ 拒绝</button></div>';
+  var yes=$('net-yes'), no=$('net-no');
+  if(yes) yes.onclick=function(){ window._restartAwait=false; netSend({t:'ok'}); closeFB(); if(window._netMode==='host'){ netStartNewRound(); } };
+  if(no) no.onclick=function(){ window._restartAwait=false; netSend({t:'no'}); showFB(window._fbState||{ok:true,duration:0,timeLeft:0,role:window._netMode==='host'?'Host':'Guest'}); };
+}
+function netAskCancel(){ showFB(window._fbState||{ok:true,duration:0,timeLeft:0,role:window._netMode==='host'?'Host':'Guest'}); }
 
 /* ============ 倒计时 ============ */
 function startCountdown(){
@@ -266,6 +292,37 @@ function cut(n){
   S.time=Math.max(0,S.time-n);
   var c=$('count'); if(c){ c.textContent=S.time+'s'; c.classList.toggle('warn',S.time<=15); }
   if(S.time<=0){ explode('时间到'); }
+}
+
+/* ============ 开场 3 秒倒计时 ============
+   同屏玩法：introGo(null, cb)；联网 host：introGo(broadcastCd, cb)，broadcastCd(n) 每阶段广播 {t:'cd',n}（n=3/2/1/0=GO）
+   倒计时期间 window._introLock=true，物理循环不启动/不推进 */
+function introGo(broadcastCd, cb){
+  window._introLock=true;
+  var old=document.getElementById('intro-ov'); if(old) old.remove();
+  var ov=document.createElement('div');
+  ov.id='intro-ov';
+  ov.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(6,10,23,.84);';
+  ov.innerHTML='<div id="intro-num" style="font-size:112px;font-weight:900;color:#f8fafc;line-height:1;text-shadow:0 0 28px rgba(148,163,184,.5)"></div><div id="intro-tip" style="font-size:17px;color:#94a3b8"></div>';
+  document.body.appendChild(ov);
+  var num=document.getElementById('intro-num'), tip=document.getElementById('intro-tip'), n=3;
+  function step(){
+    if(n>0){ num.textContent=n; tip.textContent='准备…'; try{beep(440,0.08,'square',0.1);}catch(e){} if(broadcastCd) broadcastCd(n); n--; setTimeout(step,1000); }
+    else { num.textContent='GO!'; tip.textContent='开始！'; try{beep(880,0.16,'square',0.12);}catch(e){} if(broadcastCd) broadcastCd(0); setTimeout(function(){ ov.remove(); window._introLock=false; if(cb) cb(); },450); }
+  }
+  step();
+}
+/* 加入者端倒计时同步：n>0 显示数字，n=0 收尾 */
+function guestIntro(n){
+  var ov=document.getElementById('intro-ov');
+  if(n>0){
+    if(!ov){ var o2=document.createElement('div'); o2.id='intro-ov'; o2.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(6,10,23,.84);'; o2.innerHTML='<div id="intro-num" style="font-size:112px;font-weight:900;color:#f8fafc;line-height:1"></div><div id="intro-tip" style="font-size:17px;color:#94a3b8"></div>'; document.body.appendChild(o2); }
+    var num=document.getElementById('intro-num'), tip=document.getElementById('intro-tip');
+    if(num) num.textContent=n; if(tip) tip.textContent='准备…';
+    try{beep(440,0.08,'square',0.1);}catch(e){}
+  } else {
+    if(ov){ var n2=document.getElementById('intro-num'); if(n2) n2.textContent='GO!'; try{beep(880,0.16,'square',0.12);}catch(e){} setTimeout(function(){ var o3=document.getElementById('intro-ov'); if(o3) o3.remove(); },450); }
+  }
 }
 
 /* ============ 渲染分派 ============ */
@@ -324,8 +381,7 @@ function renderSame(){
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
   $('back').onclick=function(){ location.search=''; };
   $('again').onclick=function(){ renderSame(); };
-  startCountdown();
-  runCatch(set);
+  introGo(null, function(){ startCountdown(); runCatch(set); });
 }
 
 /* ---- 玩法 7：物资空投（单设备双人同屏 · A 控左 / B 控右 合力接物） ---- */
@@ -551,7 +607,13 @@ function renderHost(){
         conn.on('open', function(){
           PEER.conn=conn;
           roomBox.className='msg ok'; roomBox.innerHTML=S.mod==='beat'?'✔ 同伴已加入！你按蓝音符，他按橙音符，紫色要两人同时按。':'✔ 同伴已加入！开始！你控制 ← 左移，他控制 → 右移。';
-          conn.on('data', function(d){ if(!d) return; if(d.t==='in'){ PEER.gdir=d.v?1:0; } else if(d.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(d.who); } });
+          conn.on('data', function(d){ if(!d) return;
+            if(d.t==='in'){ PEER.gdir=d.v?1:0; }
+            else if(d.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(d.who); }
+            else if(d.t==='ask'){ netConfirmRestart(); }
+            else if(d.t==='ok'){ window._restartAwait=false; netStartNewRound(); }
+            else if(d.t==='no'){ window._restartAwait=false; netAskCancel(); }
+          });
           conn.on('close', function(){ var rb=document.querySelector('#stage .msg'); if(rb){ rb.className='msg err'; rb.innerHTML='✘ 同伴断开连接。'; } });
           startHostGame();
         });
@@ -577,7 +639,8 @@ function startHostGame(){
     if(PEER.conn&&PEER.conn.open){
       try{ PEER.conn.send({t:'st', px:px, score:score, time:S.time,
         items:items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
-        goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:window._dead}); }catch(e){}
+        goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:window._dead,
+        msg:window._lastMsg||null}); }catch(e){}
     }
   }
   function spawn(){
@@ -627,7 +690,7 @@ function startHostGame(){
     }
     render();
   }
-  function msg(kind,txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  function msg(kind,txt){ window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你 ← 按住左半屏左移（或 ← / A 键）</div>'+
     '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴 → 在他屏上右移</div>';
@@ -635,10 +698,6 @@ function startHostGame(){
   var zL=makeZone('l',function(v){ window._inL=v; });
   window._netZones=[zL];
   S.started=Date.now(); S.time=60;
-  startCountdown();
-  var physLoop=setInterval(loop,16); timers.push(physLoop);
-  var br=setInterval(function(){ broadcast(); },66); timers.push(br);
-  render();
   window._hostState=function(){ return {px:px,score:score,win:win,dead:window._dead,items:items.length}; };
   window._hostInject=function(type,x){ items.push({x:x,y:BOT-6,vy:0.4,type:type,vx:0}); };
   window._host.px=px; window._host.score=score; window._host.items=items;
@@ -646,19 +705,27 @@ function startHostGame(){
     done=false; win=false; score=0; items.length=0; px=W/2; pv=0; nextSpawn=400;
     window._dead=false; window._inL=false; PEER.gdir=0;
     S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+CATCH_GOAL;
-    startCountdown();
+    window._lastMsg=null;
     try{ PEER.conn.send({t:'rst'}); }catch(e){}
-    var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局！'; }
-    // finish/explode 已清 timers，重启物理循环与广播
     if(window._host._loops){ window._host._loops.forEach(function(id){ clearInterval(id); }); }
     window._host._loops=[];
+    var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局！'; }
+    introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+      startCountdown();
+      window._host._loops.push(setInterval(loop,16));
+      window._host._loops.push(setInterval(function(){ broadcast(); },66));
+      timers.push(window._host._loops[0], window._host._loops[1]);
+      window._host.px=px; window._host.score=score; window._host.items=items; window._host.done=done;
+    });
+  };
+  window._host._loops=[];
+  introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+    startCountdown();
     window._host._loops.push(setInterval(loop,16));
     window._host._loops.push(setInterval(function(){ broadcast(); },66));
     timers.push(window._host._loops[0], window._host._loops[1]);
     window._host.px=px; window._host.score=score; window._host.items=items; window._host.done=done;
-  };
-  window._host._loops=[setInterval(loop,16), setInterval(function(){ broadcast(); },66)];
-  timers.push(window._host._loops[0], window._host._loops[1]);
+  });
   window._host._running=true;
 }
 function hostReset(){ if(window._host&&window._host.reset) window._host.reset(); }
@@ -678,7 +745,8 @@ function startHostBeat(){
   function broadcast(finalWin){
     if(PEER.conn&&PEER.conn.open){
       try{ PEER.conn.send({t:'st', notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
-        score:score, lives:lives, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead}); }catch(e){}
+        score:score, lives:lives, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead,
+        msg:window._lastMsg||null}); }catch(e){}
     }
   }
   function render(){
@@ -729,7 +797,7 @@ function startHostBeat(){
     }
     render();
   }
-  function msg(kind,txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  function msg(kind,txt){ window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你：蓝音符按左半屏（或 ← / A 键）</div>'+
     '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴：在他屏上按橙音符</div>';
@@ -739,28 +807,33 @@ function startHostBeat(){
   window._beatPress=function(who){ if(who==='A') press('A'); };
   window._hostBeatPress=function(who){ press(who==='B'?'B':'A'); };
   S.started=Date.now(); S.time=60;
-  startCountdown();
-  var physLoop=setInterval(loop,16); timers.push(physLoop);
-  var br=setInterval(function(){ broadcast(); },66); timers.push(br);
-  render();
   window._hostState=function(){ return {score:score,lives:lives,notes:notes.length,dead:window._dead}; };
   window._hostInject=function(type,x){ notes.push({x:x||80,hit:false,type:type||'A'}); };
   window._host.px=0; window._host.score=score; window._host.notes=notes;
   window._host.reset=function(){
     done=false; win=false; score=0; lives=LIVES; notes.length=0; next=520; bpm=96; beatT=0; beatCount=0; t=0;
     window._dead=false; S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+GOAL;
-    startCountdown();
+    window._lastMsg=null;
     try{ PEER.conn.send({t:'rst'}); }catch(e){}
     var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局！'; }
     if(window._host._loops){ window._host._loops.forEach(function(id){ clearInterval(id); }); }
     window._host._loops=[];
+    introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+      startCountdown();
+      window._host._loops.push(setInterval(loop,16));
+      window._host._loops.push(setInterval(function(){ broadcast(); },66));
+      timers.push(window._host._loops[0], window._host._loops[1]);
+      window._host.score=score; window._host.notes=notes; window._host.done=done;
+    });
+  };
+  window._host._loops=[];
+  introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, function(){
+    startCountdown();
     window._host._loops.push(setInterval(loop,16));
     window._host._loops.push(setInterval(function(){ broadcast(); },66));
     timers.push(window._host._loops[0], window._host._loops[1]);
     window._host.score=score; window._host.notes=notes; window._host.done=done;
-  };
-  window._host._loops=[setInterval(loop,16), setInterval(function(){ broadcast(); },66)];
-  timers.push(window._host._loops[0], window._host._loops[1]);
+  });
   window._host._running=true;
 }
 /* ---- 加入者：输入房间码加入 + 渲染同步 + 发送右移输入 ---- */
@@ -841,6 +914,7 @@ function renderGuestUI(code){
     if(d.t==='st'){
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你控制 → 右移。'; } }
+      if(d.msg && d.msg.txt){ var mm=$('msg'); if(mm && mm.textContent!==d.msg.txt){ mm.className='msg '+d.msg.kind; mm.textContent=d.msg.txt; } }
       var c=$('count'); if(c) c.textContent=d.time+'s';
       var g=$('goal'); if(g) g.textContent=d.score+' / '+d.goal;
       draw(d);
@@ -849,7 +923,11 @@ function renderGuestUI(code){
         showFB({ok:!!d.win, duration:0, timeLeft:d.time, role:'Guest'});
       }
     }
-    if(d.t==='rst'){ ended=false; last=null; var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+    if(d.t==='cd'){ guestIntro(d.n); }
+    if(d.t==='rst'){ ended=false; last=null; window._lastMsg=null; closeFB(); var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+    if(d.t==='ask'){ netConfirmRestart(); }
+    if(d.t==='ok'){ window._restartAwait=false; if(window._netMode==='host'){ netStartNewRound(); } }
+    if(d.t==='no'){ window._restartAwait=false; netAskCancel(); }
   });
 }
 function guestReset(){ window._guestSetDir(0); try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in',v:0}); }catch(e){} }
@@ -899,6 +977,7 @@ function renderGuestBeat(code){
     if(d.t==='st'){
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你按橙音符（B），紫色要两人同时按。'; } }
+      if(d.msg && d.msg.txt){ var mm=$('msg'); if(mm && mm.textContent!==d.msg.txt){ mm.className='msg '+d.msg.kind; mm.textContent=d.msg.txt; } }
       var c=$('count'); if(c) c.textContent=d.time+'s';
       var g=$('goal'); if(g) g.textContent=d.score+' / 30';
       draw(d);
@@ -907,7 +986,11 @@ function renderGuestBeat(code){
         showFB({ok:!!d.win, duration:0, timeLeft:d.time, role:'Guest'});
       }
     }
-    if(d.t==='rst'){ ended=false; last=null; var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+    if(d.t==='cd'){ guestIntro(d.n); }
+    if(d.t==='rst'){ ended=false; last=null; window._lastMsg=null; closeFB(); var m2=$('msg'); if(m2){ m2.className='msg warn'; m2.textContent='↻ 重新开局…'; } }
+    if(d.t==='ask'){ netConfirmRestart(); }
+    if(d.t==='ok'){ window._restartAwait=false; if(window._netMode==='host'){ netStartNewRound(); } }
+    if(d.t==='no'){ window._restartAwait=false; netAskCancel(); }
   });
 }
 
@@ -987,8 +1070,8 @@ function runShield(){
   }
   var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
   window._catchZones=[zl,zr];
-  S.started=Date.now(); S.time=60; startCountdown();
-  timers.push(setInterval(loop,16)); render();
+  S.started=Date.now(); S.time=60;
+  introGo(null, function(){ startCountdown(); timers.push(setInterval(loop,16)); render(); });
   window._shieldState=function(){ return {energy:energy,dur:dur,dead:window._dead}; };
   window._shieldInject=function(x){ rocks.push({x:x,y:120,vy:1.0}); };
   window._shieldMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
@@ -1064,8 +1147,8 @@ function runBeam(){
   }
   var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
   window._catchZones=[zl,zr];
-  S.started=Date.now(); S.time=60; startCountdown();
-  timers.push(setInterval(loop,16)); render();
+  S.started=Date.now(); S.time=60;
+  introGo(null, function(){ startCountdown(); timers.push(setInterval(loop,16)); render(); });
   window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead}; };
   window._beamInject=function(x){ bricks.push({x:x,y:100,vy:0.8,on:false,tOn:0}); };
   window._beamMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
@@ -1147,8 +1230,8 @@ function runBeat(){
   var zl=makeZone('l',pressA), zr=makeZone('r',pressB);
   window._catchZones=[zl,zr];
   window._beatPress=function(who){ press(who==='A'?'A':'B'); };
-  S.started=Date.now(); S.time=60; startCountdown();
-  timers.push(setInterval(loop,16)); render();
+  S.started=Date.now(); S.time=60;
+  introGo(null, function(){ startCountdown(); timers.push(setInterval(loop,16)); render(); });
   window._beatState=function(){ return {score:score,lives:lives,notes:notes.length,dead:window._dead}; };
   window._beatInject=function(type,x){ notes.push({x:x||80, hit:false, type:type||'A'}); };
   window._beatReset=function(){ window._inL=window._inR=false; };
@@ -1210,8 +1293,8 @@ function runBridge(){
   }
   var zl=makeZone('l',function(v){ window._inL=v; }), zr=makeZone('r',function(v){ window._inR=v; });
   window._catchZones=[zl,zr];
-  S.started=Date.now(); S.time=60; startCountdown();
-  timers.push(setInterval(loop,16)); render();
+  S.started=Date.now(); S.time=60;
+  introGo(null, function(){ startCountdown(); timers.push(setInterval(loop,16)); render(); });
   window._bridgeState=function(){ return {delivered:delivered,drops:drops,px:px,carrying:!!carrying,dead:window._dead}; };
   window._bridgeInject=function(x){ balls.push({x:x||px,y:120,vy:0.8}); };
   window._bridgeMove=function(d){ if(d==='l'){window._inL=true;window._inR=false;} else if(d==='r'){window._inR=true;window._inL=false;} else if(d===0){window._inL=window._inR=false;} };
