@@ -160,6 +160,41 @@
 .vault-panel{max-width:460px;margin:auto}.vault-panel .numpad{max-width:340px;margin:auto}
 @media(max-width:350px){.vault-slot{height:57px;font-size:21px}.vault-slots{gap:3px}}
 
+/* 卷轴地图：承接主界面、密室选择页的紫色、暖黄与粗线条。 */
+body:has(.dungeon-screen){background:linear-gradient(155deg,#454065,#2b243f);color:#fff}
+.wrap:has(.dungeon-screen){max-width:500px;padding:0 14px 24px}
+.dungeon-screen{--map-ink:#281f32;--paper:#ffe8ac;--map-height:clamp(440px,calc(100svh - 350px),540px);min-height:100svh;padding-top:max(16px,env(safe-area-inset-top));font-family:'Microsoft YaHei','PingFang SC',sans-serif}
+.dg-topline{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#d0c9df}
+.dg-back{border:2px solid #281f32;background:#66577f;color:#fff;border-radius:12px;min-width:44px;min-height:44px;font-size:23px;cursor:pointer;box-shadow:0 3px 0 #281f32}
+.dg-room-code{letter-spacing:1px}.dg-life{display:flex;align-items:center;gap:3px;background:#302640;border:2px solid #241c30;border-radius:20px;padding:7px 9px}
+.dg-heart{width:17px;height:17px;fill:#ff7b67;stroke:#20182b;stroke-width:2}.dg-heart.empty{fill:#645677}
+.dg-heading{text-align:center;margin:14px 0 16px}.dg-heading h1{margin:0;color:#ffdc64;font-size:29px;letter-spacing:3px;font-weight:900;text-shadow:2px 3px #21192e,-1px -1px #21192e}.dg-heading p{font-size:13px;color:#f3e9fd;margin:8px 0 0;font-weight:700}
+.scroll-shell{position:relative;margin:0 9px;padding:13px 0;isolation:isolate}
+.scroll-paper{position:relative;border:3px solid var(--map-ink);background:var(--paper);box-shadow:inset 10px 0 #f3ce82,inset -10px 0 #f3ce82,0 8px 0 #251c3233;border-radius:5px;overflow:hidden}
+.scroll-rod{position:absolute;left:-10px;right:-10px;height:23px;border:3px solid var(--map-ink);border-radius:12px;background:#f7b653;box-shadow:inset 0 -5px #dd9143;z-index:10;pointer-events:none}
+.scroll-rod.top{top:0}.scroll-rod.bottom{bottom:0}.scroll-rod:before,.scroll-rod:after{content:'';position:absolute;top:-6px;width:14px;height:29px;border:3px solid var(--map-ink);border-radius:7px;background:#e49a49;box-shadow:inset -4px 0 #c8793d}.scroll-rod:before{left:-5px}.scroll-rod:after{right:-5px}
+.scroll-shell.is-opening .scroll-paper{animation:scroll-unfurl 1050ms cubic-bezier(.22,.65,.24,1) both}
+.scroll-shell.is-opening .scroll-rod.bottom{animation:scroll-rod-drop 1050ms cubic-bezier(.22,.65,.24,1) both}
+.scroll-shell.is-opening{animation:scroll-land 1050ms ease-out both}
+@keyframes scroll-unfurl{0%{clip-path:inset(0 0 98% 0)}33%{clip-path:inset(0 0 66% 0)}66%{clip-path:inset(0 0 33% 0)}100%{clip-path:inset(0)}}
+@keyframes scroll-rod-drop{0%{transform:translateY(calc(-1 * var(--map-height)))}33%{transform:translateY(calc(-.66 * var(--map-height)))}66%{transform:translateY(calc(-.33 * var(--map-height)))}100%{transform:translateY(0)}}
+@keyframes scroll-land{0%{filter:drop-shadow(0 0 0 #211a2e00)}100%{filter:drop-shadow(0 7px 0 #211a2e22)}}
+#dgmap{position:relative;width:100%;height:var(--map-height,540px);color:#4e3a37}
+.dg-map-caption{position:absolute;top:19px;left:0;right:0;text-align:center;font-weight:900;letter-spacing:3px;font-size:13px;color:#806044}.dg-map-caption:before,.dg-map-caption:after{content:'—';margin:0 9px;color:#bd9556}
+.dg-map-corner{position:absolute;bottom:16px;right:18px;width:25px;height:25px;border-right:2px solid #cda76b;border-bottom:2px solid #cda76b;opacity:.6}.dg-map-corner:after{content:'';position:absolute;width:9px;height:9px;right:5px;bottom:5px;border:2px solid #cda76b;transform:rotate(45deg)}
+.dg-paths{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dg-node{position:absolute;width:52px;height:52px;border:2.5px solid #66503f;border-radius:17px;background:#ffeec6;display:flex;align-items:center;justify-content:center;padding:5px;box-shadow:0 3px 0 #b89661;cursor:pointer;transition:background .16s,box-shadow .16s;z-index:2;touch-action:manipulation;color:#463238}
+.dg-node>img{display:block;width:38px;height:38px;pointer-events:none}.dg-node.available{border-color:#281f32;background:#ffcd54;box-shadow:0 4px 0 #c38236,0 0 0 4px #fff4d9}.dg-node.completed{background:#c3dcac;border-color:#416951;box-shadow:0 3px 0 #82a374}.dg-node.blocked{background:#ecd29b;box-shadow:0 2px 0 #cbb17d;border-color:#a68a60}.dg-node.blocked>img{opacity:.57}.dg-node.boss{border-radius:50%;background:#e2c7e6;border-color:#644773}.dg-node.boss.available{background:#f0b6ce;border-color:#281f32}.dg-node.start{border-radius:50%}
+.dg-node:active{transform:translateY(2px);box-shadow:0 1px 0 #b89661}.dg-node:focus-visible{outline:3px solid #8c60a8;outline-offset:5px}
+.dg-node-label{position:absolute;left:50%;bottom:calc(100% + 7px);transform:translateX(-50%);font:800 11px/1.2 'Microsoft YaHei',sans-serif;white-space:nowrap;color:#694a3e;pointer-events:none}.dg-node.available .dg-node-label{color:#352438}.dg-node.boss .dg-node-label{color:#634574}
+.dg-node-state{position:absolute;top:-7px;right:-7px;width:18px;height:18px;border:2px solid #281f32;border-radius:50%;background:#85b99a;color:#fff;font:bold 12px/14px sans-serif;text-align:center}.dg-node-lock{position:absolute;right:-4px;bottom:-3px;width:16px;height:16px;color:#927348;background:#f5dda8;border-radius:5px}
+.dg-token{position:absolute;z-index:6;width:23px;height:23px;border:2px solid #281f32;border-radius:50%;font:900 12px/19px sans-serif;text-align:center;color:#fff;box-shadow:0 2px 0 #281f3244;pointer-events:none;transition:left .25s ease-out,top .25s ease-out;background:#5ca9c4}.dg-token.role-b{background:#ed9557}.dg-token.mine{outline:2px solid #fff5d7;outline-offset:1px;z-index:7}
+.dg-ring{position:absolute;inset:-9px;pointer-events:none;display:none}.dg-ring svg{width:100%;height:100%;overflow:visible}
+.dg-legend{display:flex;justify-content:center;gap:16px;margin:14px 0;color:#d0c3dc;font-size:11px}.dg-legend span{display:inline-flex;align-items:center;gap:5px}.dg-legend i{width:14px;height:4px;display:inline-block;background:#ffbb54;border-radius:3px}.dg-legend .done{background:#99c3a0}.dg-legend .locked{height:0;border-top:3px dotted #b29b7e;background:none}
+.dg-footer{background:#30263f;border:2px solid #21192e;border-radius:15px;padding:12px 14px;color:#efe4fc;box-shadow:0 4px 0 #21192e33}.dg-role-line{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700}.dg-role-dot{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border:2px solid #21192e;border-radius:50%;font:bold 12px sans-serif;background:#5ca9c4;color:#fff}.dg-role-dot.b{background:#ed9557}.dungeon-screen #dgmsg{margin:8px 0 0!important;padding:0;min-height:32px;font-size:12px;line-height:1.6;color:#c6b8d5;background:none;border:0}
+@media(max-width:350px){.wrap:has(.dungeon-screen){padding:0 10px 20px}.dg-heading h1{font-size:26px}.dg-life{padding:6px}.dg-heart{width:15px}.dg-room-code{font-size:10px}.dg-node-label{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.scroll-shell.is-opening,.scroll-shell.is-opening .scroll-paper,.scroll-shell.is-opening .scroll-rod.bottom{animation:none}.dg-token{transition:none}}
+
 </style>
 </head>
 <body>
@@ -532,7 +567,7 @@ function dgNodeLabel(n){
   if(n.type==='rest') return '安全屋';
   if(n.type==='boss') return '最终对峙';
   if(n.type==='start') return '潜入入口';
-  var p=dgPG(n.mode); return p?p.icon+' '+p.name:n.mode;
+  var p=dgPG(n.mode); return p?p.name:n.mode;
 }
 function dgReachable(id){
   var n=dgNode(id);
@@ -572,59 +607,71 @@ function newDungeon(){
   window._dgTries=0;
 }
 function dgMsg(html){ var m=$('dgmsg'); if(m){ m.innerHTML=html; m.style.display='block'; } }
+function dgMapHeight(){var box=$('dgmap');return box?box.clientHeight:540;}
 function dgMoveIcons(){
-  var ia=$('dg-iconA'), ib=$('dg-iconB'), box=$('dgmap');
-  // 联机角色固定；图标只显示位置，让点击穿透到下面的路线节点。
-  if(ia)ia.style.pointerEvents=window._netMode?'none':'auto';
-  if(ib)ib.style.pointerEvents=window._netMode?'none':'auto';
-  var bw=box?box.clientWidth:360, bh=540;
-  var na=dgNode(DUNGEON.posA), nb=dgNode(DUNGEON.posB);
-  if(ia&&na){ ia.style.left=(na.x/100*bw-22)+'px'; ia.style.top=(na.y/100*bh-13)+'px'; }
-  if(ib&&nb){ ib.style.left=(nb.x/100*bw+1)+'px'; ib.style.top=(nb.y/100*bh-11)+'px'; }
-  var c=$('dg-cur'); if(c) c.textContent = window._netMode==='host' ? '你控 A 🔵' : (window._netMode==='guest' ? '你控 B 🟠' : '操作：'+(DUNGEON.cur==='A'?'A 🔵':'B 🟠'));
-  if(ia){ if(window._netMode==='guest'){ ia.onclick=null; ia.style.opacity=.55; } else { ia.onclick=function(){ DUNGEON.cur='A'; dgMoveIcons(); }; ia.style.opacity=DUNGEON.cur==='A'?1:.45; } }
-  if(ib){ if(window._netMode==='host'){ ib.onclick=null; ib.style.opacity=.55; } else { ib.onclick=function(){ DUNGEON.cur='B'; dgMoveIcons(); }; ib.style.opacity=DUNGEON.cur==='B'?1:.45; } }
+  if(!DUNGEON)return;
+  var box=$('dgmap'),bw=box?box.clientWidth:360,bh=dgMapHeight();
+  ['A','B'].forEach(function(role){
+    var token=$('dg-icon'+role),n=dgNode(DUNGEON['pos'+role]);if(!token||!n)return;
+    token.style.left=(n.x/100*bw+(role==='A'?-23:1))+'px';token.style.top=(n.y/100*bh+16)+'px';
+    var mine=window._netMode==='guest'?role==='B':role==='A';
+    token.className='dg-token'+(role==='B'?' role-b':'')+(mine?' mine':'');
+    token.style.pointerEvents=window._netMode?'none':'auto';
+    token.onclick=window._netMode?null:function(){DUNGEON.cur=role;dgMoveIcons();};
+  });
 }
 function dgDrawMap(){
-  var box=$('dgmap'); if(!box) return;
-  box.style.cssText='position:relative;width:100%;max-width:430px;height:540px;margin:0 auto;background:repeating-linear-gradient(0deg,transparent,transparent 29px,#29495633 30px),repeating-linear-gradient(90deg,transparent,transparent 29px,#29495633 30px),linear-gradient(180deg,#0b2530,#101a29);border:1px solid #335461;border-radius:14px;overflow:hidden';
-  var boxW=box.clientWidth||360, boxH=540, NS=52; // 节点正圆直径 52px
-  function cx(n){ return n.x/100*boxW; }
-  function cy(n){ return n.y/100*boxH; }
-  // 连线：显示全部结构（决策用），颜色区分状态——已通关绿 / 当前可走橙 / 未解锁淡灰虚线
+  var box=$('dgmap');if(!box||!DUNGEON)return;
+  var height=dgMapHeight(),NS=52,oldA=$('dg-iconA'),oldB=$('dg-iconB');
+  function cy(n){return n.y/100*height;}
   var lines=[];
+  DUNGEON.nodes.forEach(function(n){n.prev.forEach(function(pid){
+    var p=dgNode(pid);if(!p)return;
+    var y1=cy(p)-NS/2,y2=cy(n)+NS/2,mid=(y1+y2)/2;
+    var active=p.done&&dgReachable(n.id),done=p.done&&n.done;
+    lines.push('<path d="M '+p.x+' '+y1+' C '+p.x+' '+mid+', '+n.x+' '+mid+', '+n.x+' '+y2+'" fill="none" stroke="'+(active?'#e99b3d':done?'#77a37d':'#bda276')+'" stroke-width="'+(active?4:2.5)+'" vector-effect="non-scaling-stroke" stroke-linecap="round"'+(!active&&!done?' stroke-dasharray="3 7"':'')+'/>');
+  });});
+  box.innerHTML='<div class="dg-map-caption">双人行动路线</div><div class="dg-map-corner" aria-hidden="true"></div><svg class="dg-paths" viewBox="0 0 100 '+height+'" preserveAspectRatio="none" aria-hidden="true">'+lines.join('')+'</svg>';
   DUNGEON.nodes.forEach(function(n){
-    n.prev.forEach(function(pid){ var p=dgNode(pid); if(!p) return;
-      var x1=cx(p), y1=cy(p)+NS/2, x2=cx(n), y2=cy(n)-NS/2, mid=(y1+y2)/2;
-      var isActive=p.done&&dgReachable(n.id), isDone=p.done&&n.done;
-      var stroke=isActive?'rgba(245,158,11,.9)':(isDone?'rgba(82,196,26,.7)':'rgba(168,162,158,.35)');
-      var w=isActive?3:2, dash=(!isActive&&!isDone)?' stroke-dasharray="4 5"':'';
-      lines.push('<path d="M '+x1.toFixed(1)+' '+y1.toFixed(1)+' C '+x1.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+y2.toFixed(1)+'" fill="none" stroke="'+stroke+'" stroke-width="'+w+'" stroke-linecap="round"'+dash+'/>');
-    });
+    var can=dgReachable(n.id),icon=n.type==='event'?n.mode:n.type;
+    var d=document.createElement('button');d.type='button';d.dataset.id=n.id;
+    d.className='dg-node '+n.type+(n.done?' completed':can?' available':' blocked');
+    d.style.left='calc('+n.x+'% - 26px)';d.style.top=(cy(n)-26)+'px';
+    d.innerHTML='<img src="assets/map-icons/'+icon+'.svg" alt="" draggable="false"><span class="dg-node-label">'+(n.type==='event'?dgPG(n.mode).name:dgNodeLabel(n))+'</span>';
+    if(n.done&&n.type!=='start')d.insertAdjacentHTML('beforeend','<span class="dg-node-state" aria-hidden="true">✓</span>');
+    else if(!can&&!n.done)d.insertAdjacentHTML('beforeend','<svg class="dg-node-lock" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 9V6a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2.3"/><rect x="4" y="8" width="12" height="10" rx="2" fill="currentColor"/><path d="M10 11v4" stroke="#f5dda8" stroke-width="2"/></svg>');
+    if(can)d.insertAdjacentHTML('beforeend','<span class="dg-ring" id="ring-'+n.id+'"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="#e38b36" stroke-width="3" stroke-linecap="round" stroke-dasharray="114" stroke-dashoffset="114" transform="rotate(-90 20 20)"><animate attributeName="stroke-dashoffset" from="114" to="0" dur="3s" fill="freeze"/></circle></svg></span>');
+    d.tabIndex=can||n.done?0:-1;d.setAttribute('aria-label',dgNodeLabel(n)+(n.done?'，已完成':can?'，可进入':'，未解锁'));
+    d.onclick=function(){dgTap(n.id);};box.appendChild(d);
   });
-  box.innerHTML='<div style="position:absolute;top:14px;left:16px;color:#7dd3c5;font-size:11px;letter-spacing:3px">机密行动 / 潜入路线</div><div style="position:absolute;top:35px;left:16px;color:#d8edf2;font-size:15px;font-weight:700">取回档案，双人撤离</div><svg style="position:absolute;left:0;top:0;width:100%;height:100%">'+lines.join('')+'</svg>';
-  DUNGEON.nodes.forEach(function(n){
-    var lbl = n.type==='start'?'🚪':(n.type==='rest'?'🏠':(n.type==='boss'?'🎯':dgPG(n.mode).icon));
-    var can=dgReachable(n.id);
-    var d=document.createElement('div');
-    d.dataset.id=n.id;
-    d.style.cssText='position:absolute;left:'+(cx(n)-NS/2)+'px;top:'+(cy(n)-NS/2)+'px;width:'+NS+'px;height:'+NS+'px;display:flex;align-items:center;justify-content:center;font-size:26px;border-radius:50%;cursor:'+(can?'pointer':'default')+';background:'+(n.done?'rgba(45,212,191,.25)':(can?'#214452':'#152a38'))+';box-shadow:0 0 0 '+(can?'2.5px':'1px')+' '+(can?'#fbbf24':'#507180')+';opacity:'+(can||n.done?1:.42);
-    d.innerHTML=lbl;
-    if(n.type!=='start'){ var nm=document.createElement('div'); nm.style.cssText='position:absolute;left:50%;bottom:100%;margin-bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#d5e8ec;white-space:nowrap;background:#17333f;padding:2px 6px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.1)'; nm.textContent=n.type==='event'?dgPG(n.mode).name:dgNodeLabel(n); d.appendChild(nm); }
-    if(n.type==='event'&&!can&&!n.done){ var lk=document.createElement('div'); lk.style.cssText='position:absolute;left:50%;top:-5px;transform:translateX(-50%);font-size:11px'; lk.textContent='🔒'; d.appendChild(lk); }
-    if(can){ var ring=document.createElement('div'); ring.id='ring-'+n.id; ring.style.cssText='position:absolute;left:-9px;top:-9px;right:-9px;bottom:-9px;border-radius:50%;pointer-events:none;display:none;filter:drop-shadow(0 0 6px rgba(245,158,11,.9));'; ring.innerHTML='<svg width="100%" height="100%" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5" fill="none" stroke="rgba(245,158,11,.95)" stroke-width="5" stroke-linecap="round" stroke-dasharray="110" stroke-dashoffset="110" transform="rotate(-90 20 20)"><animate attributeName="stroke-dashoffset" from="110" to="0" dur="3s" fill="freeze"/></circle></svg>'; d.appendChild(ring); }
-    d.setAttribute('role','button');d.tabIndex=can?0:-1;d.setAttribute('aria-label',dgNodeLabel(n)+(can?'，可进入':n.done?'，已完成':'，未解锁'));
-    d.onclick=function(){ dgTap(n.id); };d.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();dgTap(n.id);}};
-    box.appendChild(d);
-  });
-  var ia=document.createElement('div'); ia.id='dg-iconA'; ia.style.cssText='position:absolute;z-index:6;width:24px;height:24px;font-size:20px;line-height:24px;text-align:center;transition:left .25s,top .25s;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));cursor:pointer'; ia.textContent='🔵'; box.appendChild(ia);
-  var ib=document.createElement('div'); ib.id='dg-iconB'; ib.style.cssText='position:absolute;z-index:7;width:22px;height:22px;font-size:18px;line-height:22px;text-align:center;transition:left .25s,top .25s;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));cursor:pointer'; ib.textContent='🟠'; box.appendChild(ib);
-  var leg=document.createElement('div'); leg.style.cssText='position:absolute;left:0;right:0;bottom:5px;text-align:center;font-size:10.5px;color:#a8a29e;line-height:1.6';
-  leg.innerHTML='<span style="color:#f59e0b;font-weight:800">━</span> 可走 &nbsp;<span style="color:#52c41a">━</span> 已通 &nbsp;<span style="color:#c4bfb8">┅</span> 未解锁<br>'+(window._netMode==='host'?'你控 A 🔵，点节点移动；同伴控 B 🟠':(window._netMode==='guest'?'你控 B 🟠，点节点移动；同伴控 A 🔵':'🔵/🟠 点图标切换 · 点节点移动 · 同点 3 秒进入'))+'</div>';
-  box.appendChild(leg);
+  ['A','B'].forEach(function(role){var token=(role==='A'?oldA:oldB)||document.createElement('div');token.id='dg-icon'+role;token.textContent=role;token.setAttribute('aria-label','特工 '+role+' 的位置');box.appendChild(token);});
   dgMoveIcons();
-  dgMsg('从底部潜入，各自点击路线节点。两名特工同点停留 3 秒开始行动。失败损失 1 格生命，安全屋恢复 1 格；取回机密后在顶层撤离。');
 }
+function dgHearts(){
+  var str='';for(var i=0;i<DUNGEON.maxHp;i++)str+='<svg class="dg-heart'+(i<DUNGEON.hp?'':' empty')+'" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21S2 15 2 8a5.5 5.5 0 0110-3 5.5 5.5 0 0110 3c0 7-10 13-10 13z"/></svg>';
+  return str;
+}
+function renderDungeonMapShell(role,code){
+  window._dungeon=true;S.mod='dungeon';
+  var shell=document.querySelector('.dungeon-screen'),fresh=!shell||shell.dataset.room!==selectedRoomId||shell.dataset.role!==role;
+  if(fresh){
+    $('app').innerHTML='<section class="dungeon-screen" data-room="'+selectedRoomId+'" data-role="'+role+'">'+
+      '<div class="dg-topline"><button class="dg-back" id="back" aria-label="退出密室">‹</button><span class="dg-room-code">双人合作 · '+code+'</span><div class="dg-life" id="dg-hp"></div></div>'+
+      '<header class="dg-heading"><h1>密室爬塔</h1><p>'+selectedRoom().name+'</p></header>'+
+      '<div class="scroll-shell"><div class="scroll-rod top"></div><div class="scroll-paper"><div id="dgmap"></div></div><div class="scroll-rod bottom"></div></div>'+
+      '<div class="dg-legend"><span><i></i>可前往</span><span><i class="done"></i>已完成</span><span><i class="locked"></i>未解锁</span></div>'+
+      '<div class="dg-footer"><div class="dg-role-line"><span class="dg-role-dot'+(role==='B'?' b':'')+'">'+role+'</span><span>你控制 '+role+' · 点击节点前进</span></div><div id="dgmsg" class="msg"></div></div></section>'+
+      '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+    $('back').onclick=function(){netSend({t:'bye'});clearTimers();closePeer();window._netMode=null;window._dgStarted=false;DUNGEON=null;location.search='';};
+    var scroll=document.querySelector('.scroll-shell');
+    if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){scroll.classList.add('is-opening');scroll.addEventListener('animationend',function(e){if(e.animationName==='scroll-unfurl')scroll.classList.remove('is-opening');});}
+    dgMsg('两人到同一节点，停留 3 秒开始行动。<br>失败 −1 生命，安全屋 +1 生命。');
+  }
+  $('dg-hp').innerHTML=dgHearts();$('dg-hp').setAttribute('aria-label','队伍生命 '+DUNGEON.hp+' / '+DUNGEON.maxHp);
+  dgDrawMap();
+}
+window.addEventListener('resize',function(){if($('dgmap')&&document.querySelector('.dungeon-screen'))dgDrawMap();});
+
 function renderDungeon(){
   if(DUNGEON && DUNGEON.over){ renderDungeonOver(DUNGEON.win); return; }
   if(!DUNGEON){ renderDungeonMenu(); return; }
@@ -839,30 +886,8 @@ function applyDungeon(dd){
   DUNGEON.locked={};
   dd.nodes.forEach(function(sn){ var n=dgNode(sn.id); if(n){ n.done=sn.done; if(sn.locked) DUNGEON.locked[sn.id]=true; if(sn.mode) n.mode=sn.mode; } });
 }
-function renderDungeonHostMap(){
-  window._dungeon=true; S.mod='dungeon';
-  var app=document.getElementById('app');
-  var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
-  app.innerHTML=
-    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 '+selectedRoom().name+'</span>'+
-    '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
-    '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
-    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; DUNGEON=null; location.search=''; };
-  dgDrawMap();
-}
-function renderDungeonGuestMap(code){
-  window._dungeon=true; S.mod='dungeon';
-  var app=document.getElementById('app');
-  var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
-  app.innerHTML=
-    '<div class="topbar"><span class="badge B">加入者 · 你控 B 🟠</span><span class="badge n">🏰 '+selectedRoom().name+' · 房间 '+code+'</span>'+
-    '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
-    '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
-    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; DUNGEON=null; location.search=''; };
-  dgDrawMap();
-}
+function renderDungeonHostMap(){renderDungeonMapShell('A',String(PEER.room||''));}
+function renderDungeonGuestMap(code){renderDungeonMapShell('B',String(code));}
 function dgHostOnData(dd){
   if(dd.t==='rtInput'||dd.t==='rtReady'){ realtimeHostData(dd); return; }
   if(dd.t==='mvB'){ hostMoveB(dd.id); }
@@ -933,7 +958,7 @@ function renderDungeonJoin(){
 function dgGuestOnData(dd){
   if(dd.t==='rtState'){ realtimeGuestData(dd); return; }
   if(dd.t==='dg'){ applyDungeon(dd.d); }
-  else if(dd.t==='dgcd'){ if(dd.n>0){ showDgBar(dd.id); } else { hideDgBar(); } }
+  else if(dd.t==='dgcd'){ if(dd.n>0){ showDgBar(dd.id,dd.n); } else { hideDgBar(); } }
   else if(dd.t==='dgEnd'){ clearTimers(); clearNetZones(); window._dead=true; window._dungeon=false; if(dd.d) applyDungeon(dd.d); if(dd.over){ renderDungeonOver(!!dd.win); } else { S.mod='dungeon'; renderDungeonGuestMap(String(PEER.room||'')); } }
   else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; renderDungeonMenu(); }
   else if(dd.t==='dgAbort'){ dungeonAbort(true); }
@@ -1075,23 +1100,17 @@ function hostSetInput(which, v){
   else if(which==='l'){ window._inL=v; }
   else if(which==='bp'){ window._beatPressB=v; }
 }
-function showDgBar(id){
+function showDgBar(id,remaining){
+  var old=$('dg-nodeprogress');
+  if(old&&old.dataset.node===id){if(remaining&&$('dg-np-n'))$('dg-np-n').textContent=remaining;return;}
   hideDgBar();
-  var el=document.querySelector('#dgmap [data-id="'+id+'"]');
-  var map=document.getElementById('dgmap');
-  if(!el||!map) return;
-  var pr=document.createElement('div');
-  pr.id='dg-nodeprogress';
-  pr.style.cssText='position:absolute;z-index:9;left:'+(parseFloat(el.style.left)-6)+'px;top:'+(parseFloat(el.style.top)+52+4)+'px;width:'+(52+12)+'px;height:10px;background:rgba(0,0,0,.16);border-radius:6px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.28)';
-  pr.innerHTML='<div id="dg-np-fill" style="height:100%;width:0;background:linear-gradient(90deg,#fbbf24,#ea580c)"></div>'+
-    '<div id="dg-np-n" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:900;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.7)">3</div>';
-  map.appendChild(pr);
-  var f=$('dg-np-fill'); if(f){ f.style.transition='width 3s linear'; setTimeout(function(){ f.style.width='100%'; },30); }
-  clearInterval(window._dgBarIv);
-  var n=3;
-  window._dgBarIv=setInterval(function(){
-    n--; if(n>0){ var e=$('dg-np-n'); if(e) e.textContent=n; try{beep(760,0.07,'square',0.14);}catch(err){} } else { clearInterval(window._dgBarIv); }
-  },1000);
+  var map=$('dgmap'),node=dgNode(id);if(!map||!node)return;
+  var pr=document.createElement('div');pr.id='dg-nodeprogress';pr.dataset.node=id;
+  pr.style.cssText='position:absolute;z-index:9;left:'+(node.x/100*map.clientWidth-32)+'px;top:'+(node.y/100*map.clientHeight+44)+'px;width:64px;height:11px;background:#bda276;border:1px solid #5f483e;border-radius:6px;overflow:hidden;pointer-events:none';
+  pr.innerHTML='<div id="dg-np-fill" style="height:100%;width:0;background:#ec983f"></div><div id="dg-np-n" style="position:absolute;inset:0;text-align:center;line-height:9px;font-size:9px;font-weight:900;color:#281f32">'+(remaining||3)+'</div>';
+  map.appendChild(pr);var f=$('dg-np-fill'),n=remaining||3;
+  f.style.transition='width '+n+'s linear';requestAnimationFrame(function(){if(f.isConnected)f.style.width='100%';});
+  window._dgBarIv=setInterval(function(){n--;if(n>0){var e=$('dg-np-n');if(e)e.textContent=n;}else clearInterval(window._dgBarIv);},1000);
 }
 function hideDgBar(){ var b=document.getElementById('dg-nodeprogress'); if(b) b.remove(); clearInterval(window._dgBarIv); }
 function dgTap(id){
@@ -1354,7 +1373,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v10·特工行动';
+var APP_VER='v10.1·卷轴地图';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
