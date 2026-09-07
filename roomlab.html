@@ -112,6 +112,30 @@
   .frow .btn{flex:1}
   @media(max-width:520px){ .roles{grid-template-columns:1fr 1fr} }
   @media(pointer:coarse){ .dpad{display:grid} }
+  /* 密室封面选择页：沿用参考图的紫底、竖版海报和双色入口。 */
+  body:has(.room-select){background:linear-gradient(155deg,#454065,#2b243f)}
+  .wrap:has(.room-select){padding:0;max-width:720px}
+  .room-select{--muted:#b9b7be;min-height:100svh;color:#fff;padding:clamp(48px,9svh,92px) 0 max(28px,env(safe-area-inset-bottom));position:relative;touch-action:pan-y;user-select:none}
+  .room-back{position:absolute;top:14px;left:16px;border:0;background:none;color:#ccc8dc;font:inherit;font-size:13px;cursor:pointer;padding:8px}
+  .room-title{font-size:clamp(18px,4.6vw,34px);line-height:1.35;text-align:center;margin:0 12px 24px;font-weight:700}
+  .room-carousel{position:relative}
+  .room-cover{display:block;width:55%;aspect-ratio:390/486;object-fit:cover;margin:auto;border:2px solid #100d16;border-radius:11%;background:#ffcc42;pointer-events:none}
+  .room-arrow{position:absolute;top:40%;width:16%;height:25%;padding:0;border:0;background:none;color:#26203d;font:bold clamp(50px,12vw,90px)/1 Arial;cursor:pointer}
+  .room-arrow:hover{color:#b9a6e1}.room-arrow.prev{left:0}.room-arrow.next{right:0}
+  .room-info{width:55%;margin:8px auto 0;padding:0 10px;line-height:1.45}
+  .room-recommend{font-size:clamp(17px,4vw,28px);font-weight:700}
+  .room-meta{color:var(--muted);font-size:clamp(12px,3.5vw,23px);white-space:nowrap;font-weight:600;margin:2px 0}
+  .room-rating{color:#ff6749}.room-tag{display:inline-block;background:#bab9bc;color:#303033;border-radius:6px;padding:0 9px;margin-right:8px;font-size:clamp(13px,3.5vw,23px);font-weight:700}
+  .room-pagination{text-align:center;font-size:12px;color:#c0b9d1;margin:14px 0 0;letter-spacing:2px}
+  .room-actions{width:46%;min-width:180px;margin:clamp(24px,5svh,52px) auto 0;display:grid;gap:15px}
+  .room-action{border:2px solid #100d16;border-radius:3px;background:#ffa44d;color:white;min-height:54px;padding:12px 4px;cursor:pointer;font:800 clamp(18px,4.4vw,30px)/1.2 'Microsoft YaHei',sans-serif;text-shadow:1.5px 1.5px #000,-1.5px -1.5px #000,1.5px -1.5px #000,-1.5px 1.5px #000}
+  .room-action.join{background:#ffda59}.room-action small{display:block;font-size:10px;font-weight:600;margin-top:5px;letter-spacing:1px;color:#372b30;text-shadow:none}
+  .room-select button:focus-visible{outline:3px solid white;outline-offset:4px}
+  .room-select button:active{transform:scale(.97)}
+  @media(min-width:600px){.room-action{min-height:86px}.room-actions{gap:25px}}
+  @media(max-height:700px){.room-select{padding-top:48px}.room-title{margin-bottom:16px}.room-actions{margin-top:20px}.room-pagination{margin-top:10px}}
+
+
 </style>
 </head>
 <body>
@@ -502,7 +526,7 @@ function newDungeon(){
     n.x = cnt===1 ? 50 : (16 + idx*(68/(cnt-1)));
     n.y = [88,71,54,37,20][n.layer];
   });
-  DUNGEON={ hp:5, maxHp:5, nodes:nodes, start:start.id, boss:boss.id, cur:'A', posA:start.id, posB:start.id, locked:{}, over:false, win:false, _t:null };
+  DUNGEON={ roomId:selectedRoomId, hp:5, maxHp:5, nodes:nodes, start:start.id, boss:boss.id, cur:'A', posA:start.id, posB:start.id, locked:{}, over:false, win:false, _t:null };
   // 连通性自检：从起点可达全部节点，且每个节点最终都能到 Boss（分支不允许是死路），不满足则重开一局图
   window._dgTries=(window._dgTries||0)+1;
   if(window._dgTries>5) return; // 防死循环
@@ -569,7 +593,7 @@ function renderDungeon(){
   var app=document.getElementById('app');
   var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
   app.innerHTML=
-    '<div class="topbar"><span class="badge n">🏰 密室爬塔</span><span class="badge A" id="dg-hp">'+hpStr+'</span>'+
+    '<div class="topbar"><span class="badge n">🏰 '+selectedRoom().name+'</span><span class="badge A" id="dg-hp">'+hpStr+'</span>'+
     '<span class="count" style="font-size:13px" id="dg-cur">操作：A</span>'+
     '<button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
     '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
@@ -578,26 +602,200 @@ function renderDungeon(){
   dgDrawMap();
 }
 /* ============ 密室爬塔 · 联网房间（host 权威 / guest 同步） ============ */
-function renderDungeonMenu(){
-  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._dgStarted=false; DUNGEON=null;
-  S.mod='dungeon';
-  var app=document.getElementById('app');
-  app.innerHTML=
-    '<h1>🏰 密室爬塔 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
-    '<p class="sub">双人把多个合作玩法串成一条分支地图：各自控制自己的小人沿连线走，站到同一个节点 3 秒进入玩法，共用 ❤️ 血条（失败 -1 / 休息 +1），一路爬到 Boss。走错分支会被锁定，考验路线决策。</p>'+
-    '<div class="howto">📡 <b>必须联网</b>：两台设备各开一个链接，房主创建房间，同伴输码加入，<b>房主管 A 🔵、加入者管 B 🟠</b>，各在自己手机上控制自己，画面实时同步、结算同时。</div>'+
-    '<div class="roles">'+
-      '<div class="rolecard a" id="dm2"><p class="rt" style="color:#60a5fa">📡 联网 · 创建房间（我控 A 🔵）</p><p class="rd">生成 4 位房间码发给同伴，等对方加入后一起爬塔。</p></div>'+
-      '<div class="rolecard b" id="dm3"><p class="rt" style="color:#fb923c">📡 联网 · 加入房间（我控 B 🟠）</p><p class="rd">输入房主的房间码加入，接管你的橙色小人。</p></div>'+
-    '</div>';
-  $('dm2').onclick=function(){ renderHostDungeon(); };
-  $('dm3').onclick=function(){ renderDungeonJoin(); };
+var ROOM_CATALOG=[
+  {
+    "id": "room-1",
+    "name": "这个老登很宠我",
+    "image": "assets/rooms/这个老登很宠我.png",
+    "theme": "温情",
+    "recommend": "新手必玩",
+    "rating": "8.1",
+    "minutes": 5,
+    "difficulty": "简单",
+    "tag": "情感"
+  },
+  {
+    "id": "room-2",
+    "name": "这女鬼非要跟我面基",
+    "image": "assets/rooms/这女鬼非要跟我面基.png",
+    "theme": "惊悚",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "惊悚"
+  },
+  {
+    "id": "room-3",
+    "name": "这把输了真寄了",
+    "image": "assets/rooms/这把输了真寄了.png",
+    "theme": "生存",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "生存"
+  },
+  {
+    "id": "room-4",
+    "name": "这酒店住完就老实了",
+    "image": "assets/rooms/这酒店住完就老实了.png",
+    "theme": "悬疑",
+    "recommend": "默契挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "悬疑"
+  },
+  {
+    "id": "room-5",
+    "name": "这个老登缠上我了",
+    "image": "assets/rooms/这个老登缠上我了.png",
+    "theme": "惊悚",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "惊悚"
+  },
+  {
+    "id": "room-6",
+    "name": "拿你个宝至于吗",
+    "image": "assets/rooms/拿你个宝至于吗.png",
+    "theme": "冒险",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "冒险"
+  },
+  {
+    "id": "room-7",
+    "name": "坏了我成预制菜了",
+    "image": "assets/rooms/坏了我成预制菜了.png",
+    "theme": "逃脱",
+    "recommend": "默契挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "逃脱"
+  },
+  {
+    "id": "room-8",
+    "name": "这飞船混进个什么玩意",
+    "image": "assets/rooms/这飞船混进个什么玩意.png",
+    "theme": "科幻",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "科幻"
+  },
+  {
+    "id": "room-9",
+    "name": "情绪价值真能发电",
+    "image": "assets/rooms/情绪价值真能发电.png",
+    "theme": "协作",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "协作"
+  },
+  {
+    "id": "room-10",
+    "name": "这个妈能退货吗",
+    "image": "assets/rooms/这个妈能退货吗.png",
+    "theme": "家庭",
+    "recommend": "默契挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "家庭"
+  },
+  {
+    "id": "room-11",
+    "name": "上个学还得打巅峰赛",
+    "image": "assets/rooms/上个学还得打巅峰赛.png",
+    "theme": "校园",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "校园"
+  },
+  {
+    "id": "room-12",
+    "name": "这公司活人感真低",
+    "image": "assets/rooms/这公司活人感真低.png",
+    "theme": "职场",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "职场"
+  },
+  {
+    "id": "room-13",
+    "name": "谁家密室不包出啊",
+    "image": "assets/rooms/谁家密室不包出啊.png",
+    "theme": "解谜",
+    "recommend": "默契挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "解谜"
+  }
+];
+var selectedRoomId=ROOM_CATALOG[0].id;
+try { var savedRoom=sessionStorage.getItem('roomlab-room'); if(ROOM_CATALOG.some(function(r){return r.id===savedRoom;})) selectedRoomId=savedRoom; } catch(e){}
+function selectedRoom(){ return ROOM_CATALOG.find(function(r){return r.id===selectedRoomId;})||ROOM_CATALOG[0]; }
+function selectRoom(id){
+  if(!ROOM_CATALOG.some(function(r){return r.id===id;})) return;
+  selectedRoomId=id;
+  try{sessionStorage.setItem('roomlab-room',id);}catch(e){}
 }
-function dgSnapshot(){ return { hp:DUNGEON.hp, maxHp:DUNGEON.maxHp, posA:DUNGEON.posA, posB:DUNGEON.posB, over:DUNGEON.over, win:DUNGEON.win,
+function renderDungeonMenu(){
+  clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._dgStarted=false; window._dungeon=false; window._netMode=null; DUNGEON=null;
+  S.mod='dungeon';
+  $('app').innerHTML='<section class="room-select" aria-label="选择密室" tabindex="-1">'+
+    '<button class="room-back" id="room-back">‹ 返回首页</button>'+
+    '<h1 class="room-title" id="room-title"></h1>'+
+    '<div class="room-carousel"><img class="room-cover" id="room-cover" draggable="false" alt="">'+
+    '<button class="room-arrow prev" id="room-prev" aria-label="上一个密室">❮</button>'+
+    '<button class="room-arrow next" id="room-next" aria-label="下一个密室">❯</button></div>'+
+    '<div class="room-info" id="room-info" aria-live="polite"></div>'+
+    '<div class="room-pagination" id="room-pagination"></div>'+
+    '<div class="room-actions"><button class="room-action" id="dm2">创建房间<small>角色 A · 现场</small></button>'+
+    '<button class="room-action join" id="dm3">加入房间<small>角色 B · 后方</small></button></div></section>';
+  var page=document.querySelector('.room-select');
+  function paint(){
+    var r=selectedRoom(), i=ROOM_CATALOG.indexOf(r);
+    $('room-title').textContent=r.theme+' | '+r.name;
+    $('room-cover').src=r.image; $('room-cover').alt=r.name+'密室封面';
+    $('room-info').innerHTML='<div class="room-recommend">['+r.recommend+']</div><div class="room-meta">'+
+      (r.rating?'<span class="room-rating">'+r.rating+'分</span>　|　':'')+r.minutes+'分钟　|　2人开场</div>'+
+      '<span class="room-tag">'+r.difficulty+'</span><span class="room-tag">'+r.tag+'</span>';
+    $('room-pagination').textContent=(i+1)+' / '+ROOM_CATALOG.length;
+  }
+  function move(delta){var i=ROOM_CATALOG.indexOf(selectedRoom());selectRoom(ROOM_CATALOG[(i+delta+ROOM_CATALOG.length)%ROOM_CATALOG.length].id);paint();}
+  $('room-prev').onclick=function(){move(-1);}; $('room-next').onclick=function(){move(1);};
+  page.onkeydown=function(e){if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();move(e.key==='ArrowLeft'?-1:1);}};
+  var touch=null;
+  page.addEventListener('touchstart',function(e){if(e.touches.length!==1||e.target.closest('button')){touch=null;return;}touch={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
+  page.addEventListener('touchend',function(e){if(!touch)return;var dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3)move(dx<0?1:-1);},{passive:true});
+  page.addEventListener('touchcancel',function(){touch=null;},{passive:true});
+  $('room-back').onclick=function(){location.search='';};
+  $('dm2').onclick=function(){renderHostDungeon();}; $('dm3').onclick=function(){renderDungeonJoin();};
+  paint();
+}
+function dgSnapshot(){ return { roomId:DUNGEON.roomId, hp:DUNGEON.hp, maxHp:DUNGEON.maxHp, posA:DUNGEON.posA, posB:DUNGEON.posB, over:DUNGEON.over, win:DUNGEON.win,
   nodes:DUNGEON.nodes.map(function(n){ return {id:n.id, done:n.done, locked:!!DUNGEON.locked[n.id], mode:n.mode}; }) }; }
 function dgBroadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'dg', d:dgSnapshot()}); }catch(e){} } }
 function applyDungeon(dd){
+  if(dd.roomId) selectRoom(dd.roomId);
   if(!DUNGEON) newDungeon();
+  DUNGEON.roomId=selectedRoomId;
   DUNGEON.hp=dd.hp; DUNGEON.maxHp=dd.maxHp; DUNGEON.posA=dd.posA; DUNGEON.posB=dd.posB; DUNGEON.over=dd.over; DUNGEON.win=dd.win;
   DUNGEON.locked={};
   dd.nodes.forEach(function(sn){ var n=dgNode(sn.id); if(n){ n.done=sn.done; if(sn.locked) DUNGEON.locked[sn.id]=true; if(sn.mode) n.mode=sn.mode; } });
@@ -607,7 +805,7 @@ function renderDungeonHostMap(){
   var app=document.getElementById('app');
   var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
   app.innerHTML=
-    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 密室爬塔</span>'+
+    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 '+selectedRoom().name+'</span>'+
     '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
     '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
@@ -619,7 +817,7 @@ function renderDungeonGuestMap(code){
   var app=document.getElementById('app');
   var hpStr=''; for(var i=0;i<DUNGEON.maxHp;i++) hpStr+=(i<DUNGEON.hp?'❤️':'🖤');
   app.innerHTML=
-    '<div class="topbar"><span class="badge B">加入者 · 你控 B 🟠</span><span class="badge n">🏰 房间 '+code+'</span>'+
+    '<div class="topbar"><span class="badge B">加入者 · 你控 B 🟠</span><span class="badge n">🏰 '+selectedRoom().name+' · 房间 '+code+'</span>'+
     '<span class="badge A" id="dg-hp">'+hpStr+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
     '<div class="panel"><div id="dgmap"></div><div id="dgmsg" class="msg" style="margin:8px 0 0"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
@@ -639,10 +837,10 @@ function renderHostDungeon(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='host'; window._dgStarted=true;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 密室联网</span><button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
+    '<div class="topbar"><span class="badge A">房主 · 你控 A 🔵</span><span class="badge n">🏰 '+selectedRoom().name+'</span><button class="btn sm" id="back" style="margin-left:auto">回大厅</button></div>'+
     '<div class="panel" id="dgroom"></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=gobackMenu;
+  $('back').onclick=renderDungeonMenu;
   var room=$('dgroom');
   room.innerHTML='<div class="msg warn" style="text-align:center;font-size:15px;font-weight:700;margin:0">⏳ 正在连接服务…</div>';
   loadPeerLib(function(P){
@@ -684,7 +882,7 @@ function renderDungeonJoin(){
     '<div style="margin:10px 0"><input id="rc" inputmode="numeric" maxlength="4" placeholder="输入 4 位房间码" style="width:100%;height:64px;font-size:28px;font-weight:800;text-align:center;letter-spacing:8px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc;box-sizing:border-box;outline:none"></div>'+
     '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
     '<div id="jmsg"></div></div>';
-  $('back').onclick=gobackMenu;
+  $('back').onclick=renderDungeonMenu;
   $('rc').oninput=function(){ this.value=this.value.replace(/\D/g,''); };
   $('joing').onclick=function(){
     var code=($('rc').value||'').replace(/\D/g,'');
