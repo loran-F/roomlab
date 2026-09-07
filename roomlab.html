@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>玩法试炼场 · roomlab-v9（单玩法沙盒）</title>
+<title>玩法试炼场 · roomlab-v10（特工行动）</title>
 <style>
   :root{
     --a:#2563eb; --a-bg:#eff6ff;
@@ -112,6 +112,7 @@
   .frow .btn{flex:1}
   @media(max-width:520px){ .roles{grid-template-columns:1fr 1fr} }
   @media(pointer:coarse){ .dpad{display:grid} }
+
   /* 密室封面选择页：沿用参考图的紫底、竖版海报和双色入口。 */
   body:has(.room-select){background:linear-gradient(155deg,#454065,#2b243f)}
   .wrap:has(.room-select){padding:0;max-width:720px}
@@ -135,50 +136,76 @@
   @media(min-width:600px){.room-action{min-height:86px}.room-actions{gap:25px}}
   @media(max-height:700px){.room-select{padding-top:48px}.room-title{margin-bottom:16px}.room-actions{margin-top:20px}.room-pagination{margin-top:10px}}
 
+/* 战斗终端：安全区、触控尺寸与角色颜色统一。 */
+.rt-shell{max-width:460px;margin:auto;color:#e5edf5}
+.rt-shell .topbar{margin-bottom:10px}.rt-kicker{font-size:11px;letter-spacing:3px;color:#5eead4}
+.rt-panel{position:relative;background:radial-gradient(ellipse at top,#15333c,#111b2b 70%);border:1px solid #365663;border-radius:16px;padding:16px;overflow:hidden}
+.rt-panel h2{font-size:23px;margin:6px 0 10px}.rt-help{min-height:54px;font-size:13px;color:#bfccd8;line-height:1.6;margin:10px 0}
+.rt-steps{display:flex;gap:6px;margin-bottom:16px}.rt-step{flex:1;padding:8px 2px;border-bottom:3px solid #334155;text-align:center;font-size:11px;color:#94a3b8}.rt-step.on{border-color:#5eead4;color:#ccfbf1}.rt-step.past{border-color:#64748b}
+.rt-arena{height:190px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:repeating-linear-gradient(0deg,transparent,transparent 23px,#33505c22 24px);border:1px solid #2d4857;border-radius:12px;text-align:center}
+.rt-cue{font:900 54px/1.1 'Microsoft YaHei',sans-serif;color:#fbbf24}.rt-cue.go{color:#5eead4;text-shadow:0 0 24px #14b8a666}.rt-caption{font-size:14px;color:#d5e0ea}
+.rt-meter{height:10px;background:#28384b;border-radius:8px;overflow:hidden;margin:10px 0}.rt-meter>i{display:block;height:100%;width:0;background:#5eead4;transition:width .06s linear}
+.rt-readouts{display:flex;gap:12px;font-size:12px;color:#cbd5e1;justify-content:space-between}.rt-readouts b{color:#fbbf24}
+.rt-controls{display:flex;gap:10px;margin:14px 0 0}.rt-control{flex:1;min-height:76px;touch-action:none;user-select:none;border:2px solid #93c5fd;background:#1e40af;border-radius:13px;color:#fff;font:bold 19px 'Microsoft YaHei',sans-serif;cursor:pointer}
+.rt-control.role-b{background:#9a3412;border-color:#fdba74}.rt-control.held,.rt-control:active{filter:brightness(1.35);transform:translateY(2px)}.rt-control:disabled{opacity:.45;cursor:default}
+.rt-shell .msg{min-height:48px;font-size:13px;line-height:1.5}.rt-disconnect{border:2px solid #f87171!important}
+.rt-control:focus-visible{outline:3px solid #fff;outline-offset:3px}
+@media(max-width:350px){.rt-panel{padding:11px}.rt-arena{height:160px}.rt-help{font-size:12px}.rt-control{font-size:17px;min-height:68px}}
+@media(prefers-reduced-motion:reduce){.rt-meter>i{transition:none}}
+
+
+.vault-slots{display:flex;gap:5px;justify-content:center;margin:14px 0;width:100%}
+.vault-slot{position:relative;flex:1;min-width:0;max-width:54px;height:66px;border:2px solid #475569;background:#0f172a;border-radius:9px;color:#e2e8f0;font:bold 25px sans-serif;display:flex;align-items:center;justify-content:center;padding-top:12px}
+.vault-slot small{position:absolute;left:5px;top:3px;font:10px sans-serif;color:#94a3b8}.vault-slot.on{border-color:#5eead4;color:#5eead4;background:#123039}
+.vault-panel{max-width:460px;margin:auto}.vault-panel .numpad{max-width:340px;margin:auto}
+@media(max-width:350px){.vault-slot{height:57px;font-size:21px}.vault-slots{gap:3px}}
 
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script>
-/* ============ 规则集：roomlab-v9（单玩法沙盒） ============ */
-var RULESET_ID = 'roomlab-v9';
-var CATCH_GOAL = 20; // 物资空投：限时接够 20 个过关
+/* ============ 规则集：roomlab-v10（特工行动） ============ */
+var RULESET_ID = 'roomlab-v10';
+var CATCH_GOAL = 20; // 情报空投：限时接够 20 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
    id 唯一；time = 单局倒计时；a = A 端说明；b = B 端手册说明 */
 var PLAYGROUNDS = [
-  { id:'maze', icon:'🗺️', name:'迷宫走线', tag:'侦察', time:120,
+  {id:'boss', icon:'🎯', name:'最终对峙', tag:'首领', time:100,
+    a:'三阶段协作：按住护盾拦截 A / AB 警报，松手散热；破解阶段只让指定角色按住；最后绿灯亮时与 B 在 0.38 秒内同时点按撤离。全队 7 格装甲。',
+    b:'你守 B / AB 警报。与 A 交替破解，抢按会断链；最后绿灯时同时点按撤离。长按护盾会过热，必须报号、松手、再接力。'},
+  { id:'maze', icon:'🗺️', name:'通风潜行', tag:'侦察', time:120,
     a:'探针盲走：只能看到上/下/左/右 5 格，看不到斜向和远处。问 B 要方向，一句句走。碰墙 -5s，踩陷阱 -8s。走到终点通关。',
     b:'你手握全图：绿色安全路线 + 红色陷阱点。听 A 报方位，一句句指挥「上/下/左/右」，千万别让他走红线外的岔路。' },
-  { id:'dial', icon:'🎛️', name:'转盘对接', tag:'校时', time:90,
+  { id:'dial', icon:'🎛️', name:'频段校准', tag:'校时', time:90,
     a:'转盘上有一张目标指令卡（卡号你看得到、含义你看不到）——把卡号报给 B。转你的针，报针位，听 B 指挥，他说「锁」就按锁定键。对齐 ±1 算对，锁错 -3s。',
     b:'查「目标指令卡对照表」得到本局目标刻度。听 A 报卡号 + 当前针位，指挥他往左/往右，对齐喊「锁！」。' },
-  { id:'wires', icon:'🧨', name:'剪线排雷', tag:'拆弹', time:90,
+  { id:'wires', icon:'🧨', name:'警报拆线', tag:'拆弹', time:90,
     a:'报 6 根线颜色 → 按 B 判剪第 1 根 → 剪完再报剩余 5 根 → 剪第 2 根 → 再报剩余 4 根 → 剪第 3 根。任何一步剪错 = 爆炸！',
     b:'按「三步剪线规则」逐步判：第 1 步 6 根、第 2 步剩余 5、第 3 步剩余 4，听 A 报颜色给答案。' },
-  { id:'code', icon:'📖', name:'对暗号·接头', tag:'听译', time:120,
-    a:'墙上 4 个抽象符号（说不出口、只能描述）——逐个描述给 B，B 查「密码本」翻译成数字，你报着依次输入 4 位密码。描述错 / 听译错都会输错（-3s 清空重来）。',
+  { id:'code', icon:'📖', name:'接头暗号', tag:'听译', time:120,
+    a:'接头墙上 4 个抽象符号（说不出口、只能描述）——逐个描述给 B，B 查「密码本」翻译成数字，你报着依次输入 4 位密码。描述错 / 听译错都会输错（-3s 清空重来）。',
     b:'你是「密码本」：10 个符号 ↔ 数字对照全在你手上。听 A 描述墙上符号，认出是哪个、报对应数字；连对 4 个 A 就开门。' },
-  { id:'pressure', icon:'🌡️', name:'锅炉校准', tag:'操作', time:120,
-    a:'压力表在漂移，你只看到读数（看不到安全区间）。按 ⬆⬇ 调节并实时报数给 B，听指挥「加 / 减 / 稳住」。区间内累计保持 8 秒通关；撞到 0 或 100 = 爆炸！',
-    b:'你持有「安全区间」（如 40~60），A 看不到。听 A 报当前读数，判断在不在区间内，指挥他加 / 减 / 稳住。累计 8 秒就赢，别让 A 撞爆表。' },
-  { id:'vault', icon:'🧠', name:'记忆暗格', tag:'记忆', time:120,
-    a:'保险柜 5 位密码随机逐个闪现，每位只亮 1 秒就变问号！你边看边口述给 B，他记满 5 位后提交，你自动判定。错 -3s 重来。',
-    b:'你是密码记录员：A 报一位你按一位，记满 5 位点「提交给 A」。听错/按错 = A 那边判定失败 -3s，清空重记。' },
-  { id:'catch', icon:'🧺', name:'物资空投', tag:'合力', time:60,
+  { id:'pressure', icon:'🌡️', name:'动力稳压', tag:'协作', time:90,
+    a:'你看到实时压力，却看不到安全区间。按住加压 / 减压，报读数给 B。压力有惯性，0 / 100 爆表即失败。听 B 提前报区间移动，完成 3 轮稳压。',
+    b:'你看到移动安全区间和下一次变动，看不到 A 的压力。指挥 A 调整，确认稳定后按住校准阀 4 秒；阀门会过热，区间外硬开阀会损坏设备。3 轮校准后断开警报电源。' },
+  { id:'vault', icon:'🧠', name:'档案窃取', tag:'记忆', time:120,
+    a:'档案密码按随机位序逐个闪现，报“第几位、什么数字”给 B。独立试玩 5 位 / 每位 1 秒；密室逐层变为 5、6、7 位并提速。输错或重新扫描 -3 秒。',
+    b:'听 A 报位序，点对应格子后输入数字；填满再提交。独立试玩保持 5 位，密室高层增加至 6、7 位。听错 / 按错 -3 秒，清空重记。' },
+  { id:'catch', icon:'🧺', name:'情报空投', tag:'合力', time:60,
     a:'你控 ← 左移接货员，B 控 → 右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。',
     b:'你控 → 右移接货员，A 控 ← 左移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。' },
-  { id:'shield', icon:'🛡️', name:'双人护盾', tag:'防守', time:60,
-    a:'你管<b>左半区</b>护盾，按住升起护盾片挡住陨石。B 管右半区。护盾接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。',
-    b:'你管<b>右半区</b>护盾，按住升起护盾片挡住陨石。A 管左半区。护盾接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。' },
-  { id:'beam', icon:'🏗️', name:'双人抬梁', tag:'平衡', time:60,
+  { id:'shield', icon:'🛡️', name:'双人屏障', tag:'防守', time:60,
+    a:'你管<b>左半区</b>护盾，按住升起护盾片挡住警戒脉冲。B 管右半区。护盾接住警戒脉冲 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。',
+    b:'你管<b>右半区</b>护盾，按住升起护盾片挡住警戒脉冲。A 管左半区。护盾接住警戒脉冲 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。' },
+  { id:'beam', icon:'🏗️', name:'破障搬运', tag:'平衡', time:60,
     a:'你抬<b>左端</b>，B 抬右端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。',
     b:'你抬<b>右端</b>，A 抬左端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。' },
-  { id:'beat', icon:'🎵', name:'双人节拍', tag:'节奏', time:60,
+  { id:'beat', icon:'🎵', name:'信号节拍', tag:'节奏', time:60,
     a:'音符滚到判定线时按下：<b style="color:#60a5fa">蓝 = 你按</b>、<b style="color:#c084fc">紫 = 你和 B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。',
     b:'音符滚到判定线时按下：<b style="color:#fb923c">橙 = 你按</b>、<b style="color:#c084fc">紫 = 你和 A 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。' },
-  { id:'bridge', icon:'🌉', name:'双人架桥', tag:'运输', time:60,
+  { id:'bridge', icon:'🌉', name:'撤离架桥', tag:'运输', time:60,
     a:'你控 ← 左移桥面，B 控 → 右移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。',
     b:'你控 → 右移桥面，A 控 ← 左移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。' }
 ];
@@ -253,15 +280,20 @@ function genWires(){
    B 在手册查表得到目标刻度，指挥 A 转针对齐。零后端、跨设备可玩。 */
 var CARD_TABLE = { 1:7, 2:3, 3:9, 4:0, 5:5, 6:2, 7:8, 8:4, 9:1, 10:6 };
 /* 每一局的内容：随机转盘起始刻度 + 随机目标指令卡 + 随机 6 根线序（迷宫固定）
-   code: 随机抽 4 个不重复符号（0-9）；pressure: 安全区间为设备标准 40~60（两端一致，A 端判定、B 端展示）；
-   vault: A 端生成 5 位密码（随机逐个闪现，A 口述给 B，B 记录提交，A 自动判定） */
+   code: 随机抽 4 个不重复符号（0-9）；pressure: 使用独立的房主实时模型与角色专属快照；
+   vault: A 端按事件层数生成 5/6/7 位密码，B 只同步配置，不同步答案。 */
+function vaultSettings(){
+  if(!window._dungeon||S.mod!=='vault')return {digits:5,flashMs:1000,layer:1};
+  var node=dgNode(window._dgNode),layer=node?rtClamp(node.layer,1,3):1;
+  return {digits:layer+4,flashMs:1200-layer*200,layer:layer};
+}
 function newSet(){
   var card=1+Math.floor(Math.random()*10);
   var syms=[], pool=[0,1,2,3,4,5,6,7,8,9];
   while(syms.length<4){ var i=Math.floor(Math.random()*pool.length); syms.push(pool.splice(i,1)[0]); }
-  var vault=[]; for(var v=0;v<5;v++) vault.push(Math.floor(Math.random()*10));
+  var vc=vaultSettings(),vault=[]; for(var v=0;v<vc.digits;v++) vault.push(Math.floor(Math.random()*10));
   return { dialStart: Math.floor(Math.random()*10), targetCard: card, targetY: CARD_TABLE[card], wires: genWires(),
-           syms:syms, pres:{lo:40,hi:60}, vault:vault };
+           syms:syms, vault:vault, vaultConfig:vc };
 }
 
 /* ============ 状态 ============ */
@@ -272,7 +304,7 @@ var S = {
   time: 120
 };
 var timers = [];
-function clearTimers(){ timers.forEach(function(t){ clearInterval(t); }); timers=[]; }
+function clearTimers(){ window._timerEpoch=(window._timerEpoch||0)+1; window._vaultSubmitHandler=null;window._vaultResultHandler=null;if(window._rtCleanup) window._rtCleanup(); timers.forEach(function(t){ clearInterval(t); }); timers=[]; }
 function el(html){ var d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
 function $(id){ return document.getElementById(id); }
 function PG(){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===S.mod) return PLAYGROUNDS[i]; } return PLAYGROUNDS[0]; }
@@ -342,6 +374,7 @@ function netAskRestart(){
   var m=$('msg'); if(m){ m.className='msg warn'; m.textContent='⏳ 已请求再来一局，等对方确认…'; }
 }
 function netStartNewRound(){
+  if(S.mod==='boss'||S.mod==='pressure'){ startRealtime(S.mod); return; }
   window._restartAwait=false;
   if(window._host&&window._host.reset){ window._host.reset(); }
 }
@@ -381,6 +414,7 @@ function cut(n){
    同屏玩法：introGo(null, cb)；联网 host：introGo(broadcastCd, cb)，broadcastCd(n) 每阶段广播 {t:'cd',n}（n=3/2/1/0=GO）
    倒计时期间 window._introLock=true，物理循环不启动/不推进 */
 function introGo(broadcastCd, cb){
+  var epoch=window._timerEpoch;
   window._introLock=true;
   var old=document.getElementById('intro-ov'); if(old) old.remove();
   var ov=document.createElement('div');
@@ -392,8 +426,9 @@ function introGo(broadcastCd, cb){
   // 兜底：无论倒计时广播是否正常到达，4.5s 内一定移除遮罩，避免残留挡住触控
   setTimeout(function(){ var o=document.getElementById('intro-ov'); if(o) o.remove(); window._introLock=false; }, 4500);
   function step(){
+    if(epoch!==window._timerEpoch){ov.remove();return;}
     if(n>0){ num.textContent=n; tip.textContent='准备…'; try{beep(440,0.08,'square',0.1);}catch(e){} if(broadcastCd) broadcastCd(n); n--; setTimeout(step,1000); }
-    else { num.textContent='GO!'; tip.textContent='开始！'; try{beep(880,0.16,'square',0.12);}catch(e){} if(broadcastCd) broadcastCd(0); setTimeout(function(){ ov.remove(); window._introLock=false; if(cb) cb(); },450); }
+    else { num.textContent='GO!'; tip.textContent='开始！'; try{beep(880,0.16,'square',0.12);}catch(e){} if(broadcastCd) broadcastCd(0); setTimeout(function(){ ov.remove(); window._introLock=false; if(cb&&epoch===window._timerEpoch) cb(); },450); }
   }
   step();
 }
@@ -414,7 +449,7 @@ function guestIntro(n){
 function render(){
   if(!S.mod){ renderMain(); }
   else if(S.mod==='dungeon'){ renderDungeon(); }
-  else if(S.mod==='catch'||S.mod==='shield'||S.mod==='beam'||S.mod==='beat'||S.mod==='bridge'){
+  else if(S.mod==='boss'||S.mod==='pressure'||S.mod==='catch'||S.mod==='shield'||S.mod==='beam'||S.mod==='beat'||S.mod==='bridge'){
     if(!S.role){ renderPickRole(); }
     else if(S.role==='A'){ renderHost(); }
     else if(S.role==='B'){ renderJoin(); }
@@ -434,7 +469,7 @@ function renderMain(){
       '<div class="main-mid">'+
         '<h1 class="main-title">再做一分钟朋友</h1>'+
         '<div class="main-pic-wrap"><img src="pic.png" class="main-pic" alt=""></div>'+
-        '<button class="main-enter" id="main-enter">进入密室爬塔</button>'+
+        '<button class="main-enter" id="main-enter">选择密室行动</button>'+
       '</div>'+
       '<div class="main-ver">version:'+APP_VER+'</div>'+
     '</div>';
@@ -490,13 +525,13 @@ function renderSame(){
    休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
 var DUNGEON=null;
 var EV_POOL=[]; // 单机同屏已移除，密室必须联机（AB 两台设备）
-var EV_POOL_NET=['catch','shield','beam','beat','bridge','maze','dial','wires','code','vault'];
+var EV_POOL_NET=['catch','shield','beam','beat','bridge','maze','dial','wires','code','vault','pressure'];
 function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
 function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
 function dgNodeLabel(n){
-  if(n.type==='rest') return '休息点';
-  if(n.type==='boss') return 'Boss';
-  if(n.type==='start') return '起点';
+  if(n.type==='rest') return '安全屋';
+  if(n.type==='boss') return '最终对峙';
+  if(n.type==='start') return '潜入入口';
   var p=dgPG(n.mode); return p?p.icon+' '+p.name:n.mode;
 }
 function dgReachable(id){
@@ -539,6 +574,9 @@ function newDungeon(){
 function dgMsg(html){ var m=$('dgmsg'); if(m){ m.innerHTML=html; m.style.display='block'; } }
 function dgMoveIcons(){
   var ia=$('dg-iconA'), ib=$('dg-iconB'), box=$('dgmap');
+  // 联机角色固定；图标只显示位置，让点击穿透到下面的路线节点。
+  if(ia)ia.style.pointerEvents=window._netMode?'none':'auto';
+  if(ib)ib.style.pointerEvents=window._netMode?'none':'auto';
   var bw=box?box.clientWidth:360, bh=540;
   var na=dgNode(DUNGEON.posA), nb=dgNode(DUNGEON.posB);
   if(ia&&na){ ia.style.left=(na.x/100*bw-22)+'px'; ia.style.top=(na.y/100*bh-13)+'px'; }
@@ -549,7 +587,7 @@ function dgMoveIcons(){
 }
 function dgDrawMap(){
   var box=$('dgmap'); if(!box) return;
-  box.style.cssText='position:relative;width:100%;max-width:430px;height:540px;margin:0 auto;background:linear-gradient(180deg,#fdf6e3,#f3e9d2);border-radius:14px;overflow:hidden';
+  box.style.cssText='position:relative;width:100%;max-width:430px;height:540px;margin:0 auto;background:repeating-linear-gradient(0deg,transparent,transparent 29px,#29495633 30px),repeating-linear-gradient(90deg,transparent,transparent 29px,#29495633 30px),linear-gradient(180deg,#0b2530,#101a29);border:1px solid #335461;border-radius:14px;overflow:hidden';
   var boxW=box.clientWidth||360, boxH=540, NS=52; // 节点正圆直径 52px
   function cx(n){ return n.x/100*boxW; }
   function cy(n){ return n.y/100*boxH; }
@@ -564,18 +602,19 @@ function dgDrawMap(){
       lines.push('<path d="M '+x1.toFixed(1)+' '+y1.toFixed(1)+' C '+x1.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+mid.toFixed(1)+', '+x2.toFixed(1)+' '+y2.toFixed(1)+'" fill="none" stroke="'+stroke+'" stroke-width="'+w+'" stroke-linecap="round"'+dash+'/>');
     });
   });
-  box.innerHTML='<svg style="position:absolute;left:0;top:0;width:100%;height:100%">'+lines.join('')+'</svg>';
+  box.innerHTML='<div style="position:absolute;top:14px;left:16px;color:#7dd3c5;font-size:11px;letter-spacing:3px">机密行动 / 潜入路线</div><div style="position:absolute;top:35px;left:16px;color:#d8edf2;font-size:15px;font-weight:700">取回档案，双人撤离</div><svg style="position:absolute;left:0;top:0;width:100%;height:100%">'+lines.join('')+'</svg>';
   DUNGEON.nodes.forEach(function(n){
-    var lbl = n.type==='start'?'🚪':(n.type==='rest'?'🏕️':(n.type==='boss'?'👑':dgPG(n.mode).icon));
+    var lbl = n.type==='start'?'🚪':(n.type==='rest'?'🏠':(n.type==='boss'?'🎯':dgPG(n.mode).icon));
     var can=dgReachable(n.id);
     var d=document.createElement('div');
     d.dataset.id=n.id;
-    d.style.cssText='position:absolute;left:'+(cx(n)-NS/2)+'px;top:'+(cy(n)-NS/2)+'px;width:'+NS+'px;height:'+NS+'px;display:flex;align-items:center;justify-content:center;font-size:26px;border-radius:50%;cursor:'+(can?'pointer':'default')+';background:'+(n.done?'rgba(82,196,26,.32)':(can?'rgba(255,255,255,.96)':'rgba(255,255,255,.42)'))+';box-shadow:0 0 0 '+(can?'2.5px':'1px')+' '+(can?'#f59e0b':'#d6d3d1')+';opacity:'+(can||n.done?1:.42);
+    d.style.cssText='position:absolute;left:'+(cx(n)-NS/2)+'px;top:'+(cy(n)-NS/2)+'px;width:'+NS+'px;height:'+NS+'px;display:flex;align-items:center;justify-content:center;font-size:26px;border-radius:50%;cursor:'+(can?'pointer':'default')+';background:'+(n.done?'rgba(45,212,191,.25)':(can?'#214452':'#152a38'))+';box-shadow:0 0 0 '+(can?'2.5px':'1px')+' '+(can?'#fbbf24':'#507180')+';opacity:'+(can||n.done?1:.42);
     d.innerHTML=lbl;
-    if(n.type==='event'&&can){ var nm=document.createElement('div'); nm.style.cssText='position:absolute;left:50%;bottom:100%;margin-bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#78716c;white-space:nowrap;background:rgba(255,255,255,.92);padding:2px 6px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.1)'; nm.textContent=dgPG(n.mode).name; d.appendChild(nm); }
+    if(n.type!=='start'){ var nm=document.createElement('div'); nm.style.cssText='position:absolute;left:50%;bottom:100%;margin-bottom:4px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#d5e8ec;white-space:nowrap;background:#17333f;padding:2px 6px;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.1)'; nm.textContent=n.type==='event'?dgPG(n.mode).name:dgNodeLabel(n); d.appendChild(nm); }
     if(n.type==='event'&&!can&&!n.done){ var lk=document.createElement('div'); lk.style.cssText='position:absolute;left:50%;top:-5px;transform:translateX(-50%);font-size:11px'; lk.textContent='🔒'; d.appendChild(lk); }
     if(can){ var ring=document.createElement('div'); ring.id='ring-'+n.id; ring.style.cssText='position:absolute;left:-9px;top:-9px;right:-9px;bottom:-9px;border-radius:50%;pointer-events:none;display:none;filter:drop-shadow(0 0 6px rgba(245,158,11,.9));'; ring.innerHTML='<svg width="100%" height="100%" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17.5" fill="none" stroke="rgba(245,158,11,.95)" stroke-width="5" stroke-linecap="round" stroke-dasharray="110" stroke-dashoffset="110" transform="rotate(-90 20 20)"><animate attributeName="stroke-dashoffset" from="110" to="0" dur="3s" fill="freeze"/></circle></svg>'; d.appendChild(ring); }
-    d.onclick=function(){ dgTap(n.id); };
+    d.setAttribute('role','button');d.tabIndex=can?0:-1;d.setAttribute('aria-label',dgNodeLabel(n)+(can?'，可进入':n.done?'，已完成':'，未解锁'));
+    d.onclick=function(){ dgTap(n.id); };d.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();dgTap(n.id);}};
     box.appendChild(d);
   });
   var ia=document.createElement('div'); ia.id='dg-iconA'; ia.style.cssText='position:absolute;z-index:6;width:24px;height:24px;font-size:20px;line-height:24px;text-align:center;transition:left .25s,top .25s;filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));cursor:pointer'; ia.textContent='🔵'; box.appendChild(ia);
@@ -584,7 +623,7 @@ function dgDrawMap(){
   leg.innerHTML='<span style="color:#f59e0b;font-weight:800">━</span> 可走 &nbsp;<span style="color:#52c41a">━</span> 已通 &nbsp;<span style="color:#c4bfb8">┅</span> 未解锁<br>'+(window._netMode==='host'?'你控 A 🔵，点节点移动；同伴控 B 🟠':(window._netMode==='guest'?'你控 B 🟠，点节点移动；同伴控 A 🔵':'🔵/🟠 点图标切换 · 点节点移动 · 同点 3 秒进入'))+'</div>';
   box.appendChild(leg);
   dgMoveIcons();
-  dgMsg('从底部起点出发，两人轮流把自己的图标沿连线向上移动，站到同一个可进节点 3 秒进入玩法。❤️ 失败 -1，胜利才解锁。');
+  dgMsg('从底部潜入，各自点击路线节点。两名特工同点停留 3 秒开始行动。失败损失 1 格生命，安全屋恢复 1 格；取回机密后在顶层撤离。');
 }
 function renderDungeon(){
   if(DUNGEON && DUNGEON.over){ renderDungeonOver(DUNGEON.win); return; }
@@ -825,12 +864,13 @@ function renderDungeonGuestMap(code){
   dgDrawMap();
 }
 function dgHostOnData(dd){
+  if(dd.t==='rtInput'||dd.t==='rtReady'){ realtimeHostData(dd); return; }
   if(dd.t==='mvB'){ hostMoveB(dd.id); }
   else if(dd.t==='in'){ PEER.gdir=dd.v?1:0; }
   else if(dd.t==='in2'){ hostSetInput(dd.which, dd.v); }
   else if(dd.t==='press' && S.mod==='beat' && window._hostBeatPress){ window._hostBeatPress(dd.who); }
   else if(dd.t==='vaultSubmit' && window._vaultSubmitHandler){ window._vaultSubmitHandler(dd); }
-  else if(dd.t==='dgAbort'){ dungeonAbort(); }
+  else if(dd.t==='dgAbort'){ dungeonAbort(true); }
   else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; setTimeout(function(){ location.search=''; },800); }
 }
 function renderHostDungeon(){
@@ -891,11 +931,12 @@ function renderDungeonJoin(){
   };
 }
 function dgGuestOnData(dd){
+  if(dd.t==='rtState'){ realtimeGuestData(dd); return; }
   if(dd.t==='dg'){ applyDungeon(dd.d); }
   else if(dd.t==='dgcd'){ if(dd.n>0){ showDgBar(dd.id); } else { hideDgBar(); } }
-  else if(dd.t==='dgEnd'){ window._dungeon=false; if(dd.d) applyDungeon(dd.d); if(dd.over){ renderDungeonOver(!!dd.win); } else { S.mod='dungeon'; renderDungeonGuestMap(String(PEER.room||'')); } }
+  else if(dd.t==='dgEnd'){ clearTimers(); clearNetZones(); window._dead=true; window._dungeon=false; if(dd.d) applyDungeon(dd.d); if(dd.over){ renderDungeonOver(!!dd.win); } else { S.mod='dungeon'; renderDungeonGuestMap(String(PEER.room||'')); } }
   else if(dd.t==='bye'){ window._netMode=null; window._dgStarted=false; DUNGEON=null; renderDungeonMenu(); }
-  else if(dd.t==='dgAbort'){ dungeonAbort(); }
+  else if(dd.t==='dgAbort'){ dungeonAbort(true); }
   else if(dd.t==='cd'){ guestIntro(dd.n); }
   else if(dd.t==='dgT'){ var _c=$('count'); if(_c) _c.textContent=dd.time+'s'; }
   else if(dd.t==='dgMsg'){ var _m=$('msg'); if(_m){ _m.className='msg '+dd.kind; _m.textContent=dd.txt; } }
@@ -920,10 +961,12 @@ function startDungeonGuest(code){
           else if(dd.t==='enter'){
             window._dungeon=true;
             if(dd.mode==='rest'){ applyDungeon(dd.d); renderDungeonGuestMap(code); return; }
-            if(dd.mode==='boss'){ renderGuestBoss(code); return; }
+            if(dd.mode==='boss'){ window._dgNode=dd.node; S.mod='boss'; renderGuestBoss(code); return; }
             window._dgNode=dd.node; S.mod=dd.mode;
+            if(dd.mode==='vault') window._vaultConfig=dd.vault;
             if(dd.mode==='maze' && dd.maze!=null) setMaze(dd.maze);
             if(dd.mode==='catch') renderGuestUI(String(code));
+            else if(dd.mode==='pressure') renderRealtimeGuest('pressure');
             else if(dd.mode==='beat') renderGuestBeat(String(code));
             else if(dd.mode==='shield') renderGuestShield(String(code));
             else if(dd.mode==='beam') renderGuestBeam(String(code));
@@ -999,8 +1042,8 @@ function dgEnterHost(id){
   window._dungeon=true; window._dgNode=id; S.mod=n.mode;
   if(n.mode==='maze') window._mazeSeed=Math.floor(Math.random()*MAZES.length);
   dgBroadcast();
-  netSend({t:'enter', node:id, mode:n.mode, maze: (n.mode==='maze'? window._mazeSeed : undefined)});
-  if(n.mode==='catch'||n.mode==='beat'){ renderHost(); }
+  netSend({t:'enter', node:id, mode:n.mode, vault:n.mode==='vault'?vaultSettings():undefined, maze: (n.mode==='maze'? window._mazeSeed : undefined)});
+  if(n.mode==='catch'||n.mode==='beat'||n.mode==='pressure'){ renderHost(); }
   else if(n.mode==='shield'){ renderShieldHost(); }
   else if(n.mode==='beam'){ renderBeamHost(); }
   else if(n.mode==='bridge'){ renderBridgeHost(); }
@@ -1013,43 +1056,20 @@ function dgRestHost(id){
   dgBroadcast();
   netSend({t:'enter', node:id, mode:'rest', d:dgSnapshot()});
   renderDungeonHostMap();
-  dgMsg('🏕️ 休息完毕！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
+  dgMsg('🏠 安全屋补给完成！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
 }
 function dgBossHost(){
-  window._dungeon=true;
-  netSend({t:'enter', node:null, mode:'boss'});
-  renderDungeonBossUI();
+  window._dungeon=true; window._dgNode=DUNGEON.boss; S.mod='boss';
+  netSend({t:'enter',node:DUNGEON.boss,mode:'boss'});
+  startRealtime('boss');
 }
 function dgBossWin(){
-  DUNGEON.over=true; DUNGEON.win=true;
-  dgBroadcast();
-  netSend({t:'dgEnd', ok:true, over:true, win:true, d:dgSnapshot()});
+  if(!DUNGEON||DUNGEON.over) return;
+  DUNGEON.over=true; DUNGEON.win=true; dgNode(DUNGEON.boss).done=true;
+  dgBroadcast(); netSend({t:'dgEnd',ok:true,over:true,win:true,d:dgSnapshot()});
   renderDungeonOver(true);
 }
-function renderDungeonBossUI(){
-  window._dungeon=true;
-  var app=document.getElementById('app');
-  app.innerHTML=
-    '<div class="topbar"><span class="badge n">👑 Boss 密室</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
-    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
-    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
-    '<div style="color:#94a3b8;margin-bottom:20px">先把前面的密室流程跑通，Boss 玩法后面再定。</div>'+
-    '<button class="btn primary" id="boss-win" style="margin-right:8px">✔ 暂视为通关</button></div></div>'+
-    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; DUNGEON=null; location.search=''; };
-  $('boss-win').onclick=function(){ dgBossWin(); };
-}
-function renderGuestBoss(code){
-  window._dungeon=true;
-  var app=document.getElementById('app');
-  app.innerHTML=
-    '<div class="topbar"><span class="badge B">👑 Boss 密室</span><span class="badge n">🏰 房间 '+code+'</span><button class="btn sm" id="back" style="margin-left:auto">退出</button></div>'+
-    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
-    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
-    '<div style="color:#94a3b8">等房主确认通关…</div></div></div>'+
-    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ netSend({t:'bye'}); window._netMode=null; DUNGEON=null; location.search=''; };
-}
+function renderGuestBoss(){ renderRealtimeGuest('boss'); }
 function hostSetInput(which, v){
   if(which==='r'){ window._inR=v; }
   else if(which==='l'){ window._inL=v; }
@@ -1126,9 +1146,10 @@ function dgEnter(id){
   var again=$('again'); if(again){ again.onclick=function(){ dungeonAbort(); }; }
 }
 function gobackMenu(){ if(window._dungeon){ dungeonAbort(); } else { location.search=''; } }
-function dungeonAbort(){
-  clearTimers();
-  if(window._netMode){ netSend({t:'dgAbort'}); }
+function dungeonAbort(remote){
+  clearTimers(); clearNetZones(); window._dead=true; S.mod='dungeon';
+  window._vaultSubmitHandler=null; window._vaultResultHandler=null;
+  if(!remote && window._netMode){ netSend({t:'dgAbort'}); }
   if(window._netMode==='host'){ renderDungeonHostMap(); return; }
   if(window._netMode==='guest'){ renderDungeonGuestMap(String(PEER.room||'')); return; }
   window._dungeon=false; S.mod='dungeon';
@@ -1159,37 +1180,26 @@ function dgRest(id){
   if(DUNGEON.hp<DUNGEON.maxHp) DUNGEON.hp++;
   n.done=true;
   renderDungeon();
-  dgMsg('🏕️ 休息完毕！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
+  dgMsg('🏠 安全屋补给完成！全队恢复 ❤️ +1（现在 '+DUNGEON.hp+' / '+DUNGEON.maxHp+'）');
 }
-function dgBoss(){
-  window._dungeon=true;
-  var app=document.getElementById('app');
-  app.innerHTML=
-    '<div class="topbar"><span class="badge n">👑 Boss 密室</span><span class="count">--s</span><button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
-    '<div class="panel"><div class="stage" style="text-align:center;padding:56px 20px"><div style="font-size:56px">👑</div>'+
-    '<div style="font-size:20px;font-weight:800;margin:12px 0">Boss 合作玩法开发中</div>'+
-    '<div style="color:#94a3b8;margin-bottom:20px">先把前面的密室流程跑通，Boss 玩法后面再定。</div>'+
-    '<button class="btn primary" id="boss-win" style="margin-right:8px">✔ 暂视为通关</button><button class="btn" id="boss-back">返回地图</button></div></div>'+
-    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
-  $('back').onclick=function(){ dungeonAbort(); };
-  $('boss-win').onclick=function(){ DUNGEON.over=true; DUNGEON.win=true; renderDungeonOver(true); };
-  $('boss-back').onclick=function(){ dungeonAbort(); };
-}
+function dgBoss(){ if(window._netMode==='host') dgBossHost(); else renderDungeonMenu(); }
 function renderDungeonOver(win){
+  clearTimers(); clearNetZones();
   window._dungeon=false; S.mod='dungeon';
   var app=document.getElementById('app');
   app.innerHTML=
-    '<div style="max-width:420px;margin:0 auto;text-align:center;padding:70px 20px">'+
+    '<div style="max-width:420px;margin:0 auto;text-align:center;padding:70px 20px;color:#e2e8f0">'+
     '<div style="font-size:64px">'+(win?'🏆':'💔')+'</div>'+
     '<div style="font-size:22px;font-weight:800;margin:14px 0">'+(win?'密室通关！':'密室失败…')+'</div>'+
-    '<div style="color:#94a3b8;margin-bottom:22px">'+(win?'你俩成功站到 Boss 面前——Boss 玩法待开发，先到这里。':'全队血条见底，双人被逐出密室。')+'</div>'+
+    '<div style="color:#94a3b8;margin-bottom:22px">'+(win?'警报已解除，机密已到手。两名特工成功撤离！':'掩护耗尽，两名特工被迫撤退。调整配合，再试一次。')+'</div>'+
     '<button class="btn primary" id="dg-re">▶ 再来一局</button> <button class="btn" id="dg-hall">回大厅</button></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
   $('dg-re').onclick=function(){ if(window._netMode==='host'){ newDungeon(); dgBroadcast(); renderDungeonHostMap(); return; } DUNGEON=null; renderDungeon(); };
+  if(window._netMode==='guest'){$('dg-re').textContent='等待房主再开一局';$('dg-re').disabled=true;}
   $('dg-hall').onclick=function(){ if(window._netMode){ netSend({t:'bye'}); window._netMode=null; window._dgStarted=false; } DUNGEON=null; window._dungeon=false; location.search=''; };
 }
 
-/* ---- 玩法 7：物资空投（单设备双人同屏 · A 控左 / B 控右 合力接物） ---- */
+/* ---- 玩法 7：情报空投（单设备双人同屏 · A 控左 / B 控右 合力接物） ---- */
 function runCatch(set){
   if(window._catchZones){ window._catchZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._catchZones=null; }
   var stage=$('stage');
@@ -1284,7 +1294,7 @@ function runCatch(set){
   window._catchStop=function(){ window._inL=window._inR=false; };
 }
 
-/* ============ 联网：物资空投（PeerJS 双机 · 房主权威同步） ============ */
+/* ============ 联网：情报空投（PeerJS 双机 · 房主权威同步） ============ */
 var PEER = { peer:null, conn:null, isHost:false, room:'', gdir:0 };
 function closePeer(){
   try{ if(PEER.conn){ PEER.conn.close(); } }catch(e){}
@@ -1344,12 +1354,12 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v9·11玩法';
+var APP_VER='v10·特工行动';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<h1>🧺 物资空投 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
+    '<h1>🧺 情报空投 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
     '<p class="sub">双人合力控制一个接货员，接好物 +1、金箱 +2、躲坏物（-3s），限时接够 <b>'+CATCH_GOAL+'</b> 个过关。</p>'+
     '<div class="howto">📡 <b>联网模式</b>：房主生成 4 位房间码，同伴输码加入。房主控 ← 左移、加入者控 → 右移，画面实时同步。<br>📱 <b>一台设备</b>：两人共用一台设备各按半边屏。</div>'+
     '<div class="roles">'+
@@ -1361,12 +1371,12 @@ function renderCatchMenu(){
   $('cm2').onclick=function(){ renderHost(); };
   $('cm3').onclick=function(){ renderJoin(); };
 }
-/* ---- 🎵 双人节拍：三入口菜单 ---- */
+/* ---- 🎵 信号节拍：三入口菜单 ---- */
 function renderBeatMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<h1>🎵 双人节拍 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
+    '<h1>🎵 信号节拍 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
     '<p class="sub">音符滚到判定线时按下：蓝=A 按、橙=B 按、紫=两人同时按（+2）。错按/漏掉扣机会，累计 <b>30</b> 分过关。自带 BGM 节拍器，跟着 ♩ 鼓点按。</p>'+
     '<div class="howto">📡 <b>联网模式</b>：房主生成 4 位房间码，同伴输码加入。房主管蓝音符 + 紫的 A 侧、加入者管橙音符 + 紫的 B 侧，画面实时同步。<br>📱 <b>一台设备</b>：两人共用一台设备，A 按左半屏、B 按右半屏。</div>'+
     '<div class="roles">'+
@@ -1452,6 +1462,7 @@ function renderHost(){
   });
 }
 function startHostGame(){
+  if(S.mod==='boss'||S.mod==='pressure'){ startRealtime(S.mod); return; }
   if(S.mod==='beat'){ startHostBeat(); return; }
   if(S.mod==='shield'){ runShieldHost(); return; }
   if(S.mod==='beam'){ runBeamHost(); return; }
@@ -1702,6 +1713,7 @@ function startGuest(code){
   });
 }
 function renderGuestUI(code){
+  if(S.mod==='boss'||S.mod==='pressure'){ renderRealtimeGuest(S.mod); return; }
   if(S.mod==='beat'){ renderGuestBeat(code); return; }
   if(S.mod==='shield'||S.mod==='beam'||S.mod==='bridge'){ renderGuestTwin(code, S.mod); return; }
   var app=document.getElementById('app');
@@ -1849,9 +1861,9 @@ function dualTips(l,r){
 function dualBeep(f,du,type,vol){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type=type||'square'; o.frequency.value=f; g.gain.value=vol||0.1; o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+(du||0.1)); }catch(e){} }
 function dualMsg(kind,txt){ var m=document.getElementById('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
 
-/* ---- 🛡️ 双人护盾：各守半屏 · 共享耐久 ---- */
+/* ---- 🛡️ 双人屏障：各守半屏 · 共享耐久 ---- */
 function renderShield(){
-  dualFrame('A 守左半区','🛡️','双人护盾','B 守右半区','能量 0 / 20');
+  dualFrame('A 守左半区','🛡️','双人屏障','B 守右半区','能量 0 / 20');
   var pa=document.querySelector('#app .panel');
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ↑ 升起左护盾</div>'+
@@ -1911,9 +1923,9 @@ function runShield(){
   window._shieldStop=function(){ window._inL=window._inR=false; };
 }
 
-/* ---- 🏗️ 双人抬梁：两端独立 · 平衡接砖 ---- */
+/* ---- 🏗️ 破障搬运：两端独立 · 平衡接砖 ---- */
 function renderBeam(){
-  dualFrame('A 抬左端','🏗️','双人抬梁','B 抬右端','砖块 0 / 20');
+  dualFrame('A 抬左端','🏗️','破障搬运','B 抬右端','砖块 0 / 20');
   var pa=document.querySelector('#app .panel');
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ↑ 抬左端</div>'+
@@ -1988,9 +2000,9 @@ function runBeam(){
   window._beamStop=function(){ window._inL=window._inR=false; };
 }
 
-/* ---- 🎵 双人节拍：交替 / 同时按 ---- */
+/* ---- 🎵 信号节拍：交替 / 同时按 ---- */
 function renderBeat(){
-  dualFrame('A 按蓝','🎵','双人节拍','B 按橙','分数 0 / 30');
+  dualFrame('A 按蓝','🎵','信号节拍','B 按橙','分数 0 / 30');
   var pa=document.querySelector('#app .panel');
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按左半屏 · 蓝音符</div>'+
@@ -2070,9 +2082,9 @@ function runBeat(){
   window._beatReset=function(){ window._inL=window._inR=false; };
 }
 
-/* ---- 🌉 双人架桥：合力控桥面 · 接球运输 ---- */
+/* ---- 🌉 撤离架桥：合力控桥面 · 接球运输 ---- */
 function renderBridge(){
-  dualFrame('A 移左','🌉','双人架桥','B 移右','送达 0 / 5');
+  dualFrame('A 移左','🌉','撤离架桥','B 移右','送达 0 / 5');
   var pa=document.querySelector('#app .panel');
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">A 按住左半屏 ← 桥面左移</div>'+
@@ -2146,7 +2158,7 @@ function dgTwinHostUI(badge,icon,name,goalHtml){
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
   $('back').onclick=gobackMenu;
 }
-function renderShieldHost(){ S.mod='shield'; dgTwinHostUI('房主 · 你守左半屏','🛡️','双人护盾','能量 0 / 20'); runShieldHost(); }
+function renderShieldHost(){ S.mod='shield'; dgTwinHostUI('房主 · 你守左半屏','🛡️','双人屏障','能量 0 / 20'); runShieldHost(); }
 function runShieldHost(){
   var stg=$('stage');
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
@@ -2201,7 +2213,7 @@ function runShieldHost(){
   window._shieldState=function(){ return {energy:energy,dur:dur,dead:window._dead}; };
   window._hostInject=function(x){ rocks.push({x:x,y:120,vy:1.0}); };
 }
-function renderBeamHost(){ S.mod='beam'; dgTwinHostUI('房主 · 你抬左端','🏗️','双人抬梁','砖块 0 / 20'); runBeamHost(); }
+function renderBeamHost(){ S.mod='beam'; dgTwinHostUI('房主 · 你抬左端','🏗️','破障搬运','砖块 0 / 20'); runBeamHost(); }
 function runBeamHost(){
   var stg=$('stage');
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
@@ -2258,7 +2270,7 @@ function runBeamHost(){
   window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead}; };
   window._hostInject=function(x){ bricks.push({x:x,y:100,vy:0.8,on:false,tOn:0}); };
 }
-function renderBridgeHost(){ S.mod='bridge'; dgTwinHostUI('房主 · 你控 ← 左移','🌉','双人架桥','送达 0 / 5'); runBridgeHost(); }
+function renderBridgeHost(){ S.mod='bridge'; dgTwinHostUI('房主 · 你控 ← 左移','🌉','撤离架桥','送达 0 / 5'); runBridgeHost(); }
 function runBridgeHost(){
   var stg=$('stage');
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
@@ -2318,7 +2330,7 @@ function renderGuestTwin(code, mode){
   window._dungeon=true;
   var app=document.getElementById('app');
   app.innerHTML=
-    '<div class="topbar"><span class="badge B">加入者 · 你控 B</span><span class="badge n">'+({shield:'🛡️ 双人护盾',beam:'🏗️ 双人抬梁',bridge:'🌉 双人架桥'}[mode])+' · 房间 '+code+'</span>'+
+    '<div class="topbar"><span class="badge B">加入者 · 你控 B</span><span class="badge n">'+({shield:'🛡️ 双人屏障',beam:'🏗️ 破障搬运',bridge:'🌉 撤离架桥'}[mode])+' · 房间 '+code+'</span>'+
     '<span class="count" id="count">--s</span><span class="badge n" id="goal">--</span>'+
     '<button class="btn sm" id="back" style="margin-left:auto">返回地图</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
@@ -2631,7 +2643,7 @@ function runDial(set){
     if(isOn(cur)){
       locked=true; rafStop=true; try{clearInterval(physLoop);}catch(e){}
       beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
-      var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 对齐（±1 格），锁定成功！转盘对接完成，玩法完成！'; }
+      var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 对齐（±1 格），锁定成功！频段校准完成，玩法完成！'; }
       finish(true);
     }else{
       cut(3); beep(160,0.18,'sawtooth',0.14); buzz();
@@ -2747,7 +2759,7 @@ function judgeStep(wires){
   return 0; // 全红 → 剪第 1 根
 }
 
-/* ============ 玩法 4：对暗号·接头（A 描述符号 → B 查密码本 → A 输 4 位码） ============ */
+/* ============ 玩法 4：接头暗号（A 描述符号 → B 查密码本 → A 输 4 位码） ============ */
 /* 抽象符号库 0-9：复合图形，无法用一个字/字母命名，只能长句描述
    5 组相似对：圆+斜线(0/1)、弧+点(2/3)、山/谷+横线(4/5)、顺/逆螺旋(6/7)、三角内/外点(8/9) */
 function drawSymbol(ctx, id, x, y, s){
@@ -2797,7 +2809,7 @@ function drawSymbol(ctx, id, x, y, s){
 /* 通用数字键盘：onNum(n) 0-9、onDel() 退格 */
 function makeNumpad(container, onNum, onDel){
   var wrap=document.createElement('div');
-  wrap.style.cssText='display:grid;grid-template-columns:repeat(5,54px);gap:8px;justify-content:center;margin:10px auto 0';
+  wrap.style.cssText='display:grid;grid-template-columns:repeat(5,minmax(0,54px));gap:8px;justify-content:center;margin:10px auto 0;width:100%;max-width:302px';
   function nb(n){ var b=document.createElement('button'); b.textContent=n; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f8fafc'; b.onclick=function(){ onNum(n); }; wrap.appendChild(b); }
   function db(){ var b=document.createElement('button'); b.textContent='⌫'; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f87171'; b.onclick=function(){ onDel(); }; wrap.appendChild(b); }
   for(var i=1;i<=9;i++) nb(i);
@@ -2847,153 +2859,76 @@ function runCode(set){
   makeNumpad(pa, input, window._codeDel);
 }
 
-/* ============ 玩法 5：锅炉校准（A 调表 → B 指挥区间 → 累计达标） ============ */
-function runPressure(set){
-  var stage=$('stage'), pa=$('playarea');
-  var lo=set.pres.lo, hi=set.pres.hi;
-  var cv=document.createElement('canvas'); cv.width=260; cv.height=190; stage.appendChild(cv);
-  var ctx=cv.getContext('2d');
-  var val=30+Math.random()*40, t=0, acc=0, done=false, btn=0;
-  var NEED=8000; // 区间内累计达标 8 秒
-  window._presVal=function(){ return {val:val, acc:acc, lo:lo, hi:hi, done:done}; };
-  function render(){
-    ctx.clearRect(0,0,260,190);
-    // 表盘（0-100 弧）
-    var cx=130, cy=120, rad=78;
-    ctx.strokeStyle='#334155'; ctx.lineWidth=12; ctx.lineCap='round';
-    ctx.beginPath(); ctx.arc(cx,cy,rad,-Math.PI,0); ctx.stroke();
-    // 危险区两端红
-    ctx.strokeStyle='rgba(220,38,38,.5)'; ctx.lineWidth=12;
-    ctx.beginPath(); ctx.arc(cx,cy,rad,-Math.PI,-Math.PI+0.12); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy,rad,-0.12,0); ctx.stroke();
-    // 安全区（对 A 隐藏：画灰色，B 知道具体数字）
-    // 指针
-    var ang=-Math.PI+(val/100)*Math.PI;
-    var inZone = val>=lo&&val<=hi;
-    ctx.strokeStyle=inZone?'#4ade80':'#f87171'; ctx.lineWidth=5;
-    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(ang)*(rad-14), cy+Math.sin(ang)*(rad-14)); ctx.stroke();
-    ctx.fillStyle='#f8fafc'; ctx.beginPath(); ctx.arc(cx,cy,7,0,Math.PI*2); ctx.fill();
-    // 读数大字
-    ctx.fillStyle='#f8fafc'; ctx.font='bold 30px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(Math.round(val), cx, cy+rad+26);
-    ctx.fillStyle='#94a3b8'; ctx.font='12px sans-serif';
-    ctx.fillText('报读数给 B · 听他指挥', cx, cy+rad+48);
-    // 达标进度不显示给 A（避免反推安全区间）：达标 8s 时自动结算
-  }
-  function loop(){
-    if(done||window._dead){ return; }
-    t++;
-    var drift=Math.sin(t*0.06)*0.12+(Math.random()-0.5)*0.26;
-    val+=drift+btn*1.0;
-    if(val>=100){ explode('压力爆表！'); return; }
-    if(val<=0){ explode('压力归零！'); return; }
-    if(val>=lo&&val<=hi){ acc+=16; if(acc>=NEED){ done=true; beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 在区间内保持 '+Math.round(NEED/1000)+'s，锅炉稳定！玩法完成！'; } finish(true); return; } }
-    else acc=Math.max(0,acc-50);
-    render();
-  }
-  // 大按钮 ↑ ↓
-  var up=document.createElement('button'); up.textContent='⬆ 加压';
-  up.style.cssText='display:inline-block;width:110px;height:66px;font-size:17px;font-weight:800;border:none;border-radius:14px;background:var(--a);color:#fff;margin:10px 8px 0';
-  var dn=document.createElement('button'); dn.textContent='⬇ 减压';
-  dn.style.cssText='display:inline-block;width:110px;height:66px;font-size:17px;font-weight:800;border:none;border-radius:14px;background:var(--b);color:#fff;margin:10px 8px 0';
-  var row=document.createElement('div'); row.style.cssText='text-align:center';
-  row.appendChild(up); row.appendChild(dn); pa.appendChild(row);
-  up.onpointerdown=function(){ btn=1; }; up.onpointerup=function(){ btn=0; }; up.onpointerleave=function(){ btn=0; };
-  dn.onpointerdown=function(){ btn=-1; }; dn.onpointerup=function(){ btn=0; }; dn.onpointerleave=function(){ btn=0; };
-  window._presSet=function(d){ btn=d; };
-  var physLoop=setInterval(loop,16); timers.push(physLoop);
-  render();
-}
+/* ============ 玩法 5：动力稳压（A 调表 → B 指挥区间 → 累计达标） ============ */
+function runPressure(){renderHost();}
 
-/* ============ 玩法 6：记忆暗格（A 看 5 位密码逐个闪现 → 口述给 B → B 记录提交 → A 自动判定） ============ */
+/* ============ 玩法 6：档案窃取（A 看 5 位密码逐个闪现 → 口述给 B → B 记录提交 → A 自动判定） ============ */
 function runVault(set){
-  var stage=$('stage'), pa=$('playarea');
-  var v=set.vault, done=false;
-  window._vaultAns=v.join('');
-  // 6 个格子，初始全 ?
-  var box=document.createElement('div'); box.style.cssText='display:flex;gap:8px;justify-content:center;margin:10px 0';
+  var stage=$('stage'),v=set.vault,cfg=set.vaultConfig,done=false,flashing=false,flashGeneration=0;
+  var epoch=window._timerEpoch;window._vaultAns=v.join('');
+  stage.innerHTML='<div class="vault-panel"><div class="rt-kicker">机密档案 / '+v.length+' 位 · '+(cfg.flashMs/1000)+' 秒每位</div><div class="vault-slots" id="vault-a"></div><div class="msg warn" id="vault-hint">报位序和数字，例如“第 3 位是 7”。</div><button class="btn" id="vault-replay">重新扫描（-3 秒）</button></div>';
   var cells=[];
-  for(var i=0;i<5;i++){
-    var d=document.createElement('div');
-    d.style.cssText='width:54px;height:68px;background:#0f172a;border:2px solid #334155;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#94a3b8';
-    d.textContent='？';
-    cells.push(d); box.appendChild(d);
-  }
-  stage.appendChild(box);
-  var mem=document.createElement('div'); mem.className='msg warn'; mem.style.cssText='margin:6px 0;text-align:center';
-  mem.textContent='⏳ 准备：5 位密码将随机逐个闪现，每位只亮 1 秒，看完立刻口述给 B！';
-  stage.appendChild(mem);
-
-  // 独立模式（无联机）：A 端确认按钮（B 口头报回后 A 点对/错）
-  if(!window._netMode){
-    var cbar=document.createElement('div'); cbar.style.cssText='display:flex;gap:10px;justify-content:center;margin:12px 0';
-    var btnOk=document.createElement('button'); btnOk.textContent='✔ B 报对了'; btnOk.style.cssText='height:48px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #16a34a;background:#14532d;color:#bbf7d0;padding:0 20px;cursor:pointer';
-    var btnNo=document.createElement('button'); btnNo.textContent='✘ B 报错了 -3s'; btnNo.style.cssText='height:48px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #dc2626;background:#7f1d1d;color:#fecaca;padding:0 20px;cursor:pointer';
-    btnOk.onclick=function(){ if(done||window._dead)return; done=true; beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300); var m=$('msg'); if(m){m.className='msg ok';m.textContent='✔ 暗格打开！玩法完成！';} finish(true); };
-    btnNo.onclick=function(){ if(done||window._dead)return; cut(3); beep(160,0.18,'sawtooth',0.14); buzz(); var m=$('msg'); if(m){m.className='msg err';m.textContent='✘ 传错了 -3s！让 B 清空重记。';} };
-    cbar.appendChild(btnOk); cbar.appendChild(btnNo); pa.appendChild(cbar);
-  }
-
-  function startFlash(){
-    mem.className='msg warn'; mem.textContent='👀 注意看！数字逐个闪现中……看完立刻报给 B！';
-    var order=[0,1,2,3,4];
-    for(var i=order.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=order[i]; order[i]=order[j]; order[j]=t; }
-    var idx=0;
-    function flashNext(){
-      if(window._dead||done) return;
-      if(idx>=5){
-        cells.forEach(function(c){ c.textContent='？'; c.style.borderColor='#334155'; c.style.color='#94a3b8'; });
-        mem.className='msg err'; mem.textContent='⏰ 全部闪完！凭记忆报给 B，让他记满 5 位。'+(window._netMode==='host'?'B 提交后自动判定。':'B 记满后会口头报回，你点对/错。');
-        beep(300,0.15,'square',0.1);
-        return;
-      }
-      var pos=order[idx];
-      cells[pos].textContent=v[pos];
-      cells[pos].style.borderColor='#3b82f6';
-      cells[pos].style.color='#f8fafc';
-      beep(660,0.08,'square',0.08);
-      setTimeout(function(){
-        if(window._dead||done) return;
-        cells[pos].textContent='？';
-        cells[pos].style.borderColor='#334155';
-        cells[pos].style.color='#94a3b8';
-        idx++;
-        setTimeout(flashNext, 250);
-      }, 1000);
+  v.forEach(function(n,i){var cell=document.createElement('div');cell.className='vault-slot';cell.innerHTML='<small>'+(i+1)+'</small><span>？</span>';$('vault-a').appendChild(cell);cells.push(cell);});
+  function live(){return !done&&!window._dead&&epoch===window._timerEpoch&&S.mod==='vault';}
+  function later(fn,ms){var id=setTimeout(function(){if(live())fn();},ms);timers.push(id);}
+  function flash(){
+    if(!live()||flashing)return;
+    flashing=true;var generation=++flashGeneration;var order=v.map(function(_,i){return i;});
+    for(var k=order.length-1;k>0;k--){var j=Math.floor(Math.random()*(k+1)),tmp=order[k];order[k]=order[j];order[j]=tmp;}
+    $('vault-replay').disabled=true;$('vault-hint').textContent='扫描中：看位序再报数字，B 可点击对应格子记录。';
+    var index=0;
+    function next(){
+      if(!live()||generation!==flashGeneration)return;
+      if(index===order.length){flashing=false;$('vault-replay').disabled=false;$('vault-hint').textContent='扫描结束，等 B 提交 '+v.length+' 位密码。忘记可重新扫描（-3 秒）。';return;}
+      var pos=order[index++],cell=cells[pos];cell.classList.add('on');cell.querySelector('span').textContent=v[pos];
+      beep(620,.06,'square',.07);
+      later(function(){cell.classList.remove('on');cell.querySelector('span').textContent='？';later(next,250);},cfg.flashMs);
     }
-    flashNext();
+    next();
   }
-
-  // 联机 host：监听 B 端提交，自动判定
-  if(window._netMode==='host'){
-    window._vaultSubmitHandler=function(dd){
-      if(dd.t!=='vaultSubmit'||!dd.code||done||window._dead) return;
-      var ok=dd.code.join('')===v.join('');
-      if(ok){
-        done=true;
-        beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
-        var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ B 记对了，暗格打开！'; }
-        finish(true);
-      }else{
-        cut(3); beep(160,0.18,'sawtooth',0.14); buzz();
-        var m2=$('msg'); if(m2){ m2.className='msg err'; m2.textContent='✘ B 记错了 -3s！通知他清空重记。'; }
-        if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'vaultResult',ok:false}); }catch(e){} }
-      }
-    };
+  $('vault-replay').onclick=function(){if(!live()||flashing)return;cut(3);flash();};
+  function judge(code){
+    if(!live()||!Array.isArray(code)||code.length!==v.length||!code.every(function(x){return Number.isInteger(x)&&x>=0&&x<=9;}))return;
+    var ok=code.join('')===v.join('');
+    if(ok){done=true;netSend({t:'vaultResult',ok:true});var m=$('msg');if(m){m.className='msg ok';m.textContent='✔ 档案解锁，机密到手！';}finish(true);}
+    else{cut(3);netSend({t:'vaultResult',ok:false,time:S.time});var mm=$('msg');if(mm){mm.className='msg err';mm.textContent='✘ 密码不符 -3 秒，B 清空重记；A 可重新扫描。';}beep(160,.12,'square',.1);}
   }
-
-  // 倒计时启动（密室 host 外层已有 introGo，直接开始）
-  if(window._dungeon && window._netMode==='host'){
-    startFlash();
-  } else if(window._netMode==='host'){
-    introGo(function(n){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'cd',n:n}); }catch(e){} } }, startFlash);
-  } else {
-    introGo(null, startFlash);
+  if(window._netMode==='host')window._vaultSubmitHandler=function(d){if(d.t==='vaultSubmit')judge(d.code);};
+  else{
+    var row=document.createElement('div');row.style.cssText='display:flex;gap:10px;margin:12px 0';
+    row.innerHTML='<button class="btn green" id="vault-confirm">B 报对了</button><button class="btn red" id="vault-wrong">B 报错了 -3 秒</button>';stage.appendChild(row);
+    $('vault-confirm').onclick=function(){judge(v.slice());};$('vault-wrong').onclick=function(){if(live())cut(3);};
   }
+  if(window._dungeon)flash();else introGo(null,flash);
+}
+function renderVaultManual(){
+  var linked=window._dungeon&&window._netMode==='guest',cfg=linked?(window._vaultConfig||vaultSettings()):{digits:5,flashMs:1000};
+  var count=rtClamp(Number(cfg.digits)||5,5,7),rec=Array(count).fill(null),focus=0,submitted=false;
+  $('app').innerHTML='<div class="vault-panel"><div class="topbar"><span class="badge B">特工 B · 记录员</span><span class="badge n">档案窃取</span>'+(linked?'<span class="count" id="count">--s</span>':'')+'<button class="btn sm" id="back">'+(linked?'返回地图':'回大厅')+'</button></div>'+
+    '<div class="panel"><div class="rt-kicker">机密记录 / '+count+' 位</div><h3>听位序，再记数字</h3><p class="mc">每位闪现 '+(cfg.flashMs/1000)+' 秒。A 报“第几位、什么数字”，点对应格再输入；记满 '+count+' 位提交。</p><div class="vault-slots" id="vault-b"></div><div id="vault-numpad"></div><div style="display:flex;gap:8px;margin-top:12px"><button class="btn" id="vault-clear">清空重记</button><button class="btn green" id="vault-submit" disabled>提交给 A</button></div></div><div class="msg" id="msg"></div></div>';
+  $('back').onclick=gobackMenu;
+  var cells=[];
+  for(var i=0;i<count;i++)(function(index){var cell=document.createElement('button');cell.className='vault-slot';cell.setAttribute('aria-label','第 '+(index+1)+' 位');cell.innerHTML='<small>'+(index+1)+'</small><span>·</span>';cell.onclick=function(){focus=index;draw();};$('vault-b').appendChild(cell);cells.push(cell);})(i);
+  function draw(){cells.forEach(function(c,i){c.classList.toggle('on',i===focus);c.querySelector('span').textContent=rec[i]===null?'·':rec[i];});$('vault-submit').disabled=submitted||rec.some(function(v){return v===null;});}
+  makeNumpad($('vault-numpad'),function(n){if(submitted)return;rec[focus]=Number(n);var next=rec.indexOf(null);focus=next<0?focus:next;draw();},function(){if(submitted)return;rec[focus]=null;draw();});
+  $('vault-clear').onclick=function(){if(submitted)return;rec.fill(null);focus=0;draw();};
+  $('vault-submit').onclick=function(){
+    if(submitted||rec.some(function(v){return v===null;}))return;
+    if(linked){submitted=true;draw();netSend({t:'vaultSubmit',code:rec.slice()});$('msg').textContent='正在核对密码…';}
+    else $('msg').textContent='已记满，请按位序口头报回给 A 确认。';
+  };
+  if(linked)window._vaultResultHandler=function(d){
+    if(S.mod!=='vault'||!$('vault-b'))return;
+    submitted=false;if(!d.ok){rec.fill(null);focus=0;$('msg').className='msg err';$('msg').textContent='✘ 密码不符 -3 秒，重新记录。';if(d.time!=null)$('count').textContent=d.time+'s';}
+    else{$('msg').className='msg ok';$('msg').textContent='✔ 密码正确，机密到手！';submitted=true;}draw();
+  };
+  draw();
 }
 
 /* ============ B 端：手册（按玩法渲染） ============ */
 function renderManual(){
+  if(S.mod==='pressure'){renderJoin();return;}
+  if(S.mod==='vault'){renderVaultManual();return;}
   var app=document.getElementById('app');
   var p=PG();
   var dgG=(window._dungeon && window._netMode==='guest');
@@ -3005,12 +2940,12 @@ function renderManual(){
   var body='';
   if(S.mod==='maze'){
     body=
-      '<div class="manual-card"><h3>🗺️ 迷宫走线 · 指挥台</h3><p class="mc">A 的探针在<b>盲走</b>（视野只有上下左右 5 格）。你看到的是<b>全图</b>：绿点=A 当前方位，按<b>绿色推荐路线</b>一句句指挥「上/下/左/右」；<b>红点 = 陷阱</b>（A 视野里看不出，踩到 -8s）——千万别让 A 走红线外的岔路。<br><span style="color:#fb923c">本局随机从 '+MAZES.length+' 张图中抽一张，A 会口头报「图 N」，点下面按钮切到对应图。</span></p>'+
+      '<div class="manual-card"><h3>🗺️ 通风潜行 · 指挥台</h3><p class="mc">A 的探针在<b>盲走</b>（视野只有上下左右 5 格）。你看到的是<b>全图</b>：绿点=A 当前方位，按<b>绿色推荐路线</b>一句句指挥「上/下/左/右」；<b>红点 = 陷阱</b>（A 视野里看不出，踩到 -8s）——千万别让 A 走红线外的岔路。<br><span style="color:#fb923c">本局随机从 '+MAZES.length+' 张图中抽一张，A 会口头报「图 N」，点下面按钮切到对应图。</span></p>'+
       '<div class="maze-tabs">' + MAZES.map(function(m,i){ return '<button data-mz="'+i+'" class="mz-tab">图'+(i+1)+'</button>'; }).join('') + '</div>'+
       '<div class="stage"><canvas id="maze-map"></canvas></div></div>';
   }else if(S.mod==='dial'){
     body=
-      '<div class="manual-card"><h3>🎛️ 转盘对接 · 目标指令卡</h3>'+
+      '<div class="manual-card"><h3>🎛️ 频段校准 · 目标指令卡</h3>'+
       '<p class="mc">A 的转盘上有一张<b>目标指令卡</b>（如 C7）——卡号只有 A 看得到，他会<b>口头报给你</b>。你在这里<b>查表</b>得到本局目标刻度，然后听 A 报「我现在在第几格」，指挥他往左/右转，对齐（±1 格）时喊「锁！」让 A 按锁定。锁错 -3s。</p>'+
       '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px">'+
         '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:6px">📋 目标指令卡对照表（A 报卡号 → 查目标刻度）</div>'+
@@ -3021,7 +2956,7 @@ function renderManual(){
       '</div></div>';
   }else if(S.mod==='wires'){
     body=
-      '<div class="manual-card"><h3>🧨 剪线排雷 · 三步规则</h3><p class="mc">'+WIRE_RULE.intro+'</p>'+
+      '<div class="manual-card"><h3>🧨 警报拆线 · 三步规则</h3><p class="mc">'+WIRE_RULE.intro+'</p>'+
       '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:10px 0 4px">【第 1 步】6 根线</div>'+
       WIRE_RULE.steps.map(function(s){ return '<div class="rule-step"><div>'+s.q+'</div><div style="font-size:12px;color:#94a3b8">'+s.cond+'</div><div class="ans">→ '+s.ans+'</div></div>'; }).join('')+
       '<div style="font-size:13px;font-weight:700;color:#fb923c;margin:14px 0 4px">【第 2 步】剩余 5 根线（重新从左到右编号）</div>'+
@@ -3040,30 +2975,6 @@ function renderManual(){
         '</div>'+
         '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 描述第 1 个符号 → ② 你认图报数字 → ③ A 输入 → ④ 依次 4 个。报错了 A 那边会 -3s。</div>'+
       '</div></div>';
-  }else if(S.mod==='pressure'){
-    body=
-      '<div class="manual-card"><h3>🌡️ 锅炉校准 · 安全区间</h3>'+
-      '<p class="mc">A 只看到压力表读数（0~100），<b>看不到安全区间</b>。区间在你手里，听 A 报当前读数，判断在不在区间内，指挥他 <b>加 / 减 / 稳住</b>。区间内累计保持 <b>8 秒</b>通关；撞到 0 或 100 = 爆炸。</p>'+
-      '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;text-align:center">'+
-        '<div style="font-size:13px;color:#94a3b8">本局安全区间（设备标准，每局一致）</div>'+
-        '<div style="font-size:44px;font-weight:900;color:#4ade80;margin:4px 0">40 ~ 60</div>'+
-        '<div style="font-size:13px;color:#94a3b8">读数在 0 和 100 之间碰边就炸</div>'+
-      '</div>'+
-      '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 报读数 → ② 你在区间内吗？在 = 喊「稳住」；低于下限 = 喊「加」；高于上限 = 喊「减」→ ③ 保持喊「稳住，别动！」到 8 秒。</div></div>';
-  }else if(S.mod==='vault'){
-    body=
-      '<div class="manual-card"><h3>🧠 记忆暗格 · 密码记录器</h3>'+
-      '<p class="mc">A 的保险柜密码<b>逐个闪现</b>（每位只亮 1 秒），他必须靠嘴报给你。你是<b>密码记录员</b>：A 报一位、你在下面的<b>记录器按一位</b>，记满 5 位后提交给 A 判定（你听错 / 按错 = -3s 重来）。</p>'+
-      '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px">'+
-        '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:8px">密码记录器（A 报一位按一位）</div>'+
-        '<div style="display:flex;gap:8px;justify-content:center;margin:6px 0" id="vault-b"></div>'+
-        '<div id="vault-numpad"></div>'+
-        '<div style="display:flex;gap:8px;justify-content:center;margin-top:8px">'+
-          '<button id="vault-clear" style="height:44px;font-size:15px;font-weight:800;border-radius:10px;border:2px solid #475569;background:#1e293b;color:#f87171;padding:0 18px">清空重记</button>'+
-          '<button id="vault-submit" style="height:44px;font-size:15px;font-weight:800;border-radius:10px;border:2px solid #16a34a;background:#14532d;color:#bbf7d0;padding:0 18px;display:none">提交给 A</button>'+
-        '</div>'+
-      '</div>'+
-      '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 看闪现报密码 → ② 你按记录器记下 5 位 → ③ 点提交 → ④ A 自动判定，对了开门、错了 -3s 重记。</div></div>';
   }
   app.innerHTML= top + body + (dgG?'<div id="msg" class="msg" style="margin:10px 0 0"></div>':'');
   $('back').onclick=gobackMenu;
@@ -3086,51 +2997,6 @@ function renderManual(){
     for(var k=0;k<10;k++){
       var cv=$('sym-'+k);
       if(cv) drawSymbol(cv.getContext('2d'), k, 23, 23, 13);
-    }
-  }
-  if(S.mod==='vault'){
-    var rec=[];
-    var box=$('vault-b'); box.innerHTML='';
-    var cells=[];
-    for(var i=0;i<5;i++){
-      var d=document.createElement('div');
-      d.style.cssText='width:54px;height:68px;background:#0f172a;border:2px dashed #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#f8fafc';
-      d.textContent='·';
-      cells.push(d); box.appendChild(d);
-    }
-    var subBtn=$('vault-submit');
-    function renderRec(){
-      cells.forEach(function(d,i){ d.textContent=i<rec.length?rec[i]:'·'; });
-      if(subBtn) subBtn.style.display=(rec.length===5)?'inline-block':'none';
-    }
-    renderRec();
-    makeNumpad($('vault-numpad'),
-      function(n){ if(rec.length<5){ rec.push(n); renderRec(); beep(520,0.05,'square',0.06); } },
-      function(){ rec.pop(); renderRec(); });
-    $('vault-clear').onclick=function(){ rec=[]; renderRec(); };
-    if(subBtn){
-      subBtn.onclick=function(){
-        if(rec.length!==5) return;
-        if(window._netMode==='guest' && PEER.conn && PEER.conn.open){
-          try{ PEER.conn.send({t:'vaultSubmit',code:rec.slice()}); }catch(e){}
-          subBtn.textContent='已提交，等待 A 判定…'; subBtn.disabled=true;
-          setTimeout(function(){ subBtn.textContent='提交给 A'; subBtn.disabled=false; },2000);
-        }else{
-          // 独立模式：无通信，提示口头报给 A
-          subBtn.textContent='已记满，口头报给 A 确认！'; subBtn.disabled=true;
-          setTimeout(function(){ subBtn.textContent='提交给 A'; subBtn.disabled=false; },2500);
-        }
-      };
-    }
-    // 收 A 端错误反馈
-    if(window._netMode==='guest'){
-      window._vaultResultHandler=function(dd){
-        if(dd.t==='vaultResult' && dd.ok===false){
-          rec=[]; renderRec();
-          beep(160,0.18,'sawtooth',0.14);
-          var m=$('msg'); if(m){ m.className='msg err'; m.textContent='✘ A 说记错了 -3s！清空重记。'; }
-        }
-      };
     }
   }
 }
@@ -3248,6 +3114,232 @@ function finish(ok){
     if(window._dungeon && (window._netMode==='host'||window._netMode==='guest')){ dungeonEnd(ok); return; }
     showFB({ok:ok, duration:dur, timeLeft:S.time, role:S.role});
   }, 700);
+}
+
+/* 房主权威实时终端。输入携带局号，按住状态有租期；B 只接收自己需要的字段。 */
+var RT=null, RT_VIEW=null, RT_SERIAL=0;
+function rtClamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function rtMessage(s,txt,kind){s.msg={txt:txt,kind:kind||'warn',seq:(s.msg?s.msg.seq:0)+1};}
+function bossCreate(){
+  return {phase:1,progress:0,target:'A',next:2,round:0,hp:7,heat:{A:0,B:0},lock:{A:0,B:0},taps:{A:null,B:null},fault:false,transition:0};
+}
+function bossDamage(s,txt){s.hp--;rtMessage(s,'✘ '+txt+' · 装甲 '+s.hp+'/7','err');if(s.hp<=0){s.done=true;s.win=false;}}
+function bossAdvance(s){
+  var goal=s.phase===1?12:s.phase===2?10:5;
+  if(s.progress<goal)return;
+  if(s.phase===3){s.done=true;s.win=true;rtMessage(s,'✔ 双人撤离成功！','ok');return;}
+  s.phase++;s.progress=0;s.round++;s.transition=2;s.next=s.phase===2?1.5:2.4;
+  s.target='A';s.taps={A:null,B:null};s.fault=false;
+  rtMessage(s,s.phase===2?'第二阶段：轮到谁，谁按住；另一人松手。':'最后阶段：等绿灯，一起点按；每轮都要松手。');
+}
+function bossTap(s,who){
+  if(s.phase!==3||s.transition>0||s.done||s.cd>0||s.taps[who]!==null)return;
+  s.taps[who]=s.elapsed;
+  if(s.next>.8){s.fault=true;rtMessage(s,who+' 抢拍了！等下一轮绿灯。','err');}
+}
+function bossStep(s,dt,inputs){
+  if(s.transition>0){s.transition=Math.max(0,s.transition-dt);return;}
+  ['A','B'].forEach(function(w){s.lock[w]=Math.max(0,s.lock[w]-dt);s.heat[w]=rtClamp(s.heat[w]+(s.phase===1&&inputs[w]&&s.lock[w]===0?36:-42)*dt,0,100);if(s.heat[w]>=100&&s.lock[w]===0){s.lock[w]=1.6;bossDamage(s,w+' 护盾过热，冷却 1.6 秒');}});
+  if(s.done)return;
+  s.next-=dt;
+  if(s.next>0)return;
+  if(s.phase===1){
+    var required=s.target==='AB'?['A','B']:[s.target];
+    if(required.every(function(w){return inputs[w]&&s.lock[w]===0;})){s.progress++;rtMessage(s,'✔ 警报拦截 '+s.progress+'/12','ok');}
+    else bossDamage(s,s.target+' 漏挡警报');
+    s.target=['A','B','AB'][Math.floor(Math.random()*3)];s.next=Math.max(1.05,1.65-s.progress*.035);
+  }else if(s.phase===2){
+    var other=s.target==='A'?'B':'A';
+    if(inputs[s.target]&&!inputs[other]){s.progress++;rtMessage(s,'✔ 破解接力 '+s.progress+'/10','ok');}
+    else bossDamage(s,inputs[other]?'抢按断链！只让 '+s.target+' 按住':s.target+' 没接上破解链路');
+    s.target=other;s.next=1.35;
+  }else{
+    if(!s.fault&&s.taps.A!==null&&s.taps.B!==null&&Math.abs(s.taps.A-s.taps.B)<=.38){s.progress++;rtMessage(s,'✔ 同步撤离 '+s.progress+'/5','ok');}
+    else bossDamage(s,s.fault?'抢拍触发警报':'两人未在 0.38 秒内同步');
+    s.next=2.4;s.taps={A:null,B:null};s.fault=false;
+  }
+  s.round++;if(!s.done)bossAdvance(s);
+}
+function realtimeUI(mode,role){
+  clearNetZones();window._keys={};window.onkeydown=null;window.onkeyup=null;
+  $('app').innerHTML='<div class="rt-shell"><div class="topbar"><span class="badge '+role+'">特工 '+role+'</span><span class="badge n">'+PG().name+'</span><span id="count" class="count">--s</span><button class="btn sm" id="back" style="margin-left:auto">'+(window._dungeon?'返回地图':'回大厅')+'</button></div>'+
+    '<section class="rt-panel"><div class="rt-kicker">双人行动 · 房间 '+PEER.room+'</div><h2 id="rt-title">最终对峙</h2>'+
+    '<div class="rt-steps" id="rt-steps"><span class="rt-step">01 拦截警报</span><span class="rt-step">02 接力破解</span><span class="rt-step">03 同步撤离</span></div>'+
+    '<div class="rt-readouts"><span id="rt-health"></span><b id="rt-progress"></b></div><p class="rt-help" id="rt-help"></p>'+
+    '<div class="rt-arena"><div class="rt-caption" id="rt-signal">等待同伴准备</div><div class="rt-cue" id="rt-cue">···</div><div class="rt-caption" id="rt-detail"></div></div>'+
+    '<div class="rt-meter"><i id="rt-bar"></i></div><div class="rt-readouts"><span id="rt-self"></span><span id="rt-other"></span></div>'+
+    '<div class="rt-controls"><button class="rt-control '+(role==='B'?'role-b':'')+'" id="rt-action">按住护盾</button></div><div class="msg" id="msg">等待两端就绪…</div></section></div>'+
+    '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
+  if(mode==='pressure')pressureUI(role);
+  $('back').onclick=function(){if(window._dungeon)dungeonAbort();else {netSend({t:'bye'});clearTimers();closePeer();location.search='';}};
+}
+function rtDraw(s,role){
+  if(!$('rt-cue'))return;
+  RT_VIEW=s;S.time=Math.max(0,Math.ceil(s.time));$('count').textContent=S.time+'s';
+  if(s.mode==='pressure'){pressureDraw(s,role);return;}
+  var goal=s.phase===1?12:s.phase===2?10:5;
+  $('rt-title').textContent=['','拦截警报','接力破解','同步撤离'][s.phase];
+  document.querySelectorAll('.rt-step').forEach(function(e,i){e.className='rt-step'+(i+1===s.phase?' on':i+1<s.phase?' past':'');});
+  $('rt-health').textContent='装甲 '+s.hp+' / 7';$('rt-progress').textContent=s.progress+' / '+goal;
+  $('rt-help').textContent=s.phase===1?'警报落下时，对应角色按住护盾；AB 要一起挡。松手散热，热量满格会损坏装甲。':s.phase===2?'倒计时结束时，只让指定角色按住破解键。另一人必须松手，抢按或漏接都会断链。':'绿灯亮起后，两人在 0.38 秒内各点一次撤离。提前按会报警，每轮松手后再按。';
+  var waiting=!s.ready||s.cd>0||s.transition>0;
+  $('rt-cue').textContent=!s.ready?'···':s.cd>0?Math.ceil(s.cd):s.transition>0?'准备':s.done?(s.win?'成功':'失败'):s.phase===3?(s.next<=.8?'一起按！':'等待'):s.target;
+  $('rt-cue').className='rt-cue'+(!waiting&&s.phase===3&&s.next<=.8?' go':'');
+  $('rt-signal').textContent=!s.ready?'等待同伴就绪':s.cd>0?'行动倒计时':s.transition>0?'切换阶段 · 松开按钮':s.phase===1?'拦截角色':s.phase===2?'破解接力交给':'撤离窗口';
+  $('rt-detail').textContent=s.done?(s.win?'机密已取回':'与搭档复盘后再战'):s.phase===3?'A '+(s.taps.A!==null?'已按':'等待')+' · B '+(s.taps.B!==null?'已按':'等待'):'距判定 '+Math.max(0,s.next).toFixed(1)+' 秒';
+  $('rt-bar').style.width=(s.phase===3?rtClamp(s.next/2.4,0,1)*100:s.heat[role])+'%';
+  $('rt-bar').style.background=s.phase===3?'#5eead4':s.heat[role]>75?'#f87171':'#60a5fa';
+  $('rt-self').textContent=s.phase===1?'你的热量 '+Math.round(s.heat[role])+'%'+(s.lock[role]>0?' · 冷却中':''):role+' '+(s.inputs&&s.inputs[role]?'按住中':'已松手');
+  var other=role==='A'?'B':'A';$('rt-other').textContent=other+' '+(s.inputs&&s.inputs[other]?'按住中':'已松手');
+  $('rt-action').textContent=s.phase===1?'按住护盾':s.phase===2?'按住破解':'点按撤离';
+  $('rt-action').disabled=waiting||s.done;
+  rtDrawMessage(s);
+}
+function rtDrawMessage(s){var m=$('msg');if(s.msg&&m){m.className='msg '+s.msg.kind;m.textContent=s.msg.txt;}}
+function rtControls(role,mode){
+  var held=false,seq=0,lastSend=0,downs={};
+  function send(key,v,tap){
+    var st=role==='A'?RT:RT_VIEW;if(!st)return;
+    var packet={t:'rtInput',id:st.id,mode:mode,seq:++seq,key:key,v:!!v,tap:!!tap,round:st.round};
+    if(role==='A')realtimeInput(packet,'A');else netSend(packet);
+  }
+  function hold(v,tap){held=v;var b=$('rt-action');if(b)b.classList.toggle('held',v);send('action',v,tap);}
+  if(mode==='pressure'&&role==='A'){
+    ['up','down'].forEach(function(key){var b=$('rt-'+key);b.onpointerdown=function(e){e.preventDefault();if(b.disabled)return;try{b.setPointerCapture(e.pointerId);}catch(err){}downs[key]=true;send(key,true,false);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=function(){downs[key]=false;send(key,false,false);};});
+  }
+  var button=$('rt-action');
+  button.onpointerdown=function(e){e.preventDefault();if(button.disabled||held)return;try{button.setPointerCapture(e.pointerId);}catch(err){}hold(true,true);};
+  button.onpointerup=button.onpointercancel=button.onlostpointercapture=function(){if(held)hold(false,false);};
+  function keyDown(e){
+    if(mode==='pressure'&&role==='A'&&(e.code==='ArrowUp'||e.code==='ArrowDown')){e.preventDefault();var k=e.code==='ArrowUp'?'up':'down';if(!$('rt-'+k).disabled){downs[k]=true;send(k,true,false);}return;}
+    if((e.code==='Space'||e.code==='Enter')&&!e.repeat&&(e.target.tagName!=='BUTTON'||e.target.id==='rt-action')){e.preventDefault();if(!button.disabled&&!held)hold(true,true);}
+  }
+  function keyUp(e){if(e.code==='Space'||e.code==='Enter')hold(false,false);if(mode==='pressure'&&role==='A'&&(e.code==='ArrowUp'||e.code==='ArrowDown')){var k=e.code==='ArrowUp'?'up':'down';downs[k]=false;send(k,false,false);}}
+  function release(){if(held)hold(false,false);Object.keys(downs).forEach(function(k){send(k,false,false);});downs={};}
+  window.addEventListener('keydown',keyDown);window.addEventListener('keyup',keyUp);window.addEventListener('blur',release);document.addEventListener('visibilitychange',release);
+  var heart=setInterval(function(){if(held)send('action',true,false);Object.keys(downs).forEach(function(k){if(downs[k])send(k,true,false);});},200);timers.push(heart);
+  return function(){clearInterval(heart);window.removeEventListener('keydown',keyDown);window.removeEventListener('keyup',keyUp);window.removeEventListener('blur',release);document.removeEventListener('visibilitychange',release);};
+}
+function rtWireCleanup(dispose){
+  var conn=PEER.conn;
+  function disconnected(){clearTimers();window._dead=true;var m=$('msg');if(m){m.className='msg err';m.textContent='连接已断开，行动已停止。请返回重新建房。';}document.querySelectorAll('.rt-control').forEach(function(b){b.disabled=true;});}
+  if(conn)conn.on('close',disconnected);
+  window._rtCleanup=function(){window._rtCleanup=null;dispose();if(conn&&conn.off)conn.off('close',disconnected);RT=null;RT_VIEW=null;};
+}
+function realtimeInput(d,who){
+  var s=RT;if(!s||s.id!==d.id||s.mode!==d.mode||s.done||!s.ready||s.cd>0||!Number.isInteger(d.seq)||d.seq<=s.seq[who])return;
+  s.seq[who]=d.seq;s.seen[who]=performance.now();
+  if(s.mode==='pressure'&&who==='A'&&(d.key==='up'||d.key==='down')){s.adjust[d.key]=!!d.v;return;}
+  if(d.key==='action'){s.inputs[who]=!!d.v;if(s.mode==='boss'&&d.tap&&d.v&&d.round===s.round)bossTap(s,who);}
+}
+function realtimeHostData(d){
+  if(!RT||d.id!==RT.id)return;
+  if(d.t==='rtReady'){RT.ready=true;return;}
+  realtimeInput(d,'B');
+}
+function rtSnapshot(s,role){
+  if(s.mode==='pressure')return pressureSnapshot(s,role);
+  return {id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,phase:s.phase,progress:s.progress,target:s.target,next:s.next,round:s.round,hp:s.hp,heat:s.heat,lock:s.lock,taps:s.taps,transition:s.transition,inputs:s.inputs};
+}
+function startRealtime(mode){
+  clearTimers();closeFB();window._dead=false;window._restartAwait=false;S.mod=mode;S.started=Date.now();
+  realtimeUI(mode,'A');
+  var s=Object.assign(mode==='pressure'?pressureCreate():bossCreate(),{id:Date.now().toString(36)+'-'+(++RT_SERIAL),mode:mode,ready:false,cd:3,time:mode==='pressure'?90:100,elapsed:0,done:false,win:false,inputs:{A:false,B:false},seq:{A:-1,B:-1},seen:{A:0,B:0}});
+  RT=s;rtMessage(s,'两名特工就绪后，3 秒倒计时开始。');
+  var cleanup=rtControls('A',mode);rtWireCleanup(cleanup);
+  var last=performance.now(),broadcastAt=0,endAt=null;
+  function loop(){
+    if(RT!==s)return;
+    var now=performance.now(),dt=Math.min(.1,(now-last)/1000);last=now;
+    ['A','B'].forEach(function(w){if(now-s.seen[w]>650){s.inputs[w]=false;if(w==='A'&&s.adjust)s.adjust={up:false,down:false};}});
+    if(s.ready&&!s.done){
+      if(s.cd>0){var prev=Math.ceil(s.cd);s.cd=Math.max(0,s.cd-dt);if(Math.ceil(s.cd)!==prev)beep(520,.06,'square',.06);if(s.cd===0)rtMessage(s,mode==='boss'?'行动开始！看角色标记，临近判定再按，松手散热。':'行动开始！A 报压力，B 报安全区间，确认稳定再开阀。');}
+      else{s.time=Math.max(0,s.time-dt);s.elapsed+=dt;if(mode==='pressure')pressureStep(s,dt);else bossStep(s,dt,s.inputs);if(s.time===0&&!s.done){s.done=true;s.win=false;rtMessage(s,'✘ 时间到，行动失败。','err');}}
+    }
+    if(now>=broadcastAt||s.done){rtDraw(rtSnapshot(s,'A'),'A');netSend({t:'rtState',state:rtSnapshot(s,'B')});broadcastAt=now+66;}
+    if(s.done){
+      if(endAt===null){endAt=now+900;window._dead=true;}
+      if(now>=endAt){
+        var wasDungeon=window._dungeon,won=s.win;clearTimers();
+        if(wasDungeon){if(mode==='boss'&&won)dgBossWin();else dungeonEnd(won);}
+        else showFB({ok:won,duration:Math.round(s.elapsed),timeLeft:Math.ceil(s.time),role:'A'});
+      }
+    }
+  }
+  timers.push(setInterval(loop,16));loop();
+}
+function renderRealtimeGuest(mode){
+  clearTimers();closeFB();S.mod=mode;window._dead=false;
+  realtimeUI(mode,'B');var cleanup=rtControls('B',mode);rtWireCleanup(cleanup);
+  if(!window._dungeon&&PEER.conn&&!PEER.conn._rtGuestHandler){
+    PEER.conn._rtGuestHandler=function(d){
+      dgGuestOnData(d);
+      if(d.t==='ask')netConfirmRestart();
+      if(d.t==='no'){window._restartAwait=false;netAskCancel();}
+    };
+    PEER.conn.on('data',PEER.conn._rtGuestHandler);
+  }
+}
+function realtimeGuestData(d){
+  var s=d.state;if(!s||s.mode!==S.mod||!$('rt-cue'))return;
+  var previous=RT_VIEW;
+  if(!previous||previous.id!==s.id){closeFB();window._dead=false;window._restartAwait=false;}
+  rtDraw(s,'B');
+  if(!s.ready)netSend({t:'rtReady',id:s.id});
+  if(s.done&&!window._dungeon&&(!previous||!previous.done)){window._dead=true;showFB({ok:s.win,duration:Math.round((s.mode==='pressure'?90:100)-s.time),timeLeft:Math.ceil(s.time),role:'B'});}
+}
+
+function pressureCreate(){
+  return {phase:1,round:0,hp:3,seals:0,charge:0,val:50,velocity:0,center:50,nextCenter:35+Math.random()*30,shift:6,heatB:0,cooldown:0,unsafe:0,adjust:{up:false,down:false},transition:0};
+}
+function pressureStep(s,dt){
+  s.shift-=dt;if(s.shift<=0){s.shift=6;s.centerTarget=s.nextCenter;s.nextCenter=32+Math.random()*36;rtMessage(s,'安全区间开始移动，B 报新区间！');}
+  if(s.centerTarget!=null)s.center+=rtClamp(s.centerTarget-s.center,-4*dt,4*dt);
+  var force=(s.adjust.up?1:0)-(s.adjust.down?1:0);
+  var targetVelocity=force*19+Math.sin(s.elapsed*1.6)*3.5;
+  s.velocity+=(targetVelocity-s.velocity)*Math.min(1,dt*4);s.val+=s.velocity*dt;
+  s.cooldown=Math.max(0,s.cooldown-dt);
+  var open=s.inputs.B&&s.cooldown===0,inside=s.val>=s.center-10&&s.val<=s.center+10;
+  s.heatB=rtClamp(s.heatB+(open?18:-32)*dt,0,100);
+  if(open&&inside){s.charge+=dt;s.unsafe=0;}
+  else{s.charge=Math.max(0,s.charge-dt*.35);s.unsafe=open?s.unsafe+dt:0;}
+  if(s.unsafe>=1.25||s.heatB>=100){
+    s.hp--;s.charge=Math.max(0,s.charge-1);s.cooldown=1.5;s.unsafe=0;
+    rtMessage(s,s.heatB>=100?'✘ 校准阀过热，耐久 -1，松手散热！':'✘ 区间外硬开阀，耐久 -1！重新报数。','err');
+  }
+  if(s.charge>=4){s.seals++;s.charge=0;s.cooldown=1;s.unsafe=0;rtMessage(s,'✔ 第 '+s.seals+'/3 轮校准完成，松手冷却。','ok');}
+  if(s.val<=0||s.val>=100||s.hp<=0){s.val=rtClamp(s.val,0,100);s.done=true;s.win=false;rtMessage(s,s.hp<=0?'✘ 校准设备损坏，行动失败。':'✘ 压力爆表，动力舱失控！','err');}
+  else if(s.seals>=3){s.done=true;s.win=true;rtMessage(s,'✔ 三轮稳压完成，警报电源已切断！','ok');}
+}
+function pressureSnapshot(s,role){
+  var common={id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,hp:s.hp,seals:s.seals,round:s.round,heatB:s.heatB,cooldown:s.cooldown,inputs:s.inputs};
+  // A 不下发安全区间；B 不下发压力读数，保留口头沟通的必要性。
+  if(role==='A'){common.val=s.val;common.velocity=s.velocity;}
+  else{common.lo=s.center-10;common.hi=s.center+10;common.nextLo=s.nextCenter-10;common.nextHi=s.nextCenter+10;common.shift=s.shift;common.charge=s.charge;}
+  return common;
+}
+function pressureUI(role){
+  $('rt-title').textContent='动力稳压';$('rt-steps').innerHTML='<span class="rt-step on">01 报读数</span><span class="rt-step on">02 调压力</span><span class="rt-step on">03 开阀校准</span>';
+  $('rt-help').textContent=role==='A'?'你只看到压力，持续报数给 B。按住加 / 减压，松手后仍有短暂惯性。听 B 指挥跟随安全区间，别撞到 0 / 100。':'你只看到区间，听 A 报读数再指挥加 / 减。确认在区间内才按住校准阀，每轮保持 4 秒；注意散热和下一次区间移动。';
+  if(role==='A'){
+    $('rt-action').style.display='none';
+    var controls=document.querySelector('.rt-controls');
+    controls.insertAdjacentHTML('beforeend','<button class="rt-control" id="rt-down">− 减压</button><button class="rt-control" id="rt-up">＋ 加压</button>');
+  }else $('rt-action').textContent='按住校准阀';
+}
+function pressureDraw(s,role){
+  var waiting=!s.ready||s.cd>0;
+  $('rt-health').textContent='设备耐久 '+s.hp+' / 3';$('rt-progress').textContent='校准 '+s.seals+' / 3';
+  $('rt-signal').textContent=waiting?'行动倒计时':role==='A'?'实时压力 / 0—100':'当前安全区间';
+  $('rt-cue').textContent=!s.ready?'···':s.cd>0?Math.ceil(s.cd):s.done?(s.win?'成功':'失败'):role==='A'?s.val.toFixed(1):Math.round(s.lo)+'—'+Math.round(s.hi);
+  $('rt-cue').style.fontSize=role==='B'?'43px':'54px';
+  $('rt-detail').textContent=role==='A'?'读数报给 B · 提前松手抵消惯性':'下次 '+Math.round(s.nextLo)+'—'+Math.round(s.nextHi)+' · '+Math.ceil(s.shift)+' 秒后移动';
+  $('rt-bar').style.width=(role==='A'?rtClamp(s.val,0,100):s.charge/4*100)+'%';
+  $('rt-bar').style.background=role==='A'&&(s.val<15||s.val>85)?'#f87171':'#5eead4';
+  $('rt-self').textContent=role==='A'?'B 阀门 '+(s.inputs.B?'开启':'关闭'):'本轮稳定 '+s.charge.toFixed(1)+' / 4 秒';
+  $('rt-other').textContent='阀温 '+Math.round(s.heatB)+'%'+(s.cooldown>0?' · 冷却':'');
+  document.querySelectorAll('.rt-control').forEach(function(b){b.disabled=waiting||s.done;});
+  rtDrawMessage(s);
 }
 
 render();
