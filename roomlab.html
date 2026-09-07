@@ -142,16 +142,21 @@ var PLAYGROUNDS = [
   { id:'vault', icon:'🧠', name:'记忆暗格', tag:'记忆', time:120,
     a:'保险柜 5 位密码随机逐个闪现，每位只亮 1 秒就变问号！你边看边口述给 B，他记满 5 位后提交，你自动判定。错 -3s 重来。',
     b:'你是密码记录员：A 报一位你按一位，记满 5 位点「提交给 A」。听错/按错 = A 那边判定失败 -3s，清空重记。' },
-  { id:'catch', icon:'🧺', name:'物资空投', tag:'同屏 · 合力', time:60, mode:'same',
-    desc:'一台设备两人玩：A 按住<b>左半屏</b>（←）让接货员左移，B 按住<b>右半屏</b>（→）右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关，接不满就失败。' },
-  { id:'shield', icon:'🛡️', name:'双人护盾', tag:'同屏 · 防守', time:60, mode:'same',
-    desc:'两台共用一台设备：A 管<b>左半区</b>、B 管<b>右半区</b>，各自按住自己的半屏升起护盾片挡住陨石。护盾片接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。漏了 B 的，A 也扣血——分工但要一起守！' },
-  { id:'beam', icon:'🏗️', name:'双人抬梁', tag:'同屏 · 平衡', time:60, mode:'same',
-    desc:'一根梁，A 按住<b>左半屏</b>抬左端、B 按住<b>右半屏</b>抬右端。砖落到梁上会向<b>低的一侧滚动</b>——两人要一起倾斜梁，把每块砖<b>滚进梁正中间的收集口</b>才算收下。梁平着不动砖就停住收不了，滚过头滑出两端会失误。收够 20 块过关，滑落 5 次失败。' },
-  { id:'beat', icon:'🎵', name:'双人节拍', tag:'同屏 · 节奏', time:60, mode:'same',
-    desc:'音符从右向左滚，到判定线时按下：<b style="color:#60a5fa">蓝 = A 按</b>（左半屏）、<b style="color:#fb923c">橙 = B 按</b>（右半屏）、<b style="color:#c084fc">紫 = A、B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关，分数扣到 0 失败。紫色是友尽点——谁没跟上？' },
-  { id:'bridge', icon:'🌉', name:'双人架桥', tag:'同屏 · 运输', time:60, mode:'same',
-    desc:'A 按住<b>左半屏</b>让桥面左移、B 按住<b>右半屏</b>右移（合力控制桥面）。球从上方落下要落在桥面上，再平稳运到<b>右侧出口</b>才算收下；球落地 -1。运够 5 个过关，落地超限失败。快到门口被队友一按键又滑回去——就是这种友尽感。' }
+  { id:'catch', icon:'🧺', name:'物资空投', tag:'合力', time:60,
+    a:'你控 ← 左移接货员，B 控 → 右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。',
+    b:'你控 → 右移接货员，A 控 ← 左移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。' },
+  { id:'shield', icon:'🛡️', name:'双人护盾', tag:'防守', time:60,
+    a:'你管<b>左半区</b>护盾，按住升起护盾片挡住陨石。B 管右半区。护盾接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。',
+    b:'你管<b>右半区</b>护盾，按住升起护盾片挡住陨石。A 管左半区。护盾接住陨石 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。' },
+  { id:'beam', icon:'🏗️', name:'双人抬梁', tag:'平衡', time:60,
+    a:'你抬<b>左端</b>，B 抬右端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。',
+    b:'你抬<b>右端</b>，A 抬左端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。' },
+  { id:'beat', icon:'🎵', name:'双人节拍', tag:'节奏', time:60,
+    a:'音符滚到判定线时按下：<b style="color:#60a5fa">蓝 = 你按</b>、<b style="color:#c084fc">紫 = 你和 B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。',
+    b:'音符滚到判定线时按下：<b style="color:#fb923c">橙 = 你按</b>、<b style="color:#c084fc">紫 = 你和 A 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。' },
+  { id:'bridge', icon:'🌉', name:'双人架桥', tag:'运输', time:60,
+    a:'你控 ← 左移桥面，B 控 → 右移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。',
+    b:'你控 → 右移桥面，A 控 ← 左移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。' }
 ];
 
 /* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
@@ -282,7 +287,7 @@ function showFB(d){
   var stars=''; for(var i=1;i<=5;i++){ stars+='<span class="s" data-v="'+i+'">★</span>'; }
   box.innerHTML=
     '<div class="big">'+(d.ok?'<span class="ok">✔ 玩法完成！</span>':'<span class="err">💥 失败</span>')+'</div>'+
-    '<div class="sub" style="color:#94a3b8;margin:6px 0">'+PG().icon+' '+PG().name+' · 耗时 '+d.duration+'s · 剩余 '+d.timeLeft+'s · 角色 '+(d.role||'双人同屏')+'</div>'+
+    '<div class="sub" style="color:#94a3b8;margin:6px 0">'+PG().icon+' '+PG().name+' · 耗时 '+d.duration+'s · 剩余 '+d.timeLeft+'s · 角色 '+(d.role||'A/B 协作')+'</div>'+
     '<div class="stars" id="stars">'+stars+'</div>'+
     '<textarea id="fb-comment" placeholder="好玩吗？紧张吗？哪里卡住了？"></textarea>'+
     '<div class="frow"><button class="btn" id="fb-restart">再来一局</button><button class="btn primary" id="fb-next">换玩法</button></div>';
@@ -385,11 +390,11 @@ function guestIntro(n){
 function render(){
   if(!S.mod){ renderMain(); }
   else if(S.mod==='dungeon'){ renderDungeon(); }
-  else if(S.mod==='catch'){ renderCatchMenu(); }
-  else if(S.mod==='shield'){ renderShield(); }
-  else if(S.mod==='beam'){ renderBeam(); }
-  else if(S.mod==='beat'){ renderBeatMenu(); }
-  else if(S.mod==='bridge'){ renderBridge(); }
+  else if(S.mod==='catch'||S.mod==='shield'||S.mod==='beam'||S.mod==='beat'||S.mod==='bridge'){
+    if(!S.role){ renderPickRole(); }
+    else if(S.role==='A'){ renderHost(); }
+    else if(S.role==='B'){ renderJoin(); }
+  }
   else if(!S.role){ renderPickRole(); }
   else if(S.role==='A'){ renderPlay(); }
   else if(S.role==='B'){ renderManual(); }
@@ -419,24 +424,18 @@ function renderHall(){
   app.innerHTML=
     '<div class="topbar"><span class="badge n">🏆 玩法</span><span class="badge n">'+APP_VER+'</span>'+
       '<button class="btn sm" id="back" style="margin-left:auto">回主界面</button></div>'+
-    '<p class="sub">所有小玩法都放在这里，后续新增玩法也会继续加进来。协作玩法：两台设备各开一个链接分屏协作；同屏玩法：一台设备各按半边屏。开语音沟通，绝对不要看对方屏幕。</p>'+
+    '<p class="sub">所有小玩法都放在这里，后续新增玩法也会继续加进来。每个玩法都是 <b>A 现场 + B 后方</b> 两台设备协作：A 开「当 A」链接、B 开「当 B」链接，开语音沟通，绝对不要看对方屏幕。</p>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
-      var desc = p.mode==='same'
-        ? '<div class="pg-desc">'+p.desc+'</div>'
-        : '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>';
-      var act = p.mode==='same'
-        ? '<button class="btn primary" data-same="'+p.id+'">▶ 双人同屏 · 一台设备</button>'
-        : '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>';
       return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+p.time+'s</span></div>'+
-        desc + act +
+        '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
+        '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
         '</div>';
     }).join('')+
     '</div>';
   $('back').onclick=function(){ renderMain(); };
   document.querySelectorAll('[data-a]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.a,'A'); }; });
   document.querySelectorAll('[data-b]').forEach(function(b){ b.onclick=function(){ setGame(this.dataset.b,'B'); }; });
-  document.querySelectorAll('[data-same]').forEach(function(b){ b.onclick=function(){ setSame(this.dataset.same); }; });
 }
 
 /* ---- 同屏玩法：不分 A/B，一台设备直接进 ---- */
@@ -466,7 +465,7 @@ function renderSame(){
    胜利解锁后续节点；失败扣 1 血（可重开，胜利才解锁）；血尽 = 密室失败退出。
    休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
 var DUNGEON=null;
-var EV_POOL=['catch','shield','beam','beat','bridge'];
+var EV_POOL=[]; // 单机同屏已移除，密室必须联机（AB 两台设备）
 var EV_POOL_NET=['catch','shield','beam','beat','bridge','maze','dial','wires','code','vault'];
 function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
 function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
@@ -586,13 +585,11 @@ function renderDungeonMenu(){
   app.innerHTML=
     '<h1>🏰 密室爬塔 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h1>'+
     '<p class="sub">双人把多个合作玩法串成一条分支地图：各自控制自己的小人沿连线走，站到同一个节点 3 秒进入玩法，共用 ❤️ 血条（失败 -1 / 休息 +1），一路爬到 Boss。走错分支会被锁定，考验路线决策。</p>'+
-    '<div class="howto">📡 <b>联网模式</b>：房主创建房间，同伴输码加入，<b>房主管 A 🔵、加入者管 B 🟠</b>，各在自己手机上控制自己，画面实时同步、结算同时。<br>📱 <b>一台设备</b>：两人共用一台设备轮流操作。</div>'+
+    '<div class="howto">📡 <b>必须联网</b>：两台设备各开一个链接，房主创建房间，同伴输码加入，<b>房主管 A 🔵、加入者管 B 🟠</b>，各在自己手机上控制自己，画面实时同步、结算同时。</div>'+
     '<div class="roles">'+
-      '<div class="rolecard a" id="dm1"><p class="rt" style="color:#60a5fa">📱 一台设备 · 双人轮流</p><p class="rd">两人共用一台设备，点图标切换 A/B 轮流走位，零联网。</p></div>'+
       '<div class="rolecard a" id="dm2"><p class="rt" style="color:#60a5fa">📡 联网 · 创建房间（我控 A 🔵）</p><p class="rd">生成 4 位房间码发给同伴，等对方加入后一起爬塔。</p></div>'+
       '<div class="rolecard b" id="dm3"><p class="rt" style="color:#fb923c">📡 联网 · 加入房间（我控 B 🟠）</p><p class="rd">输入房主的房间码加入，接管你的橙色小人。</p></div>'+
     '</div>';
-  $('dm1').onclick=function(){ newDungeon(); renderDungeon(); };
   $('dm2').onclick=function(){ renderHostDungeon(); };
   $('dm3').onclick=function(){ renderDungeonJoin(); };
 }
@@ -1189,9 +1186,12 @@ function renderHost(){
   if(!window._dungeon){ closePeer(); }
   clearNetZones(); window._dead=false; window._netMode='host'; window._guestSetDir=null;
   var app=document.getElementById('app');
+  var hostLabel={catch:'房主 · 你控 ← 左移',beat:'房主 · 你按蓝音符 A',shield:'房主 · 你管左半护盾',beam:'房主 · 你抬左端',bridge:'房主 · 你控 ← 左移'};
+  var hostIcon={catch:'🧺',beat:'🎵',shield:'🛡️',beam:'🏗️',bridge:'🌉'};
+  var hostGoal={catch:CATCH_GOAL,beat:30,shield:20,beam:20,bridge:5};
   app.innerHTML=
-    '<div class="topbar"><span class="badge A">'+(S.mod==='beat'?'房主 · 你按蓝音符 A':'房主 · 你控 ← 左移')+'</span><span class="badge n">'+(S.mod==='beat'?'🎵 联网':'🧺 联网')+'</span>'+
-    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+(S.mod==='beat'?30:CATCH_GOAL)+'</span>'+
+    '<div class="topbar"><span class="badge A">'+(hostLabel[S.mod]||'房主 · A')+'</span><span class="badge n">'+(hostIcon[S.mod]||'🎮')+' 联网</span>'+
+    '<span class="count" id="count">--s</span><span class="badge n" id="goal">0 / '+(hostGoal[S.mod]||CATCH_GOAL)+'</span>'+
     '<button class="btn sm" id="back" style="margin-left:auto">'+(window._dungeon?'返回地图':'回菜单')+'</button></div>'+
     '<div class="panel" id="playarea"><div class="stage" id="stage"></div><div id="msg"></div></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
@@ -1255,6 +1255,9 @@ function renderHost(){
 }
 function startHostGame(){
   if(S.mod==='beat'){ startHostBeat(); return; }
+  if(S.mod==='shield'){ runShieldHost(); return; }
+  if(S.mod==='beam'){ runBeamHost(); return; }
+  if(S.mod==='bridge'){ runBridgeHost(); return; }
   var stg=$('stage'); stg.innerHTML='';
   var pa=$('playarea');
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
@@ -1467,8 +1470,10 @@ function startHostBeat(){
 function renderJoin(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode='guest';
   var app=document.getElementById('app');
+  var guestLabel={catch:'加入者 · 你控 → 右移',beat:'加入者 · 你按橙音符 B',shield:'加入者 · 你管右半护盾',beam:'加入者 · 你抬右端',bridge:'加入者 · 你控 → 右移'};
+  var guestIcon={catch:'🧺',beat:'🎵',shield:'🛡️',beam:'🏗️',bridge:'🌉'};
   app.innerHTML=
-    '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 联网</span><button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
+    '<div class="topbar"><span class="badge B">'+(guestLabel[S.mod]||'加入者 · B')+'</span><span class="badge n">'+(guestIcon[S.mod]||'🎮')+' 联网</span><button class="btn sm" id="back" style="margin-left:auto">回菜单</button></div>'+
     '<div class="panel"><h3>📡 输入房主的房间码 <span style="font-size:12px;color:#94a3b8;font-weight:400">'+APP_VER+'</span></h3>'+
     '<div style="margin:10px 0"><input id="rc" inputmode="numeric" maxlength="4" placeholder="输入 4 位房间码" style="width:100%;height:64px;font-size:28px;font-weight:800;text-align:center;letter-spacing:8px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f8fafc;box-sizing:border-box;outline:none"></div>'+
     '<button class="btn primary" id="joing" style="width:100%;padding:14px;font-size:16px">加入房间</button>'+
@@ -1500,6 +1505,7 @@ function startGuest(code){
 }
 function renderGuestUI(code){
   if(S.mod==='beat'){ renderGuestBeat(code); return; }
+  if(S.mod==='shield'||S.mod==='beam'||S.mod==='bridge'){ renderGuestTwin(code, S.mod); return; }
   var app=document.getElementById('app');
   app.innerHTML=
     '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 房间 '+code+'</span>'+
