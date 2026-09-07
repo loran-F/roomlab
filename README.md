@@ -112,3 +112,10 @@ node start.js           # 同时起：玩法页 http://8080 + 信令 ws://9000
 - 调试钩子：`_mazeMove` / `_dbgDial` / `_dialApply` / `_dialLock` / `_wirePick` / `_curWires` / `MAZES`/`MAZE`/`setMaze`；同屏玩法各带 `_xxxState/_xxxInject/_xxxMove`（护盾 shield / 抬梁 beam / 节拍 beat / 架桥 bridge / 空投 catch）
 - `_genmaze.js`（迷宫生成+BFS+陷阱位验证）、`_genwires.js`（三步剪线 10 万次验证）
 - 玩法数据都在 `PLAYGROUNDS` 数组，新增玩法只动这一处 + 对应 run 函数 + B 手册分支
+
+
+## 密室选择界面（2026-09-07）
+
+进入密室后显示 13 张封面，可左右滑动、点击两侧按钮或用键盘方向键切换。名称来自图片文件名，基础信息由 `ROOM_CATALOG` 配置；展示数据暂不改变关卡规则。创建房间为角色 A，加入房间为角色 B，房主所选密室通过 `roomId` 同步给 B。刷新保留选择，返回可继续切换。封面在 `assets/rooms/`，发布时必须同时上传。
+
+本次仅发布选择界面，A–D 玩法改动在后一版本发布。
