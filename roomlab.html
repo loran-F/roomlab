@@ -208,8 +208,8 @@ var CATCH_GOAL = 20; // 情报空投：限时接够 20 个过关
    id 唯一；time = 单局倒计时；a = A 端说明；b = B 端手册说明 */
 var PLAYGROUNDS = [
   {id:'boss', icon:'🎯', name:'最终对峙', tag:'首领', time:100,
-    a:'三阶段协作：按住护盾拦截 A / AB 警报，松手散热；破解阶段只让指定角色按住；最后绿灯亮时与 B 在 0.38 秒内同时点按撤离。全队 7 格装甲。',
-    b:'你守 B / AB 警报。与 A 交替破解，抢按会断链；最后绿灯时同时点按撤离。长按护盾会过热，必须报号、松手、再接力。'},
+    a:'听 B 报弱点，攻击对应部位；看到来袭方向，及时报给 B 举盾。拆掉三块装甲获胜，共有 5 格护盾。',
+    b:'找出闪亮装甲，向 A 报弱点部位；听 A 报来袭方向，选择左侧、上方或右侧护盾。破甲后留意连续来袭。'},
   { id:'maze', icon:'🗺️', name:'通风潜行', tag:'侦察', time:120,
     a:'探针盲走：只能看到上/下/左/右 5 格，看不到斜向和远处。问 B 要方向，一句句走。碰墙 -5s，踩陷阱 -8s。走到终点通关。',
     b:'你手握全图：绿色安全路线 + 红色陷阱点。听 A 报方位，一句句指挥「上/下/左/右」，千万别让他走红线外的岔路。' },
@@ -519,7 +519,7 @@ function renderHall(){
     '<p class="sub">所有小玩法都放在这里，后续新增玩法也会继续加进来。每个玩法都是 <b>A 现场 + B 后方</b> 两台设备协作：A 开「当 A」链接、B 开「当 B」链接，开语音沟通，绝对不要看对方屏幕。</p>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
-      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.id==='vault'?'3 次机会':p.time+'s')+'</span></div>'+
+      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.id==='vault'?'3 次机会':p.id==='boss'?'双人拆机':p.time+'s')+'</span></div>'+
         '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
         '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
         '</div>';
@@ -2368,7 +2368,7 @@ function renderPickRole(){
   var p=PG();
   document.getElementById('app').innerHTML=
     '<h1>'+p.icon+' '+p.name+'</h1>'+
-    '<p class="sub">'+p.tag+' · '+(p.id==='vault'?'3 次机会 · 普通记忆不计时':'单局 '+p.time+'s')+' · 双人协作</p>'+
+    '<p class="sub">'+p.tag+' · '+(p.id==='vault'?'3 次机会 · 普通记忆不计时':p.id==='boss'?'报弱点 · 挡来袭':'单局 '+p.time+'s')+' · 双人协作</p>'+
     '<div class="howto">📱 两台设备各打开这个链接 → 一人「当 A」（现场操作）、一人「当 B」（后方手册）→ 开语音。<b>绝对不要看对方屏幕</b>。</div>'+
     '<div class="roles">'+
       '<div class="rolecard a" id="rcA"><p class="rt" style="color:#60a5fa">当 A · 现场</p><p class="rd">'+p.a+'</p></div>'+
@@ -3339,6 +3339,8 @@ function pressureDraw(s,role){
 <script src="radio-mobile.js"></script>
 <link rel="stylesheet" href="wires-mobile.css">
 <script src="wires-mobile.js"></script>
+<link rel="stylesheet" href="boss-mobile.css">
+<script src="boss-mobile.js"></script>
 <script>render();</script>
 </body>
 </html>
