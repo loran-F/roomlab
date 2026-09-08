@@ -42,7 +42,7 @@ function practice(mode,role,done){
  else if(mode==='vault'){choice(role==='A'?'第 2 位亮起数字 7，你应该报：':'同伴说“第 2 位，7”，选择正确记录。',['第 7 位，2','第 2 位，7','第 1 位，7'],'第 2 位，7');}
  else if(mode==='pressure'&&role==='A'){var value=40;var gauge=document.createElement('p');box.appendChild(gauge);gauge.textContent='练习压力 40 · 目标 50';button(box,'＋ 加压',function(){value+=5;gauge.textContent='练习压力 '+value;if(value>=50)pass();});}
  else if(mode==='beat'||mode==='boss'){var ready=false;var b=button(box,'等待绿色提示',function(){if(ready)pass();else say('提前了，等绿色提示再按。');});setTimeout(function(){if(b.isConnected){ready=true;b.textContent='现在点击';b.style.background='#8cd2a2';}},900);}
- else hold(box,mode==='pressure'?'读数 50，在 40—60 内：按住阀门':role==='A'?'按住你的左侧控制':'按住你的右侧控制',650,pass);
+ else hold(box,mode==='pressure'?'读数 50，在 45—55 内：按住阀门':role==='A'?'按住你的左侧控制':'按住你的右侧控制',650,pass);
 }
 function themeName(){return DUNGEON&&DUNGEON.roomId==='room-4'?'镜像双胞胎':DUNGEON&&DUNGEON.roomId==='room-8'?'异形惊扰':'';}
 function configFor(n){
