@@ -4,7 +4,7 @@
 var duties={
 maze:['按 B 的路线移动，遇到岔路先停下。','看地图，一次只报一个方向。'],
 dial:['调整频率，让波形平顺；对准后通知同伴。','调整增益，让信号条满格；与 A 稳定收录。'],
-wires:['从左到右报线色，听 B 指令再剪。','按规则判断线号；剪错时按住应急开关。'],
+wires:['报线号、颜色和纹理，选线后再确认剪断。','分步判断线号；救场时听 A 报符号，选择旁路。'],
 code:['描述符号的形状和方向，输入 B 报的数字。','根据描述查符号，逐位报回数字。'],
 vault:['报出“第几位、什么数字”。','选对应位序，再记录数字。'],
 pressure:['加减压力，持续把读数报给 B。','报安全区间，在范围内按住阀门。'],
@@ -37,7 +37,7 @@ function practice(mode,role,done){
  function choice(prompt,choices,answer){var p=document.createElement('p');p.textContent=prompt;box.appendChild(p);choices.forEach(function(x){button(box,x,function(){if(x===answer)pass();else say('再试一次，练习不会扣血。');});});}
  if(mode==='maze')choice(role==='A'?'同伴说“右移一格”，请选择方向。':'地图出口在角色右侧，你应该报：',['← 左','→ 右','↑ 上'],'→ 右');
  else if(mode==='dial')choice(role==='A'?'同伴说目标为 7，把练习指针移到：':'练习卡 C1 → 刻度 7。A 报 C1，你报：',['3','7','9'],'7');
- else if(mode==='wires')choice(role==='A'?'B 让你剪第 2 根，点击对应线号。':'练习线序：红、黄、蓝。只有一根黄线，应剪：',['1','2','3'],'2');
+ else if(mode==='wires')choice(role==='A'?'B 让你剪第 2 根，点击对应线号。':'练习线序：1黄、2蓝、3红。红线不足2根时剪蓝线，应剪：',['1','2','3'],'2');
  else if(mode==='code')choice(role==='A'?'同伴报回数字 4，输入：':'练习密码本：圆圈向左下伸线 → 4。A 描述相同符号，你报：',['2','4','8'],'4');
  else if(mode==='vault'){choice(role==='A'?'第 2 位亮起数字 7，你应该报：':'同伴说“第 2 位，7”，选择正确记录。',['第 7 位，2','第 2 位，7','第 1 位，7'],'第 2 位，7');}
  else if(mode==='pressure'&&role==='A'){var value=40;var gauge=document.createElement('p');box.appendChild(gauge);gauge.textContent='练习压力 40 · 目标 50';button(box,'＋ 加压',function(){value+=5;gauge.textContent='练习压力 '+value;if(value>=50)pass();});}
