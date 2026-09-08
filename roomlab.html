@@ -1603,26 +1603,11 @@ function startHostBeat(){
   function broadcast(finalWin){
     if(PEER.conn&&PEER.conn.open){
       try{ PEER.conn.send({t:'st', notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
-        score:score, lives:lives, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead,
+        score:score, lives:lives, bpm:bpm, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead,
         msg:window._lastMsg||null}); }catch(e){}
     }
   }
-  function render(){
-    ctx.clearRect(0,0,W,H);
-    ctx.strokeStyle='rgba(51,65,85,.5)';
-    for(var gx=0;gx<=W;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
-    ctx.fillStyle='#facc15'; ctx.fillRect(LINE-3,0,6,H);
-    ctx.fillStyle='#a855f7'; ctx.font='bold 12px sans-serif'; ctx.textAlign='right'; ctx.textBaseline='alphabetic'; ctx.fillText('♩ '+bpm+' BPM', W-8, 16);
-    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('判定线',4,H-8);
-    notes.forEach(function(n){
-      var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
-      ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
-      ctx.beginPath(); ctx.arc(n.x,200,14,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(n.type==='AB'?'AB':(n.type==='A'?'A':'B'), n.x, 200);
-    });
-    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('机会 '+lives+' / '+LIVES, 8, H-12);
-  }
+  function render(){beatMobileDraw(ctx,notes,lives,bpm);}
   function press(who){
     if(done||window._dead) return;
     var best=null, bestD=999;
@@ -1810,22 +1795,7 @@ function renderGuestBeat(code){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; $('stage').appendChild(cv);
   var ctx=cv.getContext('2d');
   var started=false, ended=false, last=null;
-  function draw(d){
-    ctx.clearRect(0,0,340,400);
-    ctx.strokeStyle='rgba(51,65,85,.5)';
-    for(var gx=0;gx<=340;gx+=34){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,400); ctx.stroke(); }
-    ctx.fillStyle='#facc15'; ctx.fillRect(70-3,0,6,400);
-    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('判定线',4,392);
-    (d.notes||[]).forEach(function(n){
-      if(n.hit) return;
-      var col = n.type==='A' ? '#60a5fa' : (n.type==='B' ? '#fb923c' : '#c084fc');
-      ctx.fillStyle=col; ctx.shadowColor=col; ctx.shadowBlur=8;
-      ctx.beginPath(); ctx.arc(n.x,200,14,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.fillStyle='#fff'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-      ctx.fillText(n.type==='AB'?'AB':(n.type==='A'?'A':'B'), n.x, 200);
-    });
-    ctx.fillStyle='#94a3b8'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left'; ctx.fillText('机会 '+(d.lives!=null?d.lives:'--')+' / 8', 8, 16);
-  }
+  function draw(d){beatMobileDraw(ctx,d.notes||[],d.lives==null?8:d.lives,d.bpm||96);}
   function sendPress(who){
     try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'press', who:who}); }catch(e){}
     dualBeep(660,0.08,'square',0.1);
@@ -3383,6 +3353,8 @@ function pressureDraw(s,role){
 <script src="fullscreen-map.js"></script>
 <link rel="stylesheet" href="beam-mobile.css">
 <script src="beam-mobile.js"></script>
+<link rel="stylesheet" href="beat-mobile.css">
+<script src="beat-mobile.js"></script>
 <script>render();</script>
 </body>
 </html>
