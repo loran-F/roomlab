@@ -1,0 +1,16 @@
+#app.maze-mobile{max-width:520px;margin:auto;padding:12px;min-height:100dvh;background:#40385e;color:#fff5dc;box-sizing:border-box;font-family:system-ui,"Microsoft YaHei",sans-serif}
+.maze-mobile .topbar{display:flex;flex-wrap:wrap;gap:8px;background:transparent;padding:6px 0 12px;border:0;align-items:center}
+.maze-mobile .badge{background:#ffe6ac;color:#30283f;border:2px solid #241e32;border-radius:8px;padding:6px}
+.maze-mobile .badge.A{background:#acd9fa}.maze-mobile .badge.B{background:#ffbe80}
+.maze-mobile .panel,.maze-mobile .manual-card{background:#fff0cc;color:#30283f;border:3px solid #241e32;border-radius:20px;padding:12px;box-shadow:0 5px 0 #241e32;margin:0 0 16px}
+.maze-mobile .taskline,.maze-mobile .mc{font-size:14px;line-height:1.6;color:#514462;margin:0 0 12px;writing-mode:horizontal-tb}
+.maze-mobile .stage{padding:6px;background:#514662;border:2px solid #241e32;border-radius:12px;width:100%;box-sizing:border-box;display:flex;justify-content:center}
+.maze-mobile canvas{display:block;width:100%;height:auto;max-width:420px;border-radius:6px}
+.maze-mobile .msg{width:auto;box-sizing:border-box;writing-mode:horizontal-tb;margin:10px 0 0;padding:10px;border-radius:10px;font-size:14px;line-height:1.5}
+.maze-mobile .dpad{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;width:100%;max-width:360px;margin:18px auto;padding:0}
+.maze-mobile .dpad button,.maze-mobile .btn,.maze-mobile .mz-tab{border:2px solid #241e32;background:#acd9fa;color:#30283f;border-radius:12px;box-shadow:0 3px 0 #241e32;font-weight:800;touch-action:manipulation;cursor:pointer}
+.maze-mobile .dpad button{min-height:58px;width:auto;font-size:21px}.maze-mobile .dpad button:first-child{grid-column:2}.maze-mobile .dpad button:nth-child(2){grid-column:1}
+.maze-mobile button:active{transform:translateY(2px);box-shadow:none}.maze-mobile button:focus-visible{outline:3px solid #fa9950;outline-offset:3px}
+.maze-mobile .maze-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.maze-mobile .mz-tab{min-height:46px;background:#f6d9a2}.maze-mobile .mz-tab.on{background:#ffac61}
+.maze-mobile .manual-card h3{color:#30283f;margin:0 0 8px;font-size:20px}
+.maze-mobile .taskline{background:#f5deb0;border:0;padding:10px;border-radius:10px}.maze-mobile .msg.warn{background:#f5d591;color:#513d29}.maze-mobile .msg.ok{background:#c0dfb8;color:#244f3a}.maze-mobile .msg.err{background:#ffd0ba;color:#782e30}
