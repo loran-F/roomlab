@@ -13,7 +13,7 @@ shield:['守左半边，按住抵挡，及时松手。','守右半边，按住�
 beam:['抬左端使货物滚向中央；危险时一起按住。','抬右端使货物滚向中央；危险时一起按住。'],
 beat:['蓝色音符你来打，紫色一起打。','橙色音符你来打，紫色一起打。'],
 bridge:['控制左移，运送中避免急转；危险时一起刹车。','控制右移，运送中避免急转；危险时一起刹车。'],
-boss:['看 A / AB 提示行动，留意阶段变化。','看 B / AB 提示行动，撤离时与 A 同步。']
+boss:['听 B 报弱点攻击，看到来袭方向立即报给 B。','报弱点部位给 A，听 A 报方向选择护盾。']
 };
 var families={maze:'判断',dial:'搜索',wires:'判断',code:'判断',vault:'记忆',beat:'节奏',catch:'搬运',beam:'搬运',bridge:'搬运',shield:'反应',pressure:'调节',lookback:'反应',caller:'沟通',shadow:'协作'};
 var current=null,prep=null,serial=0,seen={},prepConn=null;
@@ -41,7 +41,8 @@ function practice(mode,role,done){
  else if(mode==='code')choice(role==='A'?'同伴报回数字 4，输入：':'练习密码本：圆圈向左下伸线 → 4。A 描述相同符号，你报：',['2','4','8'],'4');
  else if(mode==='vault'){choice(role==='A'?'第 2 位亮起数字 7，你应该报：':'同伴说“第 2 位，7”，选择正确记录。',['第 7 位，2','第 2 位，7','第 1 位，7'],'第 2 位，7');}
  else if(mode==='pressure'&&role==='A'){var value=40;var gauge=document.createElement('p');box.appendChild(gauge);gauge.textContent='练习压力 40 · 目标 50';button(box,'＋ 加压',function(){value+=5;gauge.textContent='练习压力 '+value;if(value>=50)pass();});}
- else if(mode==='beat'||mode==='boss'){var ready=false;var b=button(box,'等待绿色提示',function(){if(ready)pass();else say('提前了，等绿色提示再按。');});setTimeout(function(){if(b.isConnected){ready=true;b.textContent='现在点击';b.style.background='#8cd2a2';}},900);}
+ else if(mode==='boss')choice(role==='A'?'B 报弱点是右臂，你攻击：':'A 报泡泡弹从左侧来，你防御：',['左侧','右臂','上方'],role==='A'?'右臂':'左侧');
+ else if(mode==='beat'){var ready=false;var b=button(box,'等待绿色提示',function(){if(ready)pass();else say('提前了，等绿色提示再按。');});setTimeout(function(){if(b.isConnected){ready=true;b.textContent='现在点击';b.style.background='#8cd2a2';}},900);}
  else hold(box,mode==='pressure'?'读数 50，在 45—55 内：按住阀门':role==='A'?'按住你的左侧控制':'按住你的右侧控制',650,pass);
 }
 function themeName(){return DUNGEON&&DUNGEON.roomId==='room-4'?'镜像双胞胎':DUNGEON&&DUNGEON.roomId==='room-8'?'异形惊扰':'';}
