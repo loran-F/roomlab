@@ -3266,16 +3266,17 @@ function realtimeGuestData(d){
 }
 
 function pressureCreate(){
-  return {phase:1,round:0,hp:3,seals:0,charge:0,val:50,velocity:0,center:50,nextCenter:35+Math.random()*30,shift:6,heatB:0,cooldown:0,unsafe:0,adjust:{up:false,down:false},transition:0};
+  var tier=typeof coopDifficulty==='function'?Math.max(1,Math.min(4,coopDifficulty().tier||1)):1;
+  return {safeHalf:6-tier,jitter:2.5+tier,phase:1,round:0,hp:3,seals:0,charge:0,val:50,velocity:0,center:50,nextCenter:35+Math.random()*30,shift:6,heatB:0,cooldown:0,unsafe:0,adjust:{up:false,down:false},transition:0};
 }
 function pressureStep(s,dt){
   s.shift-=dt;if(s.shift<=0){s.shift=6;s.centerTarget=s.nextCenter;s.nextCenter=32+Math.random()*36;rtMessage(s,'安全区间开始移动，B 报新区间！');}
   if(s.centerTarget!=null)s.center+=rtClamp(s.centerTarget-s.center,-4*dt,4*dt);
   var force=(s.adjust.up?1:0)-(s.adjust.down?1:0);
-  var targetVelocity=force*19+Math.sin(s.elapsed*1.6)*3.5;
+  var targetVelocity=force*19+Math.sin(s.elapsed*1.6)*s.jitter;
   s.velocity+=(targetVelocity-s.velocity)*Math.min(1,dt*4);s.val+=s.velocity*dt;
   s.cooldown=Math.max(0,s.cooldown-dt);
-  var open=s.inputs.B&&s.cooldown===0,inside=s.val>=s.center-10&&s.val<=s.center+10;
+  var open=s.inputs.B&&s.cooldown===0,inside=s.val>=s.center-s.safeHalf&&s.val<=s.center+s.safeHalf;
   s.heatB=rtClamp(s.heatB+(open?18:-32)*dt,0,100);
   if(open&&inside){s.charge+=dt;s.unsafe=0;}
   else{s.charge=Math.max(0,s.charge-dt*.35);s.unsafe=open?s.unsafe+dt:0;}
@@ -3291,7 +3292,7 @@ function pressureSnapshot(s,role){
   var common={id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,hp:s.hp,seals:s.seals,round:s.round,heatB:s.heatB,cooldown:s.cooldown,inputs:s.inputs};
   // A 不下发安全区间；B 不下发压力读数，保留口头沟通的必要性。
   if(role==='A'){common.val=s.val;common.velocity=s.velocity;}
-  else{common.lo=s.center-10;common.hi=s.center+10;common.nextLo=s.nextCenter-10;common.nextHi=s.nextCenter+10;common.shift=s.shift;common.charge=s.charge;}
+  else{common.lo=s.center-s.safeHalf;common.hi=s.center+s.safeHalf;common.nextLo=s.nextCenter-s.safeHalf;common.nextHi=s.nextCenter+s.safeHalf;common.shift=s.shift;common.charge=s.charge;}
   return common;
 }
 function pressureUI(role){
