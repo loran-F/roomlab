@@ -226,8 +226,8 @@ var PLAYGROUNDS = [
     a:'你看到实时压力，却看不到安全区间。按住加压 / 减压，报读数给 B。压力有惯性，0 / 100 爆表即失败。听 B 提前报区间移动，完成 3 轮稳压。',
     b:'你看到移动安全区间和下一次变动，看不到 A 的压力。指挥 A 调整，确认稳定后按住校准阀 4 秒；阀门会过热，区间外硬开阀会损坏设备。3 轮校准后断开警报电源。' },
   { id:'vault', icon:'🧠', name:'档案窃取', tag:'记忆', time:120,
-    a:'档案密码按随机位序逐个闪现，报“第几位、什么数字”给 B。独立试玩 5 位 / 每位 1 秒；密室逐层变为 5、6、7 位并提速。输错或重新扫描 -3 秒。',
-    b:'听 A 报位序，点对应格子后输入数字；填满再提交。独立试玩保持 5 位，密室高层增加至 6、7 位。听错 / 按错 -3 秒，清空重记。' },
+    a:'阅读规则后手动开始扫描，按位序向 B 报内容。普通记忆不计时，双方共享 3 次机会；高难增加位数、混合字母、减少机会，最高档为限时算术。',
+    b:'等待 A 开始，听位序、点格子记录，扫描后核对提交。提交错误或 A 重新看均扣一次共享机会；算术档填写计算结果。' },
   { id:'catch', icon:'🧺', name:'情报空投', tag:'合力', time:60,
     a:'你控 ← 左移接货员，B 控 → 右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。',
     b:'你控 → 右移接货员，A 控 ← 左移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。' },
@@ -521,7 +521,7 @@ function renderHall(){
     '<p class="sub">所有小玩法都放在这里，后续新增玩法也会继续加进来。每个玩法都是 <b>A 现场 + B 后方</b> 两台设备协作：A 开「当 A」链接、B 开「当 B」链接，开语音沟通，绝对不要看对方屏幕。</p>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
-      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+p.time+'s</span></div>'+
+      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.id==='vault'?'3 次机会':p.time+'s')+'</span></div>'+
         '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
         '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
         '</div>';
@@ -2370,7 +2370,7 @@ function renderPickRole(){
   var p=PG();
   document.getElementById('app').innerHTML=
     '<h1>'+p.icon+' '+p.name+'</h1>'+
-    '<p class="sub">'+p.tag+' · 单局 '+p.time+'s · 双人协作</p>'+
+    '<p class="sub">'+p.tag+' · '+(p.id==='vault'?'3 次机会 · 普通记忆不计时':'单局 '+p.time+'s')+' · 双人协作</p>'+
     '<div class="howto">📱 两台设备各打开这个链接 → 一人「当 A」（现场操作）、一人「当 B」（后方手册）→ 开语音。<b>绝对不要看对方屏幕</b>。</div>'+
     '<div class="roles">'+
       '<div class="rolecard a" id="rcA"><p class="rt" style="color:#60a5fa">当 A · 现场</p><p class="rd">'+p.a+'</p></div>'+
@@ -3337,6 +3337,8 @@ function pressureDraw(s,role){
 <script src="code-symbols.js"></script>
 <link rel="stylesheet" href="maze-mobile.css">
 <script src="maze-mobile.js"></script>
+<link rel="stylesheet" href="vault-mobile.css">
+<script src="vault-mobile.js"></script>
 <script>render();</script>
 </body>
 </html>
