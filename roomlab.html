@@ -212,7 +212,7 @@ var PLAYGROUNDS = [
     b:'找出闪亮装甲，向 A 报弱点部位；听 A 报来袭方向，选择左侧、上方或右侧护盾。破甲后留意连续来袭。'},
   { id:'maze', icon:'🗺️', name:'通风潜行', tag:'侦察', time:120,
     a:'探针盲走：只能看到上/下/左/右 5 格，看不到斜向和远处。问 B 要方向，一句句走。碰墙 -5s，踩陷阱 -8s。走到终点通关。',
-    b:'你手握全图：绿色安全路线 + 红色陷阱点。听 A 报方位，一句句指挥「上/下/左/右」，千万别让他走红线外的岔路。' },
+    b:'你手握全图与阀门对照表：规划避开陷阱的路线，经过三个阀门。A 报现场符号，你查表告诉他选哪个阀门。' },
   { id:'dial', icon:'📻', name:'双人搜台', tag:'搜台', time:100,
     a:'按住 ＋ / − 调整频率，让杂乱波形变平顺。与 B 同时对准并稳定 2 秒，收集三段情报；留意频道漂移。',
     b:'按住 ＋ / − 调整增益，让接收信号条满格。告诉 A 是否已对准；遇到干扰先稳住，收录进度会保留。' },
@@ -231,9 +231,9 @@ var PLAYGROUNDS = [
   { id:'catch', icon:'🧺', name:'情报空投', tag:'合力', time:60,
     a:'你控 ← 左移接货员，B 控 → 右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。',
     b:'你控 → 右移接货员，A 控 ← 左移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。' },
-  { id:'beam', icon:'🏗️', name:'破障搬运', tag:'平衡', time:60,
-    a:'你抬<b>左端</b>，B 抬右端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。',
-    b:'你抬<b>右端</b>，A 抬左端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。' },
+  { id:'beam', icon:'🏗️', name:'破障搬运', tag:'平衡', time:65,
+    a:'你抬<b>左端</b>，B 抬右端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。六件货物各有特性：重箱慢、圆筒快、玻璃怕大倾角；中央放平半秒入库，损坏3件失败。',
+    b:'你抬<b>右端</b>，A 抬左端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。六件货物各有特性：重箱慢、圆筒快、玻璃怕大倾角；中央放平半秒入库，损坏3件失败。' },
   { id:'beat', icon:'🎵', name:'信号节拍', tag:'节奏', time:60,
     a:'音符滚到判定线时按下：<b style="color:#60a5fa">蓝 = 你按</b>、<b style="color:#c084fc">紫 = 你和 B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。',
     b:'音符滚到判定线时按下：<b style="color:#fb923c">橙 = 你按</b>、<b style="color:#c084fc">紫 = 你和 A 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。' },
@@ -2493,6 +2493,12 @@ function runMaze(set){
   var ctx=cv.getContext('2d');
   var pos=[MAZE.start[0], MAZE.start[1]];
   var done=false;
+  var path=MAZE.path[0],gates=[.25,.5,.75].map(function(f,i){var at=path[Math.floor((path.length-1)*f)].split(',').map(Number);return {r:at[0],c:at[1],index:i,symbol:Math.floor(Math.random()*6),open:false};}),pending=null;
+  var symbols=['○','△','□','⊕','◇','☆'],valves=['蓝阀','橙阀','绿阀'],answers=[0,1,2,2,0,1];
+  var panel=document.createElement('div');panel.id='maze-valve';panel.className='maze-valve';panel.hidden=true;panel.innerHTML='<b id="maze-valve-clue"></b><p>报符号给 B，听指挥选择阀门。</p>'+valves.map(function(v,i){return '<button data-valve="'+i+'">'+v+'</button>';}).join('');stage.parentNode.appendChild(panel);
+  panel.querySelectorAll('button').forEach(function(button){button.onclick=function(){if(!pending||done||window._dead)return;if(+button.dataset.valve===answers[pending.symbol]){pending.open=true;pending=null;panel.hidden=true;var m=$('msg');if(m){m.className='msg ok';m.textContent='阀门打开！继续前进。';}render();}else{cut(4);var m=$('msg');if(m){m.className='msg err';m.textContent='阀门不对，−4秒。重新向 B 核对符号。';}}};});
+  window._mazeGates=gates;
+
 
   function render(){
     var R=MAZE.rows, C=MAZE.cols;
@@ -2510,6 +2516,7 @@ function runMaze(set){
         ctx.fillRect(c*cell,r*cell,cell,cell);
       }
     }
+    gates.forEach(function(g){if(Math.abs(g.r-pos[0])+Math.abs(g.c-pos[1])<=1){ctx.fillStyle=g.open?'#81bd86':'#e6a750';ctx.fillRect(g.c*cell+2,g.r*cell+2,cell-4,cell-4);ctx.fillStyle='#30253a';ctx.font='bold '+Math.floor(cell*.65)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.open?'✓':symbols[g.symbol],g.c*cell+cell/2,g.r*cell+cell/2);}});
     // 探针
     ctx.fillStyle='#269873';
     ctx.shadowColor='#269873'; ctx.shadowBlur=0;
@@ -2530,6 +2537,10 @@ function runMaze(set){
       var m=$('msg'); if(m){ m.className='msg err'; m.textContent='✘ 碰墙！时间 -5s。让 B 重新确认方向。'; }
       return;
     }
+    var gate=gates.find(function(g){return g.r===nr&&g.c===nc&&!g.open;});
+    if(gate){pending=gate;panel.hidden=false;$('maze-valve-clue').textContent='阀门 '+(gate.index+1)+' · 现场符号「'+symbols[gate.symbol]+'」';return;}
+    pending=null;panel.hidden=true;
+    if(nr===MAZE.end[0]&&nc===MAZE.end[1]&&gates.some(function(g){return !g.open;})){var m=$('msg');if(m){m.className='msg warn';m.textContent='出口未供电：先打开地图上的三个阀门。';}return;}
     pos=[nr,nc];
     var ti=isTrap(nr,nc);
     if(ti>=0 && !sprung[ti]){
@@ -2992,27 +3003,8 @@ function drawMazeFull(ctx, cell){
     ctx.fillRect(c*cell, r*cell, cell, cell);
     ctx.strokeStyle='#b9a58b'; ctx.strokeRect(c*cell+.5, r*cell+.5, cell-1, cell-1);
   }
-  // 路径高亮 + 箭头
-  var path=MAZE.path[0];
-  for(var i=0;i<path.length;i++){
-    var p=path[i].split(','), r=+p[0], c=+p[1];
-    ctx.fillStyle='#b8ddb0';
-    ctx.fillRect(c*cell, r*cell, cell, cell);
-    if(i<path.length-1){
-      var n=path[i+1].split(','), nr=+n[0], nc=+n[1];
-      var dr=nr-r, dc=nc-c;
-      var cx=c*cell+cell/2, cy=r*cell+cell/2;
-      ctx.strokeStyle='#269873'; ctx.lineWidth=3; ctx.lineCap='round';
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+dc*cell*0.55, cy+dr*cell*0.55); ctx.stroke();
-      ctx.fillStyle='#269873';
-      ctx.beginPath();
-      var tipx=cx+dc*cell*0.62, tipy=cy+dr*cell*0.62;
-      ctx.moveTo(tipx, tipy);
-      ctx.lineTo(tipx-dc*cell*0.2-dr*cell*0.2, tipy-dr*cell*0.2-dc*cell*0.2);
-      ctx.lineTo(tipx-dc*cell*0.2+dr*cell*0.2, tipy-dr*cell*0.2+dc*cell*0.2);
-      ctx.fill();
-    }
-  }
+  // B sees the survey map and gate locations, but no recommended route or A's symbols.
+  [.25,.5,.75].forEach(function(f,i){var p=MAZE.path[0][Math.floor((MAZE.path[0].length-1)*f)].split(',').map(Number);ctx.fillStyle='#e6a750';ctx.fillRect(p[1]*cell+1,p[0]*cell+1,cell-2,cell-2);ctx.fillStyle='#30253a';ctx.font='bold '+Math.floor(cell*.6)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(i+1),p[1]*cell+cell/2,p[0]*cell+cell/2);});
   // S / E
   var s=MAZE.start, e=MAZE.end;
   ctx.fillStyle='#269873'; ctx.font='bold '+(cell*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -3025,7 +3017,7 @@ function drawMazeFull(ctx, cell){
     ctx.beginPath(); ctx.arc(t[1]*cell+cell/2, t[0]*cell+cell/2, Math.max(4,cell*0.18), 0, Math.PI*2); ctx.fill();
   });
   ctx.fillStyle='#8c343e'; ctx.font='bold '+(cell*0.45)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('⚠ 陷阱', s[1]*cell+cell/2, Math.max(10, s[0]*cell-4));
+
 }
 
 /* ---- 键盘分发 ---- */
