@@ -516,7 +516,7 @@ function renderHall(){
     '<p class="sub">所有小玩法都放在这里，后续新增玩法也会继续加进来。每个玩法都是 <b>A 现场 + B 后方</b> 两台设备协作：A 开「当 A」链接、B 开「当 B」链接，开语音沟通，绝对不要看对方屏幕。</p>'+
     '<div class="pg-grid">'+
     PLAYGROUNDS.map(function(p){
-      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.id==='vault'?'3 次机会':p.id==='boss'?'双人拆机':p.time+'s')+'</span></div>'+
+      return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.time===null?'不限时':p.id==='vault'?'3 次机会':p.id==='boss'?'双人拆机':p.time+'s')+'</span></div>'+
         '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
         '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
         '</div>';
@@ -3341,6 +3341,8 @@ function pressureDraw(s,role){
 <script src="wires-mobile.js"></script>
 <link rel="stylesheet" href="boss-mobile.css">
 <script src="boss-mobile.js"></script>
+<link rel="stylesheet" href="puzzle-pack.css">
+<script src="puzzle-pack.js"></script>
 <script>render();</script>
 </body>
 </html>
