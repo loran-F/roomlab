@@ -1373,7 +1373,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v10.1·卷轴地图';
+var APP_VER='v11·默契救场';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -2238,7 +2238,7 @@ function runBeamHost(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400,X1=40,X2=300,GOAL=20,LIMIT=5,CENTER=(40+300)/2,HOLE=18;
-  var yL=300,yR=300,bricks=[],next=420,got=0,spills=0,t=0,done=false;
+  var yL=300,yR=300,bricks=[],next=420,got=0,spills=0,t=0,done=false,rescue=null,rescueUsed=false;
   window._dead=false; window._inL=false; window._inR=false;
   function lineY(x){ return yL+(yR-yL)*(x-X1)/(X2-X1); }
   function render(){
@@ -2256,6 +2256,12 @@ function runBeamHost(){
   function broadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'st2',mode:'beam',state:{yL:yL,yR:yR,bricks:bricks.map(function(b){return{x:b.x,y:b.y,on:b.on};}),got:got,spills:spills,done:done,dead:window._dead,msg:window._lastMsg||null,goal:GOAL,LIMIT:LIMIT,CENTER:CENTER,X1:X1,X2:X2,HOLE:HOLE}}); }catch(e){} } }
   function loop(){
     if(done||window._dead) return;
+    if(rescue){
+      rescue.left-=16;rescue.held=window._inL&&window._inR?rescue.held+16:0;
+      if(rescue.held>=500){rescue.brick.x=rescue.brick.x<X1?X1+25:X2-25;yL=yR=280;rescue=null;coopRescueFeedback('抢救成功！货物回到梁上，本次救场已用。');}
+      else if(rescue.left<=0){bricks.splice(bricks.indexOf(rescue.brick),1);rescue=null;spills++;coopRescueFeedback('未及时扶稳，失误 '+spills+' / '+LIMIT);if(spills>=LIMIT){explode('梁塌了，砖全掉');return;}}
+      render();return;
+    }
     t+=16; next-=16;
     if(next<=0){ bricks.push({x:60+Math.random()*(W-120),y:-12,vy:1.3+got*0.04+Math.random()*0.5,on:false}); next=Math.max(280,640-got*30)+Math.random()*240; }
     var sway=Math.sin(t*0.0013)*0.3+Math.sin(t*0.0005+2.1)*0.4;
@@ -2272,7 +2278,7 @@ function runBeamHost(){
         b.x += (yR-yL)/(X2-X1)*2.4;
         if(Math.abs(b.x-CENTER)<=HOLE){ got++; beep(660,0.08,'square',0.1); dgPlayMsg('ok','✔ 砖滚进收集口！'+got+' / '+GOAL); $('goal').textContent='砖块 '+got+' / '+GOAL; bricks.splice(i,1);
           if(got>=GOAL){ done=true; finish(true); return; } }
-        else if(b.x<X1-10||b.x>X2+10){ bricks.splice(i,1); spills++; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 砖滚出梁了！失误 '+spills+' / '+LIMIT);
+        else if(b.x<X1-10||b.x>X2+10){ if(!rescueUsed){rescueUsed=true;rescue={brick:b,left:2200,held:0};coopRescueFeedback('货物快掉了！2.2 秒内两人一起按住抬梁 0.5 秒。');break;} bricks.splice(i,1); spills++; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 砖滚出梁了！失误 '+spills+' / '+LIMIT);
           if(spills>=LIMIT){ explode('梁塌了，砖全掉'); return; } }
       }
     }
@@ -2286,7 +2292,7 @@ function runBeamHost(){
     timers.push(setInterval(loop,16));
     timers.push(setInterval(broadcast,66));
   });
-  window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead}; };
+  window._beamState=function(){ return {got:got,spills:spills,yL:yL,yR:yR,dead:window._dead,rescue:rescue?{left:rescue.left,held:rescue.held}:null,rescueUsed:rescueUsed}; };
   window._hostInject=function(x){ bricks.push({x:x,y:100,vy:0.8,on:false,tOn:0}); };
 }
 function renderBridgeHost(){ S.mod='bridge'; dgTwinHostUI('房主 · 你控 ← 左移','🌉','撤离架桥','送达 0 / 5'); runBridgeHost(); }
@@ -2295,7 +2301,7 @@ function runBridgeHost(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400,BOT=340,GOAL=5,LIMIT=5,EXIT=296;
-  var px=W/2,pv=0,pW=110,balls=[],next=460,delivered=0,drops=0,carrying=null,slide=0,prevDir=0,done=false;
+  var px=W/2,pv=0,pW=110,balls=[],next=460,delivered=0,drops=0,carrying=null,slide=0,prevDir=0,done=false,rescue=null,rescueUsed=false;
   window._dead=false; window._inL=false; window._inR=false;
   function render(){
     ctx.clearRect(0,0,W,H);
@@ -2313,11 +2319,18 @@ function runBridgeHost(){
   function broadcast(){ if(PEER.conn&&PEER.conn.open){ try{ PEER.conn.send({t:'st2',mode:'bridge',state:{px:px,pW:pW,balls:balls.map(function(b){return{x:b.x,y:b.y};}),carrying:!!carrying,delivered:delivered,drops:drops,done:done,dead:window._dead,msg:window._lastMsg||null,goal:GOAL,LIMIT:LIMIT,EXIT:EXIT,BOT:BOT}}); }catch(e){} } }
   function loop(){
     if(done||window._dead) return;
+    if(rescue){
+      rescue.left-=16;rescue.held=window._inL&&window._inR?rescue.held+16:0;
+      if(rescue.held>=500){rescue=null;pv=0;prevDir=0;coopRescueFeedback('刹车成功！货物保住了，本次救场已用。');}
+      else if(rescue.left<=0){rescue=null;carrying=null;drops++;coopRescueFeedback('货物落地，失误 '+drops+' / '+LIMIT);if(drops>=LIMIT){explode('球全摔了');return;}}
+      render();return;
+    }
     var dir=(window._inR?1:0)-(window._inL?1:0);
     var dirFlip=prevDir!==0&&dir!==0&&dir!==prevDir;
     prevDir=dir;
     pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2,Math.min(W-pW/2,px));
     if(carrying){
+      if(dirFlip&&!rescueUsed){rescueUsed=true;rescue={left:2200,held:0};coopRescueFeedback('货物要甩出去了！2.2 秒内双方按住移动键 0.5 秒刹车。');render();return;}
       if(dirFlip){ balls.push({x:carrying.x,y:BOT-10,vy:0.4}); carrying=null; slide=0; drops++; beep(120,0.15,'square',0.15); dgPlayMsg('err','💥 球被甩掉了！失误 '+drops+' / '+LIMIT);
         if(drops>=LIMIT){ explode('球全摔了'); return; } }
       else if(px+pW/2>=EXIT){ delivered++; beep(660,0.1,'square',0.12); dgPlayMsg('ok','✔ 送达出口 '+delivered+' / '+GOAL); $('goal').textContent=delivered+' / '+GOAL; carrying=null; slide=0;
@@ -2341,7 +2354,7 @@ function runBridgeHost(){
     timers.push(setInterval(loop,16));
     timers.push(setInterval(broadcast,66));
   });
-  window._bridgeState=function(){ return {delivered:delivered,drops:drops,px:px,carrying:!!carrying,dead:window._dead}; };
+  window._bridgeState=function(){ return {delivered:delivered,drops:drops,px:px,carrying:!!carrying,dead:window._dead,rescue:rescue?{left:rescue.left,held:rescue.held}:null,rescueUsed:rescueUsed}; };
   window._hostInject=function(x){ balls.push({x:x||px,y:120,vy:0.8}); };
 }
 /* 加入者：同屏玩法通用渲染（收 host st2 广播） */
@@ -2713,7 +2726,7 @@ function runWires(set){
   cv.width=330; cv.height=150;
   stage.appendChild(cv);
   var ctx=cv.getContext('2d');
-  var wires=set.wires.slice(), remaining=null, step=1, done=false;
+  var wires=set.wires.slice(), remaining=null, step=1, done=false, rescuing=false;
   window._curWires=wires;
   var colors={ red:'#ef4444', blue:'#3b82f6', yellow:'#eab308', green:'#22c55e' };
   function render(){
@@ -2739,13 +2752,13 @@ function runWires(set){
   buildBtns(6);
   pa.appendChild(wb);
   function pick(n){
-    if(done || window._dead) return;
+    if(done || window._dead || rescuing) return;
     var arr = step===1 ? wires : remaining;
     // 越界保护：第 2/3 步只剩 5/4 根，误按 6 之类直接忽略，不触发爆炸
     if(!arr || n<1 || n>arr.length){ return; }
     var m=$('msg');
     var ans=judgeStep(arr)+1;
-    if(n!==ans){ explode('剪错线'); return; }
+    if(n!==ans){ if(coopWireRescue(function(){rescuing=false;dgPlayMsg('ok','应急修复成功！重新核对线色后再剪。');})){rescuing=true;return;} explode('剪错线'); return; }
     beep(660,0.12,'square',0.1);
     if(step===3){
       done=true;
@@ -3361,7 +3374,11 @@ function pressureDraw(s,role){
   rtDrawMessage(s);
 }
 
-render();
 </script>
+<link rel="stylesheet" href="expansion-games.css">
+<script src="expansion-games.js"></script>
+<link rel="stylesheet" href="coop-upgrade.css">
+<script src="coop-upgrade.js"></script>
+<script>render();</script>
 </body>
 </html>
