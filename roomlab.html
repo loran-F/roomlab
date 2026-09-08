@@ -231,9 +231,6 @@ var PLAYGROUNDS = [
   { id:'catch', icon:'🧺', name:'情报空投', tag:'合力', time:60,
     a:'你控 ← 左移接货员，B 控 → 右移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。',
     b:'你控 → 右移接货员，A 控 ← 左移——两人合力控制同一个接货员。接好物 +1、金箱 +2，躲开坏物（接了 -3s）。限时接够 20 个过关。' },
-  { id:'shield', icon:'🛡️', name:'双人屏障', tag:'防守', time:60,
-    a:'你管<b>左半区</b>护盾，按住升起护盾片挡住警戒脉冲。B 管右半区。护盾接住警戒脉冲 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。',
-    b:'你管<b>右半区</b>护盾，按住升起护盾片挡住警戒脉冲。A 管左半区。护盾接住警戒脉冲 = 能量 +1；漏一颗 = 全队耐久 -1。能量满 20 过关，耐久扣完失败。' },
   { id:'beam', icon:'🏗️', name:'破障搬运', tag:'平衡', time:60,
     a:'你抬<b>左端</b>，B 抬右端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。',
     b:'你抬<b>右端</b>，A 抬左端。砖落到梁上会向低的一侧滚动——两人要一起倾斜梁，把每块砖滚进梁正中间的收集口。收够 20 块过关，滑落 5 次失败。' },
@@ -331,7 +328,7 @@ function newSet(){
 
 /* ============ 状态 ============ */
 var S = {
-  mod: (function(){ var m=location.search.match(/[?&]m=(\w+)/); return m&&m[1]!=='bridge'?m[1]:null; })(),
+  mod: (function(){ var m=location.search.match(/[?&]m=(\w+)/); return m&&!['bridge','shield'].includes(m[1])?m[1]:null; })(),
   role: (function(){ var m=location.search.match(/[?&]role=(A|B)/i); return m?m[1].toUpperCase():null; })(),
   started: 0,
   time: 120
@@ -558,7 +555,7 @@ function renderSame(){
    休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
 var DUNGEON=null;
 var EV_POOL=[]; // 单机同屏已移除，密室必须联机（AB 两台设备）
-var EV_POOL_NET=['catch','shield','beam','beat','maze','dial','wires','code','vault','pressure'];
+var EV_POOL_NET=['catch','beam','beat','maze','dial','wires','code','vault','pressure'];
 function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
 function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
 function dgNodeLabel(n){
