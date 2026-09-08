@@ -2795,11 +2795,11 @@ function makeNumpad(container, onNum, onDel){
 }
 function runCode(set){
   var stage=$('stage'), pa=$('playarea');
-  var cv=document.createElement('canvas'); cv.width=300; cv.height=96; stage.appendChild(cv);
+  var cv=document.createElement('canvas'); cv.width=300; cv.height=300; cv.style.background='#ffe8ac'; stage.appendChild(cv);
   var ctx=cv.getContext('2d');
   var syms=set.syms, enter='', done=false;
   window._codeSyms=syms.slice();
-  function draw(){ ctx.clearRect(0,0,300,96); for(var i=0;i<4;i++){ drawSymbol(ctx,syms[i],40+i*75,48,26); ctx.strokeStyle='#334155'; ctx.strokeRect(7+i*75,9,66,78); } }
+  function draw(){ctx.clearRect(0,0,300,300);for(var i=0;i<4;i++){var col=i%2,row=Math.floor(i/2);drawSymbol(ctx,syms[i],75+col*150,68+row*150,66);ctx.strokeStyle='#c7a777';ctx.strokeRect(5+col*150,5+row*150,140,140);ctx.fillStyle='#745744';ctx.font='bold 13px sans-serif';ctx.textAlign='left';ctx.fillText('第 '+(i+1)+' 位',13+col*150,137+row*150);}}
   draw();
   var inp=document.createElement('div');
   inp.style.cssText='text-align:center;font-size:28px;font-weight:800;color:#f8fafc;letter-spacing:10px;margin:6px 0';
@@ -2810,7 +2810,7 @@ function runCode(set){
   }
   renderIn();
   var hint=document.createElement('div'); hint.className='msg warn'; hint.style.cssText='margin:6px 0;text-align:center';
-  hint.textContent='把 4 个符号逐个描述给 B（别说名字，他也没名字），报 B 翻出的数字依次输入';
+  hint.textContent='逐位描述：外环缺口、分叉方向、实心/空心点位置、菱形内线、底部钩向。听 B 报回数字再输入。';
   pa.appendChild(hint);
   function input(n){
     if(done||window._dead) return;
@@ -2947,7 +2947,7 @@ function renderManual(){
       '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px">'+
         '<div style="font-size:13px;font-weight:700;color:#fb923c;margin-bottom:6px">📋 符号 ↔ 数字对照表（全 10 个）</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 14px">'+
-        (function(){ var rows=[]; for(var k=0;k<10;k++){ rows.push('<div style="display:flex;align-items:center;gap:10px;border-bottom:1px dashed #1e293b;padding:5px 2px"><canvas id="sym-'+k+'" width="46" height="46" style="flex:none"></canvas><span style="font-size:18px;font-weight:800;color:#4ade80">= '+k+'</span></div>'); } return rows.join(''); })()+
+        (function(){ var rows=[]; for(var k=0;k<10;k++){ rows.push('<div style="display:flex;align-items:center;gap:10px;border-bottom:1px dashed #1e293b;padding:5px 2px"><canvas id="sym-'+k+'" width="108" height="108" style="flex:none;background:#ffe8ac;border-radius:10px"></canvas><span style="font-size:18px;font-weight:800;color:#4ade80">= '+k+'</span></div>'); } return rows.join(''); })()+
         '</div>'+
         '<div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.7">流程：① A 描述第 1 个符号 → ② 你认图报数字 → ③ A 输入 → ④ 依次 4 个。报错了 A 那边会 -3s。</div>'+
       '</div></div>';
@@ -2972,7 +2972,7 @@ function renderManual(){
   if(S.mod==='code'){
     for(var k=0;k<10;k++){
       var cv=$('sym-'+k);
-      if(cv) drawSymbol(cv.getContext('2d'), k, 23, 23, 13);
+      if(cv) drawSymbol(cv.getContext('2d'), k, 54, 48, 47);
     }
   }
 }
@@ -3333,6 +3333,7 @@ function pressureDraw(s,role){
 <script src="bridge-mobile.js"></script>
 <link rel="stylesheet" href="catch-mobile.css">
 <script src="catch-mobile.js"></script>
+<script src="code-symbols.js"></script>
 <script>render();</script>
 </body>
 </html>
