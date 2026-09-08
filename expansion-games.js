@@ -5,7 +5,7 @@
   const META={
     lookback:{name:'你别回头',tag:'追逃',time:85,a:'你看前路：报门上的箭头，听 B 指挥前进、停步或躲藏。',b:'你看监控：辨认怪物，指挥 A 应对；听 A 报箭头开启对应门。'},
     caller:{name:'真假接线员',tag:'判断',time:110,a:'你接来电：询问工号和任务，把回答告诉 B，然后提出放行或拒绝。',b:'你查值班表：核对 A 报来的身份和任务，独立投票；两票一致才执行。'},
-    shadow:{name:'影子替身',tag:'接力',time:100,a:'第一轮录影：听 B 报六个踏板位置。回放时你报出口，B 跟影子过门。',b:'第一轮导航：把六个踏板位置报给 A；回放时听 A 报出口。第二轮交换职责。'}
+    shadow:{name:'影子替身',tag:'机关',time:100,a:'你录下走动：走到黄色按钮上，多站一会儿。回放时你的影子会帮 B 开门。',b:'你拿钥匙：等 A 录完，启动影子回放。影子踩住按钮时，穿过门去拿钥匙。'}
   };
   const pick=a=>a[Math.floor(Math.random()*a.length)];
   const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -31,9 +31,7 @@
     s.real=kind==='real';s.questions=[];s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
   }
   function shadowRound(s){
-    s.recorder=s.completed%2===0?'A':'B';s.runner=s.recorder==='A'?'B':'A';
-    s.plates=Array.from({length:6},()=>pick([0,1,2]));s.gates=Array.from({length:6},()=>pick([0,1,2]));
-    s.tape=[];s.lanes={A:1,B:1};s.slot=0;s.beat=0;s.phase='plan';s.phaseTime=0;s.agree={A:false,B:false};s.round++;
+    s.positions={A:0,B:0};s.tape=[];s.ghost=0;s.doorOpen=false;s.recordTime=0;s.playTime=0;s.recordLength=8;s.moves={A:-1,B:-1};s.phase='plan';s.phaseTime=0;s.attempts=s.attempts||0;s.round++;
   }
   function create(mode){
     const s={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),mode,time:META[mode].time,elapsed:0,ready:{A:false,B:false},cd:3,done:false,win:false,hp:3,completed:0,round:0,phase:'brief',message:'先试一次按钮，再点准备。双方准备后开始。',messageSeq:0,seq:{A:-1,B:-1},seen:{A:0,B:0}};
@@ -65,14 +63,25 @@
         }
       }
     }else if(s.mode==='shadow'){
-      if(d.key==='continue'&&s.phase==='plan'){s.agree[who]=true;if(s.agree.A&&s.agree.B){s.phase='record';s.slot=0;s.beat=0;message(s,s.recorder+' 开始录影，'+s.runner+' 报踏板顺序。');}}
-      if(/^lane[012]$/.test(d.key))s.lanes[who]=+d.key.slice(-1);
+      if(who==='A'&&d.key==='record'&&['plan','waiting','retry'].includes(s.phase)){shadowRound(s);s.phase='record';s.attempts++;message(s,'正在录影：A 走到黄色按钮上，停留越久，影子开门越久。');}
+      if(who==='B'&&d.key==='replay'&&['waiting','retry'].includes(s.phase)&&s.tape.length){s.phase='replay';s.phaseTime=0;s.playTime=0;s.positions.B=0;s.ghost=s.tape[0].x;s.doorOpen=s.ghost===2;s.round++;message(s,'影子出发了！B 朝钥匙走，等门打开再穿过去。');}
+      if(['left','right'].includes(d.key)&&s.elapsed-s.moves[who]>=.12){
+        const allowed=who==='A'?s.phase==='record':s.phase==='replay';
+        if(allowed){
+          let next=clamp(s.positions[who]+(d.key==='right'?1:-1),0,6);s.moves[who]=s.elapsed;
+          if(who==='A'&&next>=4)next=3;
+          if(who==='B'&&((s.positions.B===3&&next===4)||(s.positions.B===4&&next===3))&&!s.doorOpen){message(s,'门还关着，等影子踩到黄色按钮。');return true;}
+          s.positions[who]=next;
+          if(who==='A'){s.doorOpen=next===2;s.tape.push({t:s.recordTime,x:next});message(s,next===2?'按钮压下去了，门开了！站住几秒，给 B 留时间。':'A 离开按钮，门就会关上。');}
+          if(who==='B'&&next===6){s.completed=1;finish(s,true,'拿到钥匙！过去的 A 帮现在的 B 打开了门。');}
+        }
+      }
     }
     return true;
   }
   function step(s,dt){
     if(s.done||!s.ready.A||!s.ready.B)return;
-    if(s.cd>0){s.cd=Math.max(0,s.cd-dt);if(s.cd===0)message(s,s.mode==='lookback'?'行动开始：先报门向，再一起穿过走廊。':s.mode==='caller'?'第一通来电接通，询问并交换证据。':'先交流踏板路线，双方确认后开始录影。');return;}
+    if(s.cd>0){s.cd=Math.max(0,s.cd-dt);if(s.cd===0)message(s,s.mode==='lookback'?'行动开始：先报门向，再一起穿过走廊。':s.mode==='caller'?'第一通来电接通，询问并交换证据。':'先让 A 开始录影，走到黄色按钮上站一会儿。');return;}
     s.time=Math.max(0,s.time-dt);s.elapsed+=dt;s.phaseTime+=dt;
     if(s.mode==='lookback'){
       if(s.elapsed-s.seen.A>.9)s.action='stop';
@@ -89,23 +98,15 @@
     }else if(s.mode==='caller'){
       if(s.phase==='verdict'&&s.phaseTime>=2.6&&!s.done)callCase(s);
     }else if(s.mode==='shadow'){
-      if(s.phase==='record'||s.phase==='replay'){
-        s.beat+=dt;
-        if(s.beat>=1.8){
-          s.beat-=1.8;
-          if(s.phase==='record')s.tape.push(s.lanes[s.recorder]);
-          else if(s.tape[s.slot]!==s.plates[s.slot]||s.lanes[s.runner]!==s.gates[s.slot]){
-            const why=s.tape[s.slot]!==s.plates[s.slot]?'影子踩错了第 '+(s.slot+1)+' 个踏板':'跑者走错了第 '+(s.slot+1)+' 扇门';
-            damage(s,why);s.phase='retry';s.phaseTime=0;return;
-          }
-          s.slot++;
-          if(s.slot>=6){
-            if(s.phase==='record'){s.phase='handoff';s.phaseTime=0;message(s,'录影完成！现在录影者报出口，跑者准备接力。');}
-            else{s.completed++;if(s.completed===2)finish(s,true,'两轮影子接力完成，默契逃出机关！');else{s.phase='swap';s.phaseTime=0;message(s,'第一轮通过！现在交换职责。');}}
-          }
-        }
-      }else if(s.phase==='handoff'&&s.phaseTime>=3){s.phase='replay';s.slot=0;s.beat=0;}
-      else if((s.phase==='retry'||s.phase==='swap')&&s.phaseTime>=2.5)shadowRound(s);
+      if(s.phase==='record'){
+        if(!s.tape.length)s.tape.push({t:0,x:0});
+        s.recordTime=Math.min(s.recordLength,s.recordTime+dt);
+        if(s.recordTime>=s.recordLength){s.phase='waiting';s.doorOpen=false;message(s,'8 秒录影完成。B 点「播放影子」开始拿钥匙；A 也可以重新录。');}
+      }else if(s.phase==='replay'){
+        s.playTime=Math.min(s.recordLength,s.playTime+dt);
+        s.ghost=s.tape.filter(p=>p.t<=s.playTime).slice(-1)[0].x;s.doorOpen=s.ghost===2;
+        if(s.playTime>=s.recordLength){s.phase='retry';s.doorOpen=false;message(s,s.tape.some(p=>p.x===2)?'回放结束，还没拿到钥匙。A 可以多踩一会儿重新录，或 B 再放一次。':'影子没踩到按钮。请 A 重新录：向右走两步，站在黄色按钮上。');}
+      }
     }
     if(s.time<=0&&!s.done)finish(s,false,'时间用尽，先和搭档复盘，再挑战一次。');
   }
@@ -120,9 +121,7 @@
       else v.roster=s.roster.map(x=>({...x}));
       if(s.phase==='verdict'||s.done)v.explanation=s.explanation;
     }else{
-      Object.assign(v,{recorder:s.recorder,runner:s.runner,slot:s.slot,beat:s.beat,tape:[...s.tape],lanes:{...s.lanes},agree:{...s.agree}});
-      if(['plan','record'].includes(s.phase)&&role===s.runner)v.plates=[...s.plates];
-      if(!['plan','record'].includes(s.phase)&&role===s.recorder)v.gates=[...s.gates];
+      Object.assign(v,{positions:{...s.positions},ghost:s.ghost,doorOpen:s.doorOpen,recordTime:s.recordTime,playTime:s.playTime,recordLength:s.recordLength,attempts:s.attempts,tape:s.tape.map(p=>({...p}))});
     }
     return v;
   }
@@ -139,13 +138,13 @@
     const m=META[mode];practice=false;localAction='stop';
     el('app').innerHTML='<main class="x-shell"><header class="x-top"><button class="x-back" id="back" aria-label="返回">‹</button><span>双人合作 · '+esc(PEER.room)+'</span><b id="x-time">准备中</b></header><div class="x-heading">'+icon(mode)+'<h1>'+m.name+'</h1></div><div class="x-role '+(role==='B'?'is-b':'')+'"><b>'+role+'</b><span id="x-duty">'+esc(m[role.toLowerCase()])+'</span></div><section class="x-paper"><div class="x-stats"><span id="x-health">配合机会 ●●●</span><b id="x-progress"></b></div><div id="x-stage" class="x-stage"></div><div class="x-meter"><i id="x-meter"></i></div><p id="x-hint" class="x-hint"></p><div id="x-actions" class="x-actions"></div><div id="x-message" class="x-message" role="status" aria-live="polite"></div></section><section id="x-brief" class="x-brief"><b>先试一下，再出发</b><p>'+esc(m[role.toLowerCase()])+'</p><div id="x-practice"></div><button id="x-ready" class="x-btn primary" disabled>先完成上面的小练习</button></section><div id="x-result" class="x-result" hidden></div></main>';
     el('back').onclick=()=>{if(window._dungeon)dungeonAbort();else{netSend({t:'bye'});clearTimers();closePeer();location.search='';}};
-    const demo=mode==='lookback'?(role==='A'?'听到「躲起来」时，点这里躲藏':'练习：长耳朵怪物靠听觉追踪，该喊什么？'):mode==='caller'?(role==='A'?'练习：询问来电者的工号':'练习：工号不符，该怎么投票？'):'练习：搭档喊「左」，点这里移动到左边';
-    el('x-practice').innerHTML='<p>'+demo+'</p>'+button('practice',mode==='lookback'?(role==='A'?'躲藏':'停步'):mode==='caller'?(role==='A'?'请报工号':'拒绝'):'← 左');
+    const demo=mode==='lookback'?(role==='A'?'听到「躲起来」时，点这里躲藏':'练习：长耳朵怪物靠听觉追踪，该喊什么？'):mode==='caller'?(role==='A'?'练习：询问来电者的工号':'练习：工号不符，该怎么投票？'):(role==='A'?'练习：踩住黄色按钮，门就会打开。':'练习：等门打开后，穿过去拿钥匙。');
+    el('x-practice').innerHTML='<p>'+demo+'</p>'+button('practice',mode==='lookback'?(role==='A'?'躲藏':'停步'):mode==='caller'?(role==='A'?'请报工号':'拒绝'):(role==='A'?'踩按钮 → 门打开':'门打开 → 去拿钥匙'));
     el('x-practice').onclick=e=>{if(!e.target.closest('[data-x]'))return;practice=true;el('x-practice').innerHTML='<p class="x-practiced">✓ 练习完成。正式行动要听搭档的情报。</p>';el('x-ready').disabled=false;el('x-ready').textContent='我准备好了';};
     el('x-ready').onclick=()=>{if(practice)send('ready',role);};
     el('x-actions').onclick=e=>{const b=e.target.closest('[data-x]');if(!b||b.disabled)return;const k=b.dataset.x;if(['go','stop','hide'].includes(k))localAction=k;send(k,role);};
     function release(){localAction='stop';if(mode==='lookback'&&role==='A')send('stop',role);}
-    function key(e){if(/INPUT|TEXTAREA/.test(e.target.tagName))return;const maps=mode==='lookback'?(role==='A'?{ArrowUp:'go',Space:'stop',ArrowDown:'hide'}:{ArrowLeft:'left',ArrowRight:'right',Space:'lure'}):mode==='shadow'?{ArrowLeft:'lane0',ArrowDown:'lane1',ArrowRight:'lane2'}:{};if(maps[e.code]&&!e.repeat){e.preventDefault();const b=document.querySelector('[data-x="'+maps[e.code]+'"]');if(b&&!b.disabled)b.click();}}
+    function key(e){if(/INPUT|TEXTAREA/.test(e.target.tagName))return;const maps=mode==='lookback'?(role==='A'?{ArrowUp:'go',Space:'stop',ArrowDown:'hide'}:{ArrowLeft:'left',ArrowRight:'right',Space:'lure'}):mode==='shadow'?{ArrowLeft:'left',ArrowRight:'right'}:{};if(maps[e.code]&&!e.repeat){e.preventDefault();const b=document.querySelector('[data-x="'+maps[e.code]+'"]');if(b&&!b.disabled)b.click();}}
     window.addEventListener('blur',release);document.addEventListener('visibilitychange',release);window.addEventListener('keydown',key);
     const conn=PEER.conn;
     function disconnect(){clearTimers();window._dead=true;const m=el('x-message');if(m)m.textContent='同伴已断线，行动暂停。请返回重新建房。';document.querySelectorAll('.x-btn').forEach(b=>b.disabled=true);}
@@ -195,13 +194,24 @@
       hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':'先问完工号和任务；两个人的决定一致才执行。';
       meter=s.questions.length/2;
     }else{
-      const rec=role===s.recorder,recording=['plan','record'].includes(s.phase);
-      el('x-duty').textContent=rec?(recording?'你录影 · 听搭档报踏板位置，逐拍选左、中、右。':'你指挥 · 把出口顺序报给搭档，影子会自动重播。'):(recording?'你导航 · 把六个踏板按顺序报给录影者。':'你跑关 · 听搭档报出口，逐拍选左、中、右。');
-      const sequence=s.plates||s.gates;
-      html='<div class="x-file-title">第 '+(s.completed+1)+' 轮 · '+({plan:'商量路线',record:'录下影子',handoff:'准备回放',replay:'跟影子过门',retry:'重新规划',swap:'交换职责'}[s.phase]||'完成')+'</div><div class="x-shadow-scene"><div class="x-lanes">'+[0,1,2].map(n=>'<div><span>'+laneName(n)+'</span>'+(s.lanes[role]===n?'<b class="x-pawn">'+role+'</b>':'')+(!recording&&s.tape[Math.min(s.slot,5)]===n?'<b class="x-ghost">影</b>':'')+'</div>').join('')+'</div></div><div class="x-sequence-label">'+(sequence?(s.plates?'把踏板顺序报给搭档':'把出口顺序报给搭档'):'这份路线在搭档那边 · 听对方报位')+'</div><div class="x-sequence">'+Array.from({length:6},(_,i)=>'<span class="'+(i===s.slot?'now':'')+'"><small>'+(i+1)+'</small>'+(sequence?laneName(sequence[i]):'？')+'</span>').join('')+'</div><div class="x-tape">已录：'+(s.tape.length?s.tape.map(laneName).join(' · '):'等待开始')+'</div>';
-      actions(button('lane0','← 左')+button('lane1','↓ 中')+button('lane2','右 →')+(s.phase==='plan'?button('continue',s.agree[role]?'等搭档确认':'路线说好了 · 开始录影','wide primary'):''));
-      hint=s.phase==='plan'?'先一起看清分工，再分别确认。每拍 1.8 秒，倒计时结束记录当前位置。':s.phase==='record'?'第 '+(Math.min(s.slot,5)+1)+' / 6 拍 · '+s.recorder+' 录影，'+s.runner+' 报踏板。':s.phase==='replay'?'第 '+(Math.min(s.slot,5)+1)+' / 6 扇门 · '+s.recorder+' 报出口，'+s.runner+' 移动。':s.message;
-      meter=s.beat/1.8;
+      const recording=s.phase==='record',replay=s.phase==='replay';
+      el('x-health').textContent='一个按钮 · 一扇门';el('x-progress').textContent=s.done&&s.win?'钥匙到手':'目标：拿到钥匙';
+      el('x-duty').textContent=role==='A'?'你是 A：录下走动，踩住黄色按钮。你的影子会替 B 开门。':'你是 B：看影子踩按钮，等门打开，向右走去拿钥匙。';
+      const actor=recording?s.positions.A:s.ghost;
+      const position=x=>(7+x*14.3)+'%';
+      html='<div class="x-file-title">'+({plan:'先让 A 录下动作',record:'● A 正在录影',waiting:'录好了，轮到 B！',replay:'▶ 影子正在回放',retry:'再试一下，就差一点'}[s.phase]||'拿到钥匙')+'</div>'+
+        '<div class="shadow-room" aria-label="按钮在左边，门在中间，钥匙在右边">'+
+        '<div class="shadow-wall"></div><div class="shadow-wire '+(s.doorOpen?'on':'')+'"></div>'+
+        '<div class="shadow-switch '+(s.doorOpen?'down':'')+'" style="left:'+position(2)+'"><b></b><span>踩这里</span></div>'+
+        '<div class="shadow-gate '+(s.doorOpen?'open':'')+'" style="left:'+position(3.5)+'"><div class="shadow-gate-leaf"></div><span>'+(s.doorOpen?'门开了！':'门关着')+'</span></div>'+
+        '<div class="shadow-key '+(s.done&&s.win?'taken':'')+'" style="left:'+position(6)+'"><svg viewBox="0 0 32 40" aria-hidden="true"><path d="M19 19v16h8v-6h-4v-4h4v-6" fill="#ffda65" stroke="#281f32" stroke-width="3"/><circle cx="17" cy="11" r="9" fill="#ffda65" stroke="#281f32" stroke-width="3"/><circle cx="17" cy="11" r="3" fill="#776087"/></svg><span>钥匙</span></div>'+
+        '<div class="shadow-person '+(recording?'live':'echo')+'" style="left:'+position(actor)+'"><b>'+(recording?'A':'影')+'</b><small>'+(recording?'正在录':'A 的影子')+'</small></div>'+
+        '<div class="shadow-person runner" style="left:'+position(s.positions.B)+'"><b>B</b><small>拿钥匙</small></div></div>'+
+        '<div class="shadow-cause"><b class="'+(s.doorOpen?'on':'')+'">'+(s.doorOpen?'按钮被踩住':'按钮松开')+'</b><span>→</span><b>'+ (s.doorOpen?'门打开':'门关闭')+'</b></div>'+
+        '<div class="shadow-timeline">'+(recording?'录影剩余 '+Math.ceil(s.recordLength-s.recordTime)+' 秒':replay?'回放剩余 '+Math.ceil(s.recordLength-s.playTime)+' 秒':'每段录影 8 秒 · 没成功可以立即重录')+'</div>';
+      actions(button('left','← 向左走')+button('right','向右走 →')+(role==='A'?button('record',s.attempts?'重新录一遍':'开始录影 · 8 秒','wide primary'):button('replay',s.phase==='retry'?'再放一次影子':'播放影子 · 出发','wide primary')));
+      hint=recording?(role==='A'?'向右走两步，站上黄色按钮。看到门开后，停在那里给 B 留时间。':'看 A 踩住按钮时门会打开。录完后，你就能跟着影子出发。'):replay?(role==='B'?'向右走！门关着就等一等，影子踩住按钮时马上穿门。':'提醒 B 什么时候开门。现在开门的是你刚才录下的影子。'):s.phase==='plan'?'A 先录影：向右走到黄色按钮，停留几秒。':s.phase==='waiting'?'B 点播放影子，再向右穿门拿钥匙。':s.message;
+      meter=recording?s.recordTime/s.recordLength:replay?s.playTime/s.recordLength:0;
     }
     // Keep controls stable during state broadcasts; only the scene is redrawn.
     el('x-stage').innerHTML=html;el('x-hint').textContent=wait?(s.ready.A&&s.ready.B?'双方就绪，倒计时后开始。':'完成小练习，然后准备。'):hint;el('x-meter').style.width=clamp(meter*100,0,100)+'%';
@@ -210,7 +220,7 @@
       b.disabled=wait||s.done;
       if(s.mode==='lookback'){if(k==='lure')b.disabled=b.disabled||s.phase!=='danger'||s.rescue||!s.lures;b.classList.toggle('selected',k===s.action||k===s.openDoor);}
       if(s.mode==='caller'){b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<2);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
-      if(s.mode==='shadow'){if(k.startsWith('lane'))b.disabled=b.disabled||(s.phase!=='plan'&&(s.phase!=='record'||role!==s.recorder)&&(s.phase!=='replay'||role!==s.runner));if(k==='continue')b.disabled=b.disabled||s.agree[role];b.classList.toggle('selected',k==='lane'+s.lanes[role]);}
+      if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':s.phase!=='replay');if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry'].includes(s.phase)||!s.tape.length;}
     });
     if(s.done&&!window._dungeon)result(s,role);
   }
