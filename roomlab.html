@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>玩法试炼场 · roomlab-v10（特工行动）</title>
+<title>玩法试炼场 · roomlab-v12（合作解谜）</title>
 <style>
   :root{
     --a:#2563eb; --a-bg:#eff6ff;
@@ -200,8 +200,8 @@ body:has(.dungeon-screen){background:linear-gradient(155deg,#454065,#2b243f);col
 <body>
 <div class="wrap" id="app"></div>
 <script>
-/* ============ 规则集：roomlab-v10（特工行动） ============ */
-var RULESET_ID = 'roomlab-v10';
+/* ============ 规则集：roomlab-v12（合作解谜） ============ */
+var RULESET_ID = 'roomlab-v12';
 var CATCH_GOAL = 20; // 情报空投：限时接够 20 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
@@ -1379,7 +1379,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v11·默契救场';
+var APP_VER='v12·合作解谜';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
