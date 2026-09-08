@@ -1,3 +1,7 @@
+# v11 合作优化验证
+
+2026-09-08。原有玩法合作优化的实际双人联测、练习覆盖、随机地图抽样与难度边界记录见 [COOP_UPGRADE.md](COOP_UPGRADE.md)。新增三个玩法的验证记录见 [EXPANSION_GAMES.md](EXPANSION_GAMES.md)。
+
 # v10.1 卷轴地图验证
 
 2026-09-07，两个独立 Edge 页面通过实际 PeerJS / WebRTC 联测通过：
