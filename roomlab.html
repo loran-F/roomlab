@@ -213,9 +213,9 @@ var PLAYGROUNDS = [
   { id:'maze', icon:'🗺️', name:'通风潜行', tag:'侦察', time:120,
     a:'探针盲走：只能看到上/下/左/右 5 格，看不到斜向和远处。问 B 要方向，一句句走。碰墙 -5s，踩陷阱 -8s。走到终点通关。',
     b:'你手握全图：绿色安全路线 + 红色陷阱点。听 A 报方位，一句句指挥「上/下/左/右」，千万别让他走红线外的岔路。' },
-  { id:'dial', icon:'🎛️', name:'频段校准', tag:'校时', time:90,
-    a:'转盘上有一张目标指令卡（卡号你看得到、含义你看不到）——把卡号报给 B。转你的针，报针位，听 B 指挥，他说「锁」就按锁定键。对齐 ±1 算对，锁错 -3s。',
-    b:'查「目标指令卡对照表」得到本局目标刻度。听 A 报卡号 + 当前针位，指挥他往左/往右，对齐喊「锁！」。' },
+  { id:'dial', icon:'📻', name:'双人搜台', tag:'搜台', time:100,
+    a:'按住 ＋ / − 调整频率，让杂乱波形变平顺。与 B 同时对准并稳定 2 秒，收集三段情报；留意频道漂移。',
+    b:'按住 ＋ / − 调整增益，让接收信号条满格。告诉 A 是否已对准；遇到干扰先稳住，收录进度会保留。' },
   { id:'wires', icon:'🧨', name:'警报拆线', tag:'拆弹', time:90,
     a:'报 6 根线颜色 → 按 B 判剪第 1 根 → 剪完再报剩余 5 根 → 剪第 2 根 → 再报剩余 4 根 → 剪第 3 根。任何一步剪错 = 爆炸！',
     b:'按「三步剪线规则」逐步判：第 1 步 6 根、第 2 步剩余 5、第 3 步剩余 4，听 A 报颜色给答案。' },
@@ -3339,6 +3339,8 @@ function pressureDraw(s,role){
 <script src="maze-mobile.js"></script>
 <link rel="stylesheet" href="vault-mobile.css">
 <script src="vault-mobile.js"></script>
+<link rel="stylesheet" href="radio-mobile.css">
+<script src="radio-mobile.js"></script>
 <script>render();</script>
 </body>
 </html>
