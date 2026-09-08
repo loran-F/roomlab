@@ -240,9 +240,7 @@ var PLAYGROUNDS = [
   { id:'beat', icon:'🎵', name:'信号节拍', tag:'节奏', time:60,
     a:'音符滚到判定线时按下：<b style="color:#60a5fa">蓝 = 你按</b>、<b style="color:#c084fc">紫 = 你和 B 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。',
     b:'音符滚到判定线时按下：<b style="color:#fb923c">橙 = 你按</b>、<b style="color:#c084fc">紫 = 你和 A 同时按</b>。按对 +1，按错或漏掉 -1。累计 30 分过关。自带 BGM 节拍器。' },
-  { id:'bridge', icon:'🌉', name:'撤离架桥', tag:'运输', time:60,
-    a:'你控 ← 左移桥面，B 控 → 右移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。',
-    b:'你控 → 右移桥面，A 控 ← 左移——两人合力控制桥面。球从上方落下要落在桥面上，再平稳运到右侧出口才算收下；球落地 -1。运够 5 个过关。' }
+
 ];
 
 /* ---- 固定迷宫（A/B 两侧必须一致）11行 x 15列，1=墙 0=路 ----
@@ -333,7 +331,7 @@ function newSet(){
 
 /* ============ 状态 ============ */
 var S = {
-  mod: (function(){ var m=location.search.match(/[?&]m=(\w+)/); return m?m[1]:null; })(),
+  mod: (function(){ var m=location.search.match(/[?&]m=(\w+)/); return m&&m[1]!=='bridge'?m[1]:null; })(),
   role: (function(){ var m=location.search.match(/[?&]role=(A|B)/i); return m?m[1].toUpperCase():null; })(),
   started: 0,
   time: 120
@@ -560,7 +558,7 @@ function renderSame(){
    休息点补血；终点 Boss（占位）。数值先简单版：5 血 / 失败 -1 / 休息 +1。 */
 var DUNGEON=null;
 var EV_POOL=[]; // 单机同屏已移除，密室必须联机（AB 两台设备）
-var EV_POOL_NET=['catch','shield','beam','beat','bridge','maze','dial','wires','code','vault','pressure'];
+var EV_POOL_NET=['catch','shield','beam','beat','maze','dial','wires','code','vault','pressure'];
 function dgNode(id){ if(!DUNGEON) return null; for(var i=0;i<DUNGEON.nodes.length;i++){ if(DUNGEON.nodes[i].id===id) return DUNGEON.nodes[i]; } return null; }
 function dgPG(id){ for(var i=0;i<PLAYGROUNDS.length;i++){ if(PLAYGROUNDS[i].id===id) return PLAYGROUNDS[i]; } return null; }
 function dgNodeLabel(n){
@@ -3330,8 +3328,6 @@ function pressureDraw(s,role){
 <script src="beam-mobile.js"></script>
 <link rel="stylesheet" href="beat-mobile.css">
 <script src="beat-mobile.js"></script>
-<link rel="stylesheet" href="bridge-mobile.css">
-<script src="bridge-mobile.js"></script>
 <link rel="stylesheet" href="catch-mobile.css">
 <script src="catch-mobile.js"></script>
 <script src="code-symbols.js"></script>
