@@ -2496,17 +2496,17 @@ function runMaze(set){
       // A 视野：十字 5 格（上下左右+自己），看不到斜向——更依赖 B 的方向
       var near=Math.abs(r-pos[0])+Math.abs(c-pos[1])<=1;
       if(near){
-        ctx.fillStyle=wall?'#334155':'#0b1220';
+        ctx.fillStyle=wall?'#786b86':'#fff0cc';
         ctx.fillRect(c*cell,r*cell,cell,cell);
-        ctx.strokeStyle='#1e293b'; ctx.strokeRect(c*cell+.5,r*cell+.5,cell-1,cell-1);
+        ctx.strokeStyle='#b9a58b'; ctx.strokeRect(c*cell+.5,r*cell+.5,cell-1,cell-1);
       }else{
-        ctx.fillStyle='rgba(2,6,23,.92)';
+        ctx.fillStyle='#514662';
         ctx.fillRect(c*cell,r*cell,cell,cell);
       }
     }
     // 探针
-    ctx.fillStyle='#4ade80';
-    ctx.shadowColor='#4ade80'; ctx.shadowBlur=10;
+    ctx.fillStyle='#269873';
+    ctx.shadowColor='#269873'; ctx.shadowBlur=0;
     ctx.fillRect(pos[1]*cell+4, pos[0]*cell+4, cell-8, cell-8);
     ctx.shadowBlur=0;
   }
@@ -2516,7 +2516,7 @@ function runMaze(set){
   }
   var sprung={};
   function move(dr,dc){
-    if(done) return;
+    if(done || window._dead) return;
     var nr=pos[0]+dr, nc=pos[1]+dc;
     if(nr<0||nc<0||nr>=MAZE.rows||nc>=MAZE.cols||MAZE.walls[nr][nc]==='1'){
       beep(160,0.18,'sawtooth',0.14); buzz();
@@ -2982,23 +2982,23 @@ function drawMazeFull(ctx, cell){
   var R=MAZE.rows, C=MAZE.cols;
   for(var r=0;r<R;r++) for(var c=0;c<C;c++){
     var wall=MAZE.walls[r][c]==='1';
-    ctx.fillStyle=wall?'#334155':'#0b1220';
+    ctx.fillStyle=wall?'#786b86':'#fff0cc';
     ctx.fillRect(c*cell, r*cell, cell, cell);
-    ctx.strokeStyle='#1e293b'; ctx.strokeRect(c*cell+.5, r*cell+.5, cell-1, cell-1);
+    ctx.strokeStyle='#b9a58b'; ctx.strokeRect(c*cell+.5, r*cell+.5, cell-1, cell-1);
   }
   // 路径高亮 + 箭头
   var path=MAZE.path[0];
   for(var i=0;i<path.length;i++){
     var p=path[i].split(','), r=+p[0], c=+p[1];
-    ctx.fillStyle='rgba(74,222,128,.35)';
+    ctx.fillStyle='#b8ddb0';
     ctx.fillRect(c*cell, r*cell, cell, cell);
     if(i<path.length-1){
       var n=path[i+1].split(','), nr=+n[0], nc=+n[1];
       var dr=nr-r, dc=nc-c;
       var cx=c*cell+cell/2, cy=r*cell+cell/2;
-      ctx.strokeStyle='#4ade80'; ctx.lineWidth=3; ctx.lineCap='round';
+      ctx.strokeStyle='#269873'; ctx.lineWidth=3; ctx.lineCap='round';
       ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+dc*cell*0.55, cy+dr*cell*0.55); ctx.stroke();
-      ctx.fillStyle='#4ade80';
+      ctx.fillStyle='#269873';
       ctx.beginPath();
       var tipx=cx+dc*cell*0.62, tipy=cy+dr*cell*0.62;
       ctx.moveTo(tipx, tipy);
@@ -3009,7 +3009,7 @@ function drawMazeFull(ctx, cell){
   }
   // S / E
   var s=MAZE.start, e=MAZE.end;
-  ctx.fillStyle='#4ade80'; ctx.font='bold '+(cell*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#269873'; ctx.font='bold '+(cell*0.6)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('S', s[1]*cell+cell/2, s[0]*cell+cell/2);
   ctx.fillStyle='#f87171';
   ctx.fillText('E', e[1]*cell+cell/2, e[0]*cell+cell/2);
@@ -3018,7 +3018,7 @@ function drawMazeFull(ctx, cell){
   MAZE.traps.forEach(function(t){
     ctx.beginPath(); ctx.arc(t[1]*cell+cell/2, t[0]*cell+cell/2, Math.max(4,cell*0.18), 0, Math.PI*2); ctx.fill();
   });
-  ctx.fillStyle='#fecaca'; ctx.font='bold '+(cell*0.45)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle='#8c343e'; ctx.font='bold '+(cell*0.45)+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('⚠ 陷阱', s[1]*cell+cell/2, Math.max(10, s[0]*cell-4));
 }
 
@@ -3334,6 +3334,8 @@ function pressureDraw(s,role){
 <link rel="stylesheet" href="catch-mobile.css">
 <script src="catch-mobile.js"></script>
 <script src="code-symbols.js"></script>
+<link rel="stylesheet" href="maze-mobile.css">
+<script src="maze-mobile.js"></script>
 <script>render();</script>
 </body>
 </html>
