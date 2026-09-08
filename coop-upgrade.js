@@ -3,7 +3,7 @@
 'use strict';
 var duties={
 maze:['按 B 的路线移动，遇到岔路先停下。','看地图，一次只报一个方向。'],
-dial:['报卡号并调整指针，再按锁定。','查卡号对应刻度，告诉 A 目标。'],
+dial:['调整频率，让波形平顺；对准后通知同伴。','调整增益，让信号条满格；与 A 稳定收录。'],
 wires:['从左到右报线色，听 B 指令再剪。','按规则判断线号；剪错时按住应急开关。'],
 code:['描述符号的形状和方向，输入 B 报的数字。','根据描述查符号，逐位报回数字。'],
 vault:['报出“第几位、什么数字”。','选对应位序，再记录数字。'],
@@ -15,7 +15,7 @@ beat:['蓝色音符你来打，紫色一起打。','橙色音符你来打，紫�
 bridge:['控制左移，运送中避免急转；危险时一起刹车。','控制右移，运送中避免急转；危险时一起刹车。'],
 boss:['看 A / AB 提示行动，留意阶段变化。','看 B / AB 提示行动，撤离时与 A 同步。']
 };
-var families={maze:'判断',dial:'判断',wires:'判断',code:'判断',vault:'记忆',beat:'节奏',catch:'搬运',beam:'搬运',bridge:'搬运',shield:'反应',pressure:'调节',lookback:'反应',caller:'沟通',shadow:'协作'};
+var families={maze:'判断',dial:'搜索',wires:'判断',code:'判断',vault:'记忆',beat:'节奏',catch:'搬运',beam:'搬运',bridge:'搬运',shield:'反应',pressure:'调节',lookback:'反应',caller:'沟通',shadow:'协作'};
 var current=null,prep=null,serial=0,seen={},prepConn=null;
 document.addEventListener('keydown',function(e){if($('coop-panel')){e.stopImmediatePropagation();}},true);
 function lostPrep(){if(!prep&&!window._coopRescue)return;prep=null;clearTimers();window._dead=true;removeRescue();removePanel();panel('连接已断开','行动已停止，请返回后重新建房。');}
@@ -63,7 +63,7 @@ function beginPrep(id){
 }
 function localPrep(role){
  var p=prep;S.mod=p.mode;
- if(!seen[p.mode+role]&&['lookback','caller','shadow'].indexOf(p.mode)<0)practice(p.mode,role,function(){if(prep===p)ready(role);});
+ if(!seen[p.mode+role]&&['lookback','caller','shadow','dial'].indexOf(p.mode)<0)practice(p.mode,role,function(){if(prep===p)ready(role);});
  else {panel('角色 '+role+' · 行动准备',(duties[p.mode]||['与同伴配合','与同伴配合'])[role==='A'?0:1]+' 连续同玩法第 '+p.cfg.streak+' 次，基础限时 '+Math.round(p.cfg.baseScale*100)+'%。');button($('coop-work'),'准备好了',function(){ready(role);});}
 }
 function ready(role){if(!prep)return;prep.ready[role]=true;if($('coop-work'))$('coop-work').innerHTML='';say('已就绪，等待同伴。');if(role==='B')netSend({t:'coopReady',id:prep.id});else advance();}
