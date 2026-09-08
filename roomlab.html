@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>玩法试炼场 · roomlab-v12（合作解谜）</title>
+<title>玩法试炼场 · roomlab-v13（主题密室）</title>
 <style>
   :root{
     --a:#2563eb; --a-bg:#eff6ff;
@@ -24,12 +24,14 @@
   .count{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;color:#f8fafc}
   .count.warn{color:#f87171;animation:blink .5s infinite}
   @keyframes blink{50%{opacity:.3}}
-  .btn{display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:10px;padding:11px 15px;font-size:15px;font-weight:600;cursor:pointer;background:#334155;color:#e2e8f0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:44px;border:1px solid #64748b;border-radius:10px;padding:11px 15px;font-size:15px;font-weight:600;cursor:pointer;background:#334155;color:#e2e8f0}
   .btn.primary{background:var(--a);color:#fff}
   .btn.green{background:var(--ok);color:#fff}
   .btn.red{background:var(--err);color:#fff}
-  .btn.sm{padding:7px 12px;font-size:13px}
-  .btn:active{opacity:.8}
+  .btn.sm{min-height:44px;padding:9px 12px;font-size:13px}
+  .btn:active:not(:disabled){filter:brightness(.92)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn:focus-visible{outline:3px solid #90c8e4;outline-offset:3px}
   .panel{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:14px;margin-bottom:12px;color:#e2e8f0}
   .panel h3{margin:0 0 10px;font-size:15px;color:#f8fafc}
   .taskline{font-size:13px;color:#cbd5e1;background:#0f172a;border-left:3px solid #475569;padding:8px 10px;border-radius:6px;margin-bottom:12px;line-height:1.7}
@@ -39,6 +41,14 @@
   .msg.warn{background:#78350f;color:#fde68a}
   .big{font-size:16px;font-weight:700}
   .ok{color:#4ade80} .err{color:#f87171}
+  .btn>span,.btn>b,.btn>small,.rt-control>span,.rt-control>b,.rt-control>small{background:transparent;border:0;box-shadow:none;color:inherit}
+  .btn,.rt-control{box-shadow:none;background-image:none;line-height:1.35;white-space:normal}
+  .btn:before,.btn:after,.rt-control:before,.rt-control:after{content:none}
+  .code-keypad button{box-shadow:none;background-image:none;touch-action:manipulation;cursor:pointer}
+  .code-keypad button:active{filter:brightness(1.3)}
+  .code-keypad button:focus-visible{outline:3px solid #90c8e4;outline-offset:3px}
+  .dpad button,.wire-btns button,.mz-tab{min-width:44px;min-height:44px;cursor:pointer;box-shadow:none}
+  .dpad button:focus-visible,.wire-btns button:focus-visible,.mz-tab:focus-visible{outline:3px solid #90c8e4;outline-offset:3px}
   /* 玩法大厅 */
   .pg-grid{display:grid;grid-template-columns:1fr;gap:12px}
   .pg-card{background:#1e293b;border:2px solid #334155;border-radius:16px;padding:16px;color:#e2e8f0}
@@ -62,8 +72,8 @@
   /* 主界面 */
   .main-screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;color:#fff;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#3b2a63 0%,#2a2050 45%,#171233 100%)}
   .main-top{width:100%;display:flex;justify-content:flex-end;padding:22px 20px 0}
-  .main-play{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.28);color:#ffd94d;border-radius:999px;padding:10px 22px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-  .main-play:active{transform:scale(.96)}
+  .main-play{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.28);color:#ffd94d;border-radius:999px;padding:10px 22px;font-size:16px;font-weight:800;cursor:pointer;box-shadow:none}
+  .main-play{min-height:48px}.main-play:active{filter:brightness(.9)}
   .main-mid{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:0 20px}
   .main-title{font-size:34px;font-weight:900;color:#ffd94d;letter-spacing:3px;margin:0 0 6px;text-align:center;animation:titleGlow 3.2s ease-in-out infinite}
   @keyframes titleGlow{0%,100%{text-shadow:0 0 16px rgba(255,217,77,.65),0 2px 4px rgba(0,0,0,.45)}50%{text-shadow:0 0 32px rgba(255,217,77,.95),0 2px 4px rgba(0,0,0,.45)}}
@@ -71,8 +81,8 @@
   @keyframes mainFloat{0%,100%{transform:translateY(0) rotate(-1.2deg)}50%{transform:translateY(-13px) rotate(1.2deg)}}
   .main-pic{width:min(64%,360px);height:auto;filter:drop-shadow(0 14px 34px rgba(0,0,0,.5));animation:mainPop .8s cubic-bezier(.2,.9,.3,1.2)}
   @keyframes mainPop{from{opacity:0;transform:translateY(26px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
-  .main-enter{background:linear-gradient(135deg,#fb923c,#ea580c);color:#fff;border:none;border-radius:999px;padding:16px 52px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 10px 28px rgba(234,88,12,.45);margin-top:8px;letter-spacing:1px}
-  .main-enter:active{transform:scale(.97)}
+  .main-enter{background:#f6a152;color:#fff;border:none;border-radius:999px;padding:16px 52px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:none;margin-top:8px;letter-spacing:1px}
+  .main-enter{min-height:56px;border:2px solid #382949;border-radius:12px;color:#30253a}.main-enter:active{filter:brightness(.9)}
   .main-ver{width:100%;padding:16px 22px;font-size:12px;color:rgba(255,255,255,.5);text-align:left}
   /* canvas 容器 */
   .stage{display:flex;justify-content:center;background:#0f172a;border-radius:12px;padding:10px;margin-bottom:8px}
@@ -117,7 +127,7 @@
   body:has(.room-select){background:linear-gradient(155deg,#454065,#2b243f)}
   .wrap:has(.room-select){padding:0;max-width:720px}
   .room-select{--muted:#b9b7be;min-height:100svh;color:#fff;padding:clamp(48px,9svh,92px) 0 max(28px,env(safe-area-inset-bottom));position:relative;touch-action:pan-y;user-select:none}
-  .room-back{position:absolute;top:14px;left:16px;border:0;background:none;color:#ccc8dc;font:inherit;font-size:13px;cursor:pointer;padding:8px}
+  .room-back{position:absolute;top:14px;left:16px;min-height:44px;min-width:44px;border:0;background:none;color:#ccc8dc;font:inherit;font-size:13px;cursor:pointer;padding:8px}
   .room-title{font-size:clamp(18px,4.6vw,34px);line-height:1.35;text-align:center;margin:0 12px 24px;font-weight:700}
   .room-carousel{position:relative}
   .room-cover{display:block;width:55%;aspect-ratio:390/486;object-fit:contain;margin:auto;border:0;border-radius:0;background:transparent;pointer-events:none}
@@ -129,10 +139,10 @@
   .room-rating{color:#ff6749}.room-tag{display:inline-block;background:#bab9bc;color:#303033;border-radius:6px;padding:0 9px;margin-right:8px;font-size:clamp(13px,3.5vw,23px);font-weight:700}
   .room-pagination{text-align:center;font-size:12px;color:#c0b9d1;margin:14px 0 0;letter-spacing:2px}
   .room-actions{width:46%;min-width:180px;margin:clamp(24px,5svh,52px) auto 0;display:grid;gap:15px}
-  .room-action{border:2px solid #100d16;border-radius:3px;background:#ffa44d;color:white;min-height:54px;padding:12px 4px;cursor:pointer;font:800 clamp(18px,4.4vw,30px)/1.2 'Microsoft YaHei',sans-serif;text-shadow:1.5px 1.5px #000,-1.5px -1.5px #000,1.5px -1.5px #000,-1.5px 1.5px #000}
+  .room-action{border:2px solid #100d16;border-radius:12px;background:#ffa44d;color:#30253a;min-height:54px;padding:12px 4px;cursor:pointer;font:800 clamp(18px,4.4vw,30px)/1.2 'Microsoft YaHei',sans-serif;text-shadow:none}
   .room-action.join{background:#ffda59}.room-action small{display:block;font-size:10px;font-weight:600;margin-top:5px;letter-spacing:1px;color:#372b30;text-shadow:none}
   .room-select button:focus-visible{outline:3px solid white;outline-offset:4px}
-  .room-select button:active{transform:scale(.97)}
+  .room-select button:active{filter:brightness(.9)}
   @media(min-width:600px){.room-action{min-height:86px}.room-actions{gap:25px}}
   @media(max-height:700px){.room-select{padding-top:48px}.room-title{margin-bottom:16px}.room-actions{margin-top:20px}.room-pagination{margin-top:10px}}
 
@@ -146,8 +156,8 @@
 .rt-cue{font:900 54px/1.1 'Microsoft YaHei',sans-serif;color:#fbbf24}.rt-cue.go{color:#5eead4;text-shadow:0 0 24px #14b8a666}.rt-caption{font-size:14px;color:#d5e0ea}
 .rt-meter{height:10px;background:#28384b;border-radius:8px;overflow:hidden;margin:10px 0}.rt-meter>i{display:block;height:100%;width:0;background:#5eead4;transition:width .06s linear}
 .rt-readouts{display:flex;gap:12px;font-size:12px;color:#cbd5e1;justify-content:space-between}.rt-readouts b{color:#fbbf24}
-.rt-controls{display:flex;gap:10px;margin:14px 0 0}.rt-control{flex:1;min-height:76px;touch-action:none;user-select:none;border:2px solid #93c5fd;background:#1e40af;border-radius:13px;color:#fff;font:bold 19px 'Microsoft YaHei',sans-serif;cursor:pointer}
-.rt-control.role-b{background:#9a3412;border-color:#fdba74}.rt-control.held,.rt-control:active{filter:brightness(1.35);transform:translateY(2px)}.rt-control:disabled{opacity:.45;cursor:default}
+.rt-controls{display:flex;gap:10px;margin:14px 0 0;padding:0;background:none;border:0;box-shadow:none}.rt-control{flex:1;min-height:76px;touch-action:none;user-select:none;border:2px solid #54758d;background:#a8cadc;border-radius:12px;color:#1d3445;font:bold 19px 'Microsoft YaHei',sans-serif;cursor:pointer}
+.rt-control.role-b{background:#dec1a5;border-color:#886c55;color:#392b20}.rt-control.held,.rt-control:active:not(:disabled){filter:brightness(.86);transform:none}.rt-control:disabled{opacity:1;background:#66727b;border-color:#818c94;color:#d7dde1;cursor:default}
 .rt-shell .msg{min-height:48px;font-size:13px;line-height:1.5}.rt-disconnect{border:2px solid #f87171!important}
 .rt-control:focus-visible{outline:3px solid #fff;outline-offset:3px}
 @media(max-width:350px){.rt-panel{padding:11px}.rt-arena{height:160px}.rt-help{font-size:12px}.rt-control{font-size:17px;min-height:68px}}
@@ -201,7 +211,7 @@ body:has(.dungeon-screen){background:linear-gradient(155deg,#454065,#2b243f);col
 <div class="wrap" id="app"></div>
 <script>
 /* ============ 规则集：roomlab-v12（合作解谜） ============ */
-var RULESET_ID = 'roomlab-v12';
+var RULESET_ID = 'roomlab-v13';
 var CATCH_GOAL = 20; // 情报空投：限时接够 20 个过关
 
 /* ---- 玩法大厅（可插拔：以后加新玩法，往这里加一项即可） ----
@@ -518,7 +528,7 @@ function renderHall(){
     PLAYGROUNDS.map(function(p){
       return '<div class="pg-card"><div class="pg-head">'+p.icon+' <b>'+p.name+'</b> <span class="pg-tag">'+p.tag+' · '+(p.time===null?'不限时':p.id==='vault'?'3 次机会':p.id==='boss'?'双人拆机':p.time+'s')+'</span></div>'+
         '<div class="pg-desc b"><b>A 现场：</b>'+p.a+'</div><div class="pg-desc"><b>B 后方：</b>'+p.b+'</div>'+
-        '<button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button>'+
+        '<div class="pg-actions"><button class="btn primary" data-a="'+p.id+'">当 A · 现场</button><button class="btn" data-b="'+p.id+'">当 B · 后方</button></div>'+
         '</div>';
     }).join('')+
     '</div>';
@@ -696,72 +706,6 @@ var ROOM_CATALOG=[
     "tag": "情感"
   },
   {
-    "id": "room-2",
-    "name": "这女鬼非要跟我面基",
-    "image": "assets/rooms/这女鬼非要跟我面基.png",
-    "theme": "惊悚",
-    "recommend": "胆量试炼",
-    "rating": null,
-    "minutes": 10,
-    "difficulty": "困难",
-    "tag": "惊悚"
-  },
-  {
-    "id": "room-3",
-    "name": "这把输了真寄了",
-    "image": "assets/rooms/这把输了真寄了.png",
-    "theme": "生存",
-    "recommend": "搭档集结",
-    "rating": null,
-    "minutes": 12,
-    "difficulty": "中等",
-    "tag": "生存"
-  },
-  {
-    "id": "room-4",
-    "name": "双胞胎邀我一起玩",
-    "image": "assets/rooms/双胞胎邀我一起玩.png",
-    "theme": "悬疑",
-    "recommend": "默契挑战",
-    "rating": null,
-    "minutes": 8,
-    "difficulty": "中等",
-    "tag": "悬疑"
-  },
-  {
-    "id": "room-5",
-    "name": "这个老登缠上我了",
-    "image": "assets/rooms/这个老登缠上我了.png",
-    "theme": "惊悚",
-    "recommend": "胆量试炼",
-    "rating": null,
-    "minutes": 10,
-    "difficulty": "困难",
-    "tag": "惊悚"
-  },
-  {
-    "id": "room-8",
-    "name": "想养，看着不咬人",
-    "image": "assets/rooms/想养，看着不咬人.png",
-    "theme": "科幻",
-    "recommend": "胆量试炼",
-    "rating": null,
-    "minutes": 10,
-    "difficulty": "困难",
-    "tag": "科幻"
-  },
-  {
-    "id": "room-12",
-    "name": "这公司活人感真低",
-    "image": "assets/rooms/这公司活人感真低.png",
-    "theme": "职场",
-    "recommend": "搭档集结",
-    "rating": null,
-    "minutes": 12,
-    "difficulty": "中等",
-    "tag": "职场"
-  },
-  {
     "id": "room-13",
     "name": "谁家密室不包出啊",
     "image": "assets/rooms/谁家密室不包出啊.png",
@@ -776,41 +720,19 @@ var ROOM_CATALOG=[
     "id": "room-14",
     "name": "你好骚",
     "image": "assets/rooms/12_你好骚_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
+    "theme": "喜剧",
+    "recommend": "衣帽间剪影",
     "rating": null,
     "minutes": 8,
     "difficulty": "中等",
-    "tag": "协作"
+    "tag": "观察"
   },
   {
     "id": "room-15",
     "name": "强哥，收手吧",
     "image": "assets/rooms/20_强哥，收手吧_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
-    "rating": null,
-    "minutes": 8,
-    "difficulty": "中等",
-    "tag": "协作"
-  },
-  {
-    "id": "room-16",
-    "name": "爬吗？",
-    "image": "assets/rooms/21_爬吗？_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
-    "rating": null,
-    "minutes": 8,
-    "difficulty": "中等",
-    "tag": "协作"
-  },
-  {
-    "id": "room-17",
-    "name": "玩命过家家",
-    "image": "assets/rooms/22_玩命过家家_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
+    "theme": "罪案",
+    "recommend": "合力搬货",
     "rating": null,
     "minutes": 8,
     "difficulty": "中等",
@@ -820,23 +742,144 @@ var ROOM_CATALOG=[
     "id": "room-18",
     "name": "男朋友保质期有点长",
     "image": "assets/rooms/23_男朋友保质期有点长_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
+    "theme": "奇幻",
+    "recommend": "记忆挑战",
     "rating": null,
     "minutes": 8,
     "difficulty": "中等",
-    "tag": "协作"
+    "tag": "记忆"
+  },
+  {
+    "id": "room-16",
+    "name": "爬吗？",
+    "image": "assets/rooms/21_爬吗？_390x486.png",
+    "theme": "悬疑",
+    "recommend": "山径探险",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "探路"
+  },
+  {
+    "id": "room-12",
+    "name": "这公司活人感真低",
+    "image": "assets/rooms/这公司活人感真低.png",
+    "theme": "职场",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "职场"
+  },
+  {
+    "id": "room-5",
+    "name": "这个老登缠上我了",
+    "image": "assets/rooms/这个老登缠上我了.png",
+    "theme": "惊悚",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "惊悚"
   },
   {
     "id": "room-19",
     "name": "拔剑吧男朋友",
     "image": "assets/rooms/24_拔剑吧男朋友_390x486.png",
-    "theme": "协作",
-    "recommend": "新密室",
+    "theme": "奇幻",
+    "recommend": "默契引光",
     "rating": null,
     "minutes": 8,
     "difficulty": "中等",
-    "tag": "协作"
+    "tag": "解谜"
+  },
+  {
+    "id": "room-2",
+    "name": "这女鬼非要跟我面基",
+    "image": "assets/rooms/这女鬼非要跟我面基.png",
+    "theme": "惊悚",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "惊悚"
+  },
+  {
+    "id": "room-4",
+    "name": "双胞胎邀我一起玩",
+    "image": "assets/rooms/双胞胎邀我一起玩.png",
+    "theme": "悬疑",
+    "recommend": "默契挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "悬疑"
+  },
+  {
+    "id": "room-17",
+    "name": "玩命过家家",
+    "image": "assets/rooms/22_玩命过家家_390x486.png",
+    "theme": "生存",
+    "recommend": "停走挑战",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "反应"
+  },
+  {
+    "id": "room-8",
+    "name": "想养，看着不咬人",
+    "image": "assets/rooms/想养，看着不咬人.png",
+    "theme": "科幻",
+    "recommend": "胆量试炼",
+    "rating": null,
+    "minutes": 10,
+    "difficulty": "困难",
+    "tag": "科幻"
+  },
+  {
+    "id": "room-3",
+    "name": "这把输了真寄了",
+    "image": "assets/rooms/这把输了真寄了.png",
+    "theme": "生存",
+    "recommend": "搭档集结",
+    "rating": null,
+    "minutes": 12,
+    "difficulty": "中等",
+    "tag": "生存"
+  },
+  {
+    "id": "room-20",
+    "name": "蛇系女友",
+    "image": "assets/rooms/17_蛇系女友_390x486.png",
+    "theme": "奇幻",
+    "recommend": "符咒辨认",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "奇幻"
+  },
+  {
+    "id": "room-21",
+    "name": "好男人就是我",
+    "image": "assets/rooms/19_好男人就是我_390x486.png",
+    "theme": "喜剧",
+    "recommend": "电台搭档",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "喜剧"
+  },
+  {
+    "id": "room-22",
+    "name": "贱人就是矫情",
+    "image": "assets/rooms/13_贱人就是矫情_390x486.png",
+    "theme": "宫廷",
+    "recommend": "宫廷断案",
+    "rating": null,
+    "minutes": 8,
+    "difficulty": "中等",
+    "tag": "宫廷"
   }
 ];
 var selectedRoomId=ROOM_CATALOG[0].id;
@@ -1216,7 +1259,7 @@ function renderDungeonOver(win){
     '<div style="max-width:420px;margin:0 auto;text-align:center;padding:70px 20px;color:#e2e8f0">'+
     '<div style="font-size:64px">'+(win?'🏆':'💔')+'</div>'+
     '<div style="font-size:22px;font-weight:800;margin:14px 0">'+(win?'密室通关！':'密室失败…')+'</div>'+
-    '<div style="color:#94a3b8;margin-bottom:22px">'+(win?'警报已解除，机密已到手。两名特工成功撤离！':'掩护耗尽，两名特工被迫撤退。调整配合，再试一次。')+'</div>'+
+    '<div style="color:#94a3b8;margin-bottom:22px">'+(win?'合作完成，成功走出密室！':'机会用尽了。调整配合，再试一次。')+'</div>'+
     '<button class="btn primary" id="dg-re">▶ 再来一局</button> <button class="btn" id="dg-hall">回大厅</button></div>'+
     '<div class="fb" id="fb"><div class="box" id="fb-box"></div></div>';
   $('dg-re').onclick=function(){ if(window._netMode==='host'){ newDungeon(); dgBroadcast(); renderDungeonHostMap(); return; } DUNGEON=null; renderDungeon(); };
@@ -1245,7 +1288,7 @@ function runCatch(set){
     else type = r<0.5 ? 'good' : (r<0.82 ? 'bad' : 'gold');
     items.push({x:18+Math.random()*(W-36), y:-18, vy:1.5+score*0.04+Math.random()*0.8, type:type, vx:0});
   }
-  function msg(kind, txt){ var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  function msg(kind, txt){ txt=window.catchMobileText?catchMobileText(txt):txt; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
   function loop(){
     if(done||window._dead) return;
     t+=16;
@@ -1379,7 +1422,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v12·合作解谜';
+var APP_VER='v13·主题密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -1541,7 +1584,7 @@ function startHostGame(){
     }
     render();
   }
-  function msg(kind,txt){ window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
+  function msg(kind,txt){ txt=window.catchMobileText?catchMobileText(txt):txt; window._lastMsg={kind:kind,txt:txt}; var m=$('msg'); if(m){ m.className='msg '+kind; m.textContent=txt; } }
   var tip=document.createElement('div'); tip.style.cssText='display:flex;gap:8px;margin:10px 0 4px';
   tip.innerHTML='<div style="flex:1;text-align:center;background:#eff6ff;color:#2563eb;border-radius:10px;padding:10px;font-weight:800;font-size:15px">你 ← 按住左半屏左移（或 ← / A 键）</div>'+
     '<div style="flex:1;text-align:center;background:#fff7ed;color:#ea580c;border-radius:10px;padding:10px;font-weight:800;font-size:15px">同伴 → 在他屏上右移</div>';
@@ -2501,6 +2544,7 @@ function runMaze(set){
 
 
   function render(){
+    if(window.mazeDrawLocal){window.mazeDrawLocal(ctx,cell,pos,gates);return;}
     var R=MAZE.rows, C=MAZE.cols;
     ctx.clearRect(0,0,cv.width,cv.height);
     for(var r=0;r<R;r++) for(var c=0;c<C;c++){
@@ -2802,7 +2846,8 @@ function drawSymbol(ctx, id, x, y, s){
 /* 通用数字键盘：onNum(n) 0-9、onDel() 退格 */
 function makeNumpad(container, onNum, onDel){
   var wrap=document.createElement('div');
-  wrap.style.cssText='display:grid;grid-template-columns:repeat(5,minmax(0,54px));gap:8px;justify-content:center;margin:10px auto 0;width:100%;max-width:302px';
+  wrap.className='code-keypad';
+  wrap.style.cssText='display:grid;grid-template-columns:repeat(3,minmax(44px,1fr));gap:8px;justify-content:center;margin:10px auto 0;width:100%;max-width:302px';
   function nb(n){ var b=document.createElement('button'); b.textContent=n; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f8fafc'; b.onclick=function(){ onNum(n); }; wrap.appendChild(b); }
   function db(){ var b=document.createElement('button'); b.textContent='⌫'; b.style.cssText='height:50px;font-size:20px;font-weight:800;border-radius:12px;border:2px solid #475569;background:#1e293b;color:#f87171'; b.onclick=function(){ onDel(); }; wrap.appendChild(b); }
   for(var i=1;i<=9;i++) nb(i);
@@ -3318,31 +3363,41 @@ function pressureDraw(s,role){
 }
 
 </script>
-<link rel="stylesheet" href="expansion-games.css">
-<script src="expansion-games.js"></script>
-<link rel="stylesheet" href="coop-upgrade.css">
-<script src="coop-upgrade.js"></script>
-<link rel="stylesheet" href="fullscreen-map.css">
-<script src="fullscreen-map.js"></script>
-<link rel="stylesheet" href="beam-mobile.css">
-<script src="beam-mobile.js"></script>
-<link rel="stylesheet" href="beat-mobile.css">
-<script src="beat-mobile.js"></script>
-<link rel="stylesheet" href="catch-mobile.css">
-<script src="catch-mobile.js"></script>
-<script src="code-symbols.js"></script>
-<link rel="stylesheet" href="maze-mobile.css">
-<script src="maze-mobile.js"></script>
-<link rel="stylesheet" href="vault-mobile.css?v=clarity2">
-<script src="vault-mobile.js?v=clarity2"></script>
-<link rel="stylesheet" href="radio-mobile.css">
-<script src="radio-mobile.js"></script>
-<link rel="stylesheet" href="wires-mobile.css">
-<script src="wires-mobile.js"></script>
-<link rel="stylesheet" href="boss-mobile.css">
-<script src="boss-mobile.js"></script>
-<link rel="stylesheet" href="puzzle-pack.css">
-<script src="puzzle-pack.js"></script>
+<link rel="stylesheet" href="expansion-games.css?v=13">
+<script src="expansion-games.js?v=13"></script>
+<link rel="stylesheet" href="coop-upgrade.css?v=13">
+<script src="coop-upgrade.js?v=13"></script>
+<link rel="stylesheet" href="fullscreen-map.css?v=13">
+<script src="fullscreen-map.js?v=13"></script>
+<link rel="stylesheet" href="beam-mobile.css?v=13">
+<script src="beam-mobile.js?v=13"></script>
+<link rel="stylesheet" href="beat-mobile.css?v=13">
+<script src="beat-mobile.js?v=13"></script>
+<link rel="stylesheet" href="catch-mobile.css?v=13">
+<script src="catch-mobile.js?v=13"></script>
+<script src="code-symbols.js?v=13"></script>
+<link rel="stylesheet" href="maze-mobile.css?v=13">
+<script src="maze-mobile.js?v=13"></script>
+<link rel="stylesheet" href="vault-mobile.css?v=13">
+<script src="vault-mobile.js?v=13"></script>
+<link rel="stylesheet" href="radio-mobile.css?v=13">
+<script src="radio-mobile.js?v=13"></script>
+<link rel="stylesheet" href="wires-mobile.css?v=13">
+<script src="wires-mobile.js?v=13"></script>
+<link rel="stylesheet" href="boss-mobile.css?v=13">
+<script src="boss-mobile.js?v=13"></script>
+<link rel="stylesheet" href="puzzle-pack.css?v=13">
+<script src="puzzle-pack.js?v=13"></script>
+<link rel="stylesheet" href="dungeon-routes.css?v=13">
+<script src="dungeon-routes.js?v=13"></script>
+<link rel="stylesheet" href="password-strip.css?v=13">
+<script src="password-strip.js?v=13"></script>
+<link rel="stylesheet" href="rhythm-light.css?v=13">
+<script src="rhythm-light.js?v=13"></script>
+<link rel="stylesheet" href="room-puzzle-themes.css?v=13">
+<script src="room-puzzle-themes.js?v=13"></script>
+<link rel="stylesheet" href="room-progression.css?v=13">
+<script src="room-progression.js?v=13"></script>
 <script>render();</script>
 </body>
 </html>

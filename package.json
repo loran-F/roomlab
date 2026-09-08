@@ -1,0 +1,16 @@
+{
+  "name": "prototype",
+  "version": "1.0.0",
+  "description": "双人「信息不对称」合作解谜的**玩法沙盒**。目标：**把每个玩法独立试玩，验证「单个玩法好不好玩」**；确定哪些好玩，再按密室主题去嵌套组合。",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "peer": "^1.0.2"
+  }
+}

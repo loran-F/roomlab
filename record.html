@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>RoomLab 自动试玩录制台</title>
+<style>
+  body{margin:0;background:#0b0f1a;color:#e5e9f0;font-family:system-ui,'PingFang SC',sans-serif;}
+  #head{padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid #1e2740;}
+  #head h1{font-size:15px;margin:0;}
+  #status{font-size:13px;color:#8ab4ff;}
+  #log{font-size:12px;color:#94a3b8;max-height:80px;overflow:auto;width:100%;box-sizing:border-box;}
+  #wrap{display:flex;flex-direction:column;align-items:center;padding:10px;padding-right:330px;}
+  canvas#out{width:594px;height:990px;background:#0b0f1a;border:1px solid #1e2740;}
+  #cams{position:fixed;right:0;top:0;width:320px;background:#0b0f1a;border-left:1px solid #1e2740;padding:6px;box-sizing:border-box;height:100%;overflow:auto;}
+  #cams iframe{width:412px;height:915px;border:1px solid #334155;transform:scale(0.34);transform-origin:top left;background:#fff;display:block;}
+  .cam{position:relative;height:318px;overflow:hidden;margin-bottom:6px;}
+  .cam span{position:absolute;top:2px;left:2px;z-index:5;background:rgba(0,0,0,.65);font-size:11px;padding:1px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<div id="head"><h1>RoomLab 自动试玩录制台</h1><span id="status">初始化…</span><div id="log"></div></div>
+<div id="wrap">
+  <canvas id="out" width="990" height="1650"></canvas>
+</div>
+<div id="cams">
+  <div class="cam"><span>A 屏 · 现场/操作台</span><iframe id="fA"></iframe></div>
+  <div class="cam"><span>B 屏 · 手册/加入端</span><iframe id="fB"></iframe></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="record.js?v=13"></script>
+</body>
+</html>

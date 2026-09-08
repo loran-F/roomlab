@@ -23,12 +23,13 @@ function watchPrep(){if(prepConn&&prepConn.off)prepConn.off('close',lostPrep);pr
 try{seen=JSON.parse(sessionStorage.getItem('coop-practice-v1')||'{}');}catch(e){}
 function remember(mode,role){seen[mode+role]=true;try{sessionStorage.setItem('coop-practice-v1',JSON.stringify(seen));}catch(e){}}
 function removePanel(){var el=$('coop-panel');if(el)el.remove();}
-function panel(title,txt){removePanel();var el=document.createElement('div');el.id='coop-panel';el.className='coop-overlay';el.innerHTML='<section class="coop-card"><h2>'+title+'</h2><p>'+txt+'</p><div id="coop-work"></div><p id="coop-status" role="status"></p><button id="coop-cancel" class="btn">返回</button></section>';document.body.appendChild(el);$('coop-cancel').onclick=function(){cancelPrep();};return $('coop-work');}
-function button(parent,txt,fn){var b=document.createElement('button');b.className='btn coop-action';b.textContent=txt;b.onclick=fn;parent.appendChild(b);return b;}
+function panel(title,txt){removePanel();var el=document.createElement('div');el.id='coop-panel';el.className='coop-overlay';el.innerHTML='<section class="coop-card"><h2>'+title+'</h2><p>'+txt+'</p><div id="coop-work"></div><p id="coop-status" role="status"></p><button id="coop-cancel" class="coop-cancel">返回</button></section>';document.body.appendChild(el);$('coop-cancel').onclick=function(){cancelPrep();};return $('coop-work');}
+function button(parent,txt,fn){var b=document.createElement('button');b.className='coop-action';b.textContent=txt;b.onclick=fn;parent.appendChild(b);return b;}
 function say(txt){if($('coop-status'))$('coop-status').textContent=txt;}
 function hold(parent,label,ms,done){var b=button(parent,label,function(){}),started=0,iv=null,finished=false;
-function stop(){clearInterval(iv);iv=null;started=0;if(!finished)b.textContent=label;}
-b.onpointerdown=function(e){if(finished)return;e.preventDefault();b.setPointerCapture(e.pointerId);started=performance.now();iv=setInterval(function(){var n=performance.now()-started;b.textContent='保持 '+Math.min(100,Math.round(n/ms*100))+'%';if(n>=ms){finished=true;stop();b.textContent='完成 ✓';b.disabled=true;done();}},30);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=stop;
+b.setAttribute('aria-pressed','false');
+function stop(){b.setAttribute('aria-pressed','false');clearInterval(iv);iv=null;started=0;if(!finished)b.textContent=label;}
+b.onpointerdown=function(e){if(finished)return;e.preventDefault();b.setPointerCapture(e.pointerId);b.setAttribute('aria-pressed','true');started=performance.now();iv=setInterval(function(){var n=performance.now()-started;b.textContent='保持 '+Math.min(100,Math.round(n/ms*100))+'%';if(n>=ms){finished=true;stop();b.textContent='完成 ✓';b.disabled=true;done();}},30);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=stop;
 var observer=new MutationObserver(function(){if(!b.isConnected){stop();observer.disconnect();}});observer.observe(document.body,{childList:true,subtree:true});return b;}
 function practice(mode,role,done){
  var words=duties[mode]||['按提示操作，与 B 交流。','观察提示，与 A 配合。'];
@@ -144,7 +145,8 @@ var oldManual=renderManual;renderManual=function(){oldManual();if(!window._dunge
 function removeRescue(){var el=$('coop-rescue');if(el)el.remove();window._coopRescue=null;}
 function showRescue(d,role){var old=$('coop-rescue');if(old)old.remove();var el=document.createElement('div');el.id='coop-rescue';el.className='coop-rescue';el.innerHTML='<b>应急救场</b><p>'+d.text+'</p>';document.body.appendChild(el);
  var b=button(el,role==='B'?'按住应急开关':'按住确认修复',function(){});
- function set(v){if(role==='B')netSend({t:'coopRescueHold',id:d.id,v:v});else if(window._coopRescue)window._coopRescue.holdA=v;}
+ b.setAttribute('aria-pressed','false');
+ function set(v){b.setAttribute('aria-pressed',String(v));if(role==='B')netSend({t:'coopRescueHold',id:d.id,v:v});else if(window._coopRescue)window._coopRescue.holdA=v;}
  b.onpointerdown=function(e){b.setPointerCapture(e.pointerId);set(true);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=function(){set(false);};
 }
 window.coopWireRescue=function(resume){

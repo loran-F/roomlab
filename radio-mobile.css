@@ -25,3 +25,40 @@
 .radio-console button:disabled{opacity:.6;filter:saturate(.65)}
 @media(max-height:620px){.radio-console .radio-buttons button{min-height:62px;border-radius:14px;font-size:27px}.radio-knob{width:58px;height:58px}.radio-knob i{width:42px;height:42px}}
 @media(prefers-reduced-motion:reduce){.radio-console .radio-buttons button{transition:none}}
+
+/* Shared button acceptance: one surface, no inset face or raised base. */
+.radio-console button,
+.radio-console header button,
+.radio-console .radio-buttons button,
+.radio-console .radio-controls>button{appearance:none;-webkit-appearance:none;background-image:none;border-width:1px;border-style:solid;border-radius:12px;box-shadow:none;text-shadow:none;transform:none;transition:filter .1s ease}
+.radio-console header button{border-radius:50%;min-width:44px;min-height:44px;background-color:#f9e7c4}
+.radio-console .radio-buttons button{background-color:var(--role-color);min-height:62px}
+.radio-console .radio-controls>button{min-height:48px;background-color:#f7d996}
+.radio-console button span,.radio-console button b,.radio-console button small{background:none;border:0;box-shadow:none;text-shadow:none;padding:0}
+.radio-console button::before,.radio-console button::after{content:none;display:none}
+.radio-console button:active:not(:disabled),.radio-console .radio-buttons button:active:not(:disabled){transform:none;box-shadow:none;filter:brightness(.92)}
+.radio-console button:focus-visible{outline:2px solid #55415f;outline-offset:3px}
+.radio-console button:disabled{opacity:.55;filter:grayscale(.35)}
+@media(max-height:620px){.radio-display canvas{height:65px}.radio-console .radio-buttons button{border-radius:12px}}
+@media(prefers-reduced-motion:reduce){.radio-console button{transition:none}}
+
+/* room-21 only: acoustic wall, broadcast microphone and recording desk. */
+.radio-studio{background:repeating-linear-gradient(90deg,#302d39 0 20px,#393442 20px 23px,#262530 23px 26px)}
+.radio-studio .radio-console{background:linear-gradient(145deg,#e4d8cb,#b5acb1);border-color:#57525f;box-shadow:0 6px 0 #24242e,0 22px 55px #10101b88}
+.radio-studio .radio-console header strong{font-size:20px;letter-spacing:1px;color:#403c4d}
+.radio-studio .radio-display{background:#25343c;border-color:#5c5968;border-radius:12px}
+.radio-studio .radio-display-label>span{display:flex;align-items:center;gap:7px;color:#d4e0cf;font-size:12px}
+.radio-studio .radio-display-label svg{width:18px;height:26px;flex-shrink:0;color:#d6b786}
+.radio-studio .radio-display-label span b{font:inherit;color:#d6b786}
+.radio-studio[data-recording=true] #radio-studio-lamp{color:#ffb0a4}
+.radio-studio #radio-studio-lamp::before{content:'●';margin-right:4px}
+.radio-studio .radio-controls{background:#e3dcd2;border-color:#999098;border-radius:12px;box-shadow:none}
+.radio-studio .radio-message{border-left-color:#82707c;color:#4c4254}
+.radio-studio .radio-track{color:#54485d}
+.radio-studio .radio-decor-left{bottom:10%;left:2%;width:20%;color:#a7a2ad;opacity:.6}
+.radio-studio-mic{transform:rotate(-15deg)}.radio-studio-mic svg{width:100%;max-height:280px}
+.radio-studio .radio-decor-right{top:8%;bottom:auto;right:2%;width:22%}
+.radio-studio-sign{padding:14px 8px;border:2px solid #b17e83;border-radius:6px;color:#edaaa3;text-align:center;font:800 24px monospace;letter-spacing:3px;background:#282632}
+.radio-studio-sign small{display:block;font:12px sans-serif;letter-spacing:1px;margin-top:7px;color:#c3a5a9}
+@media(max-width:600px){.radio-studio .radio-decor-right{top:8px;right:12px;width:140px;opacity:.4}.radio-studio-sign{font-size:15px;padding:6px}.radio-studio-sign small{display:none}.radio-studio .radio-decor-left{left:-8%;bottom:6%;width:40%}}
+@media(max-height:620px){.radio-studio .radio-display-label b{font-size:15px}.radio-studio .radio-display-label span b{font-size:12px}.radio-studio .radio-console header strong{font-size:18px}}
