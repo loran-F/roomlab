@@ -1,0 +1,23 @@
+body:has(.dungeon-screen){overflow:hidden;overscroll-behavior:none}
+.wrap:has(.dungeon-screen){width:100%;max-width:none;padding:0;margin:0}
+.dungeon-screen{height:100dvh;min-height:0;box-sizing:border-box;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);display:flex;flex-direction:column;overflow:hidden}
+.dg-topline{flex:none;min-height:62px;padding:8px 12px;box-sizing:border-box;gap:10px}
+.dg-topline .dg-back{box-shadow:none}
+.dg-map-title{flex:1;min-width:0;color:#fff0cb;font-weight:800;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dg-topline .dg-life{padding:6px;gap:1px;flex:none}.dg-topline .dg-heart{width:15px;height:17px}
+.dg-help{border:2px solid #281f32;color:#fff0cb;background:#66577f;border-radius:12px;min-width:44px;height:44px;font-size:19px;font-weight:800}
+.dungeon-screen .scroll-shell{flex:1;min-height:0;margin:0 12px 8px;padding:13px 0;box-sizing:border-box;width:calc(100% - 24px);align-self:center;max-width:1000px}
+.dungeon-screen .scroll-paper{height:100%;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#b99560 #ffe8ac;overflow-anchor:none}
+.dungeon-screen #dgmap{max-width:650px;margin:0 auto;height:var(--map-height);min-height:100%}
+.dungeon-screen .dg-map-caption,.dungeon-screen .dg-map-corner{display:none}
+.dungeon-screen .dg-node{touch-action:pan-y}
+.dungeon-screen .dg-node-label{font-size:12px}
+.dg-map-tools{position:absolute;bottom:32px;right:26px;z-index:20;display:flex;gap:8px;align-items:center;pointer-events:none}
+.dg-map-tools button{pointer-events:auto;min-height:44px;padding:0 14px;border:2px solid #281f32;border-radius:24px;background:#fff0c5;color:#30253a;font-weight:800;box-shadow:0 3px 0 #281f3222}
+.dg-map-tools .dg-role-dot{width:27px;height:27px;margin-right:6px;vertical-align:middle}
+.dungeon-screen #dgmsg{position:absolute;left:28px;right:28px;bottom:90px;z-index:22;margin:0!important;padding:10px 14px;border:2px solid #281f32;border-radius:12px;background:#30263ff2;color:#fff0cb;min-height:0;pointer-events:none;font-size:13px;line-height:1.5}
+.dg-map-help{position:absolute;top:76px;left:16px;right:16px;z-index:25;background:#30263ff5;color:#fff0cb;border:2px solid #21192e;border-radius:16px;padding:16px;font-size:14px;line-height:1.7;max-width:430px;margin:0 auto}.dg-map-help[hidden]{display:none}
+.dungeon-screen .scroll-shell.is-opening .scroll-rod.bottom{animation:map-rod-open 800ms cubic-bezier(.22,.65,.24,1) both}.dungeon-screen .scroll-shell.is-opening .scroll-paper{animation-duration:800ms}
+@keyframes map-rod-open{from{transform:translateY(calc(-1 * var(--viewport-height)))}to{transform:translateY(0)}}
+@media(max-width:350px){.dg-topline{gap:6px;padding:6px 8px}.dg-map-title{font-size:13px}.dg-topline .dg-heart{width:12px}.dungeon-screen .scroll-shell{margin-left:10px;margin-right:10px;width:calc(100% - 20px)}.dungeon-screen .dg-node-label{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.dungeon-screen .scroll-shell.is-opening .scroll-rod.bottom{animation:none}}
