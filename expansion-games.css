@@ -17,3 +17,5 @@ body:has(.x-shell){background:linear-gradient(155deg,#454065,#2b243f);color:#fff
 @media(prefers-reduced-motion:reduce){.shadow-gate-leaf{transition:none}}
 
 .shadow-key svg{display:block;width:30px;height:34px}.shadow-key span{color:#48374f;margin-top:3px}
+
+.caller-people{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.caller-people button{min-height:44px;border:2px solid #30253a;border-radius:9px;background:#fff6db;color:#30253a;font-weight:bold}.caller-people button.selected{background:#ffb268}
