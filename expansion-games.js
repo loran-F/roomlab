@@ -4,7 +4,7 @@
   const IDS=['lookback','caller','shadow'];
   const META={
     lookback:{name:'你别回头',tag:'追逃',time:85,a:'你看前路：报门上的箭头，听 B 指挥前进、停步或躲藏。',b:'你看监控：辨认怪物，指挥 A 应对；听 A 报箭头开启对应门。'},
-    caller:{name:'真假接线员',tag:'判断',time:110,a:'你接来电：询问工号和任务，把回答告诉 B，然后提出放行或拒绝。',b:'你查值班表：核对 A 报来的身份和任务，独立投票；两票一致才执行。'},
+    caller:{name:'真假接线员',tag:'判断',time:110,a:'先听 B 指定今日核验项，再从工号、任务、来路中选择两个问题。交换证据后投票。',b:'先报今日核验项，再听名字点档案。注意封闭通道与来路证词的矛盾，独立投票。'},
     shadow:{name:'影子替身',tag:'机关',time:100,a:'你录下走动：走到黄色按钮上，多站一会儿。回放时你的影子会帮 B 开门。',b:'你拿钥匙：等 A 录完，启动影子回放。影子踩住按钮时，穿过门去拿钥匙。'}
   };
   const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -24,11 +24,13 @@
   function encounter(s){s.phase='travel';s.phaseTime=0;s.travel=0;s.action='stop';s.door=pick(['left','right']);s.openDoor='';s.monster=pick(['ears','eyes','nose']);s.bad=0;s.rescue=false;s.round++;}
   function callCase(s){
     const roster=PEOPLE.map(x=>({...x,code:String(Math.floor(100+Math.random()*900))}));
-    const person=pick(roster),kind=pick(['real','real','code','task']);
-    s.roster=roster;s.claim={...person};
+    const person=pick(roster);s.checks=pick([['code','task'],['code','route'],['task','route']]);
+    s.closed=pick(['东门','西楼梯','货梯']);const kind=pick(['real','real',...s.checks]);
+    s.roster=roster;s.claim={...person,route:pick(['东门','西楼梯','货梯'].filter(x=>x!==s.closed))+'，我直接过来的，没有绕路。'};
     if(kind==='code')s.claim.code=String((+person.code+137)%900+100);
     if(kind==='task')s.claim.task=pick(roster.filter(x=>x.name!==person.name)).task;
-    s.real=kind==='real';s.questions=[];s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
+    if(kind==='route')s.claim.route=s.closed+'，我刚刚直接过来的，畅通无阻。';
+    s.real=kind==='real';s.fault=kind;s.questions=[];s.extra=false;s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
   }
   function shadowRound(s){
     s.positions={A:0,B:0};s.tape=[];s.ghost=0;s.doorOpen=false;s.recordTime=0;s.playTime=0;s.recordLength=8;s.moves={A:-1,B:-1};s.phase='plan';s.phaseTime=0;s.attempts=s.attempts||0;s.round++;
@@ -49,8 +51,9 @@
       if(who==='B'&&['left','right'].includes(d.key))s.openDoor=d.key;
       if(who==='B'&&d.key==='lure'&&s.phase==='danger'&&!s.rescue&&s.lures>0){s.lures--;s.rescue=true;s.bad=0;message(s,'B 打开诱饵灯，暂时吸引了怪物！本局诱饵已用完。');}
     }else if(s.mode==='caller'&&s.phase==='call'){
-      if(who==='A'&&['code','task'].includes(d.key)&&!s.questions.includes(d.key))s.questions.push(d.key);
-      if(['admit','reject'].includes(d.key)&&s.questions.length===2){
+      if(who==='A'&&d.key==='extra'&&s.questions.length===2&&!s.extra){s.extra=true;s.time=Math.max(0,s.time-8);s.votes={A:null,B:null};message(s,'追加一次追问，行动时间 −8 秒。');}
+      if(who==='A'&&['code','task','route'].includes(d.key)&&!s.questions.includes(d.key)&&s.questions.length<(s.extra?3:2)){s.questions.push(d.key);s.votes={A:null,B:null};}
+      if(['admit','reject'].includes(d.key)&&s.questions.length>=2){
         s.votes[who]=d.key;
         if(s.votes.A&&s.votes.B){
           if(s.votes.A!==s.votes.B){message(s,'意见不同，先交换证据。任一人改票即可。');return true;}
@@ -58,7 +61,7 @@
           if(!correct)damage(s,s.real?'误拒了真正的值班人员':'冒充者混进来了');
           else message(s,s.real?'核验通过，值班人员安全进入。':'发现矛盾，成功拦下冒充者。');
           s.completed++;s.phase='verdict';s.phaseTime=0;
-          s.explanation=s.real?'工号与任务均和值班表一致。':s.claim.code!==s.roster.find(x=>x.name===s.claim.name).code?'工号不符合值班表。':'任务不符合值班表。';
+          s.explanation=s.real?'今日要求核验的证据没有矛盾，是真正的值班人员。':s.fault==='route'?'他说刚经过'+s.closed+'，但该通道整晚封闭，行程自相矛盾。':s.fault==='code'?'工号与档案不符。':'任务与档案不符。';
           if(s.completed>=5&&!s.done)finish(s,true,'五通来电处理完毕，值班室安全！');
         }
       }
@@ -116,9 +119,9 @@
       Object.assign(v,{travel:s.travel,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
       if(role==='A')v.door=s.door;else v.monster=s.monster;
     }else if(s.mode==='caller'){
-      Object.assign(v,{questions:[...s.questions],votes:{...s.votes}});
-      if(role==='A')v.claim={name:s.claim.name,job:s.claim.job,code:s.questions.includes('code')?s.claim.code:null,task:s.questions.includes('task')?s.claim.task:null};
-      else v.roster=s.roster.map(x=>({...x}));
+      Object.assign(v,{questions:[...s.questions],extra:s.extra,votes:{...s.votes}});
+      if(role==='A')v.claim={name:s.claim.name,job:s.claim.job,code:s.questions.includes('code')?s.claim.code:null,task:s.questions.includes('task')?s.claim.task:null,route:s.questions.includes('route')?s.claim.route:null};
+      else {v.roster=s.roster.map(x=>({...x}));v.checks=[...s.checks];v.closed=s.closed;}
       if(s.phase==='verdict'||s.done)v.explanation=s.explanation;
     }else{
       Object.assign(v,{positions:{...s.positions},ghost:s.ghost,doorOpen:s.doorOpen,recordTime:s.recordTime,playTime:s.playTime,recordLength:s.recordLength,attempts:s.attempts,tape:s.tape.map(p=>({...p}))});
@@ -128,6 +131,7 @@
   const API={ids:IDS,meta:META,core:{create,input,step,snapshot}};
   g.RoomLabExpansion=API;
   if(typeof PLAYGROUNDS==='undefined')return;
+  let callerFocus=0,callerRound='';
   let active=null,view=null,dispose=null,serial=0,practice=false,localAction='stop',guestConn=null,lobbyTicket=0;
   const el=id=>document.getElementById(id);
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -185,14 +189,15 @@
     }else if(s.mode==='caller'){
       if(role==='A'){
         const c=s.claim;
-        html='<div class="x-call-head">'+icon('caller')+'<span>线路 0'+(s.completed+(s.phase==='call'?1:0))+' · 来电接通</span></div><div class="x-speech"><b>“我是'+esc(c.name)+'，'+esc(c.job)+'。请开门。”</b><p>工号：'+esc(c.code||'还没问到')+'</p><p>任务：'+esc(c.task||'还没问到')+'</p></div><p class="x-small">把这些话报给 B；你手里没有值班表。</p>';
-        actions(button('code','询问工号')+button('task','询问任务')+button('admit','放行','primary')+button('reject','拒绝'));
+        html='<div class="x-call-head">'+icon('caller')+'<span>线路 0'+(s.completed+(s.phase==='call'?1:0))+' · 来电接通</span></div><div class="x-speech"><b>“我是'+esc(c.name)+'，'+esc(c.job)+'。请开门。”</b><p>工号：'+esc(c.code||'还没问到')+'</p><p>任务：'+esc(c.task||'还没问到')+'</p><p>来路：'+esc(c.route||'还没问到')+'</p></div><p class="x-small">把这些话报给 B；你手里没有值班表。</p>';
+        actions(button('code','询问工号')+button('task','询问任务')+button('route','追问来路')+button('extra','追加追问 −8秒')+button('admit','放行','primary')+button('reject','拒绝'));
       }else{
-        html='<div class="x-file-title">夜班值班表 <small>仅你可见</small></div><div class="x-roster">'+s.roster.map(p=>'<article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b><strong>'+p.code+'</strong><p>'+esc(p.task)+'</p></article>').join('')+'</div>';
+        const roundKey=s.id+':'+s.round;if(callerRound!==roundKey){callerRound=roundKey;callerFocus=0;}const p=s.roster[callerFocus]||s.roster[0];
+        html='<div class="x-speech"><b>今日核验：'+s.checks.map(k=>({code:'工号',task:'任务',route:'来路'})[k]).join('＋')+'</b><p>先告诉 A 该问哪两项。'+(s.checks.includes('route')?s.closed+'整晚封闭，声称刚从这里直接经过的人在撒谎。':'')+'</p></div><div class="x-file-title">听名字，点开对应档案</div><div class="caller-people">'+s.roster.map((p,i)=>'<button data-person="'+i+'" class="'+(i===callerFocus?'selected':'')+'">'+esc(p.name)+'</button>').join('')+'</div><div class="x-roster"><article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b><strong>'+p.code+'</strong><p>'+esc(p.task)+'</p></article></div>';
         actions(button('admit','核对无误 · 放行','primary')+button('reject','发现矛盾 · 拒绝'));
       }
-      hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':'先问完工号和任务；两个人的决定一致才执行。';
-      meter=s.questions.length/2;
+      hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':(s.extra?'已追加追问 · 共问 '+s.questions.length+' / 3':'免费提问 '+s.questions.length+' / 2')+'；先听 B 指定核验内容，再询问。';
+      meter=Math.min(1,s.questions.length/2);
     }else{
       const recording=s.phase==='record',replay=s.phase==='replay';
       el('x-health').textContent='一个按钮 · 一扇门';el('x-progress').textContent=s.done&&s.win?'钥匙到手':'目标：拿到钥匙';
@@ -214,12 +219,12 @@
       meter=recording?s.recordTime/s.recordLength:replay?s.playTime/s.recordLength:0;
     }
     // Keep controls stable during state broadcasts; only the scene is redrawn.
-    el('x-stage').innerHTML=html;el('x-hint').textContent=wait?(s.ready.A&&s.ready.B?'双方就绪，倒计时后开始。':'完成小练习，然后准备。'):hint;el('x-meter').style.width=clamp(meter*100,0,100)+'%';
+    el('x-stage').innerHTML=html;el('x-stage').querySelectorAll('[data-person]').forEach(b=>{b.onclick=()=>{callerFocus=+b.dataset.person;};});el('x-hint').textContent=wait?(s.ready.A&&s.ready.B?'双方就绪，倒计时后开始。':'完成小练习，然后准备。'):hint;el('x-meter').style.width=clamp(meter*100,0,100)+'%';
     document.querySelectorAll('#x-actions [data-x]').forEach(b=>{
       const k=b.dataset.x;
       b.disabled=wait||s.done;
       if(s.mode==='lookback'){if(k==='lure')b.disabled=b.disabled||s.phase!=='danger'||s.rescue||!s.lures;b.classList.toggle('selected',k===s.action||k===s.openDoor);}
-      if(s.mode==='caller'){b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<2);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
+      if(s.mode==='caller'){if(['code','task','route'].includes(k))b.disabled=b.disabled||s.questions.includes(k)||s.questions.length>=(s.extra?3:2);if(k==='extra')b.disabled=b.disabled||s.extra||s.questions.length!==2;b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<2);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
       if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':s.phase!=='replay');if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry'].includes(s.phase)||!s.tape.length;}
     });
     if(s.done&&!window._dungeon)result(s,role);
