@@ -14,3 +14,7 @@
 .maze-mobile .maze-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.maze-mobile .mz-tab{min-height:46px;background:#f6d9a2}.maze-mobile .mz-tab.on{background:#ffac61}
 .maze-mobile .manual-card h3{color:#30283f;margin:0 0 8px;font-size:20px}
 .maze-mobile .taskline{background:#f5deb0;border:0;padding:10px;border-radius:10px}.maze-mobile .msg.warn{background:#f5d591;color:#513d29}.maze-mobile .msg.ok{background:#c0dfb8;color:#244f3a}.maze-mobile .msg.err{background:#ffd0ba;color:#782e30}
+
+.maze-valve,.maze-valve-table{margin-top:12px;padding:12px;background:#f4dba6;border:2px solid #30253a;border-radius:12px;color:#30253a}.maze-valve[hidden]{display:none}.maze-valve button{min-height:48px;margin:4px;padding:8px 12px;border:2px solid #30253a;border-radius:10px;font-weight:bold}.maze-valve p,.maze-valve-table p{font-size:14px;line-height:1.6}.maze-valve-table small{font-size:12px}
+
+.maze-mobile:has(.maze-valve:not([hidden])) #stage canvas{max-height:220px;width:auto;max-width:100%}.maze-valve button:nth-of-type(1){background:#acd9fa}.maze-valve button:nth-of-type(2){background:#ffbe80}.maze-valve button:nth-of-type(3){background:#bde2b6}
