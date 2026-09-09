@@ -6,7 +6,7 @@ maze:['报现场阀门符号，按 B 的路线打开三道门。','规划路线�
 dial:['调整频率，让波形平顺；对准后通知同伴。','调整增益，让信号条满格；与 A 稳定收录。'],
 wires:['报线号、颜色和纹理，选线后再确认剪断。','分步判断线号；救场时听 A 报符号，选择旁路。'],
 code:['描述符号的形状和方向，输入 B 报的数字。','根据描述查符号，逐位报回数字。'],
-vault:['报出“第几位、什么数字”。','选对应位序，再记录数字。'],
+vault:['观察随机亮起的格子，描述它的位置和内容。','听 A 描述位置和内容，点击对应空格记录。'],
 pressure:['加减压力，持续把读数报给 B。','报安全区间，在范围内按住阀门。'],
 catch:['按住左移，与 B 协调接物资。','按住右移，与 A 协调接物资。'],
 shield:['守左半边，按住抵挡，及时松手。','守右半边，按住抵挡，及时松手。'],
@@ -40,7 +40,7 @@ function practice(mode,role,done){
  else if(mode==='dial')choice(role==='A'?'同伴说目标为 7，把练习指针移到：':'练习卡 C1 → 刻度 7。A 报 C1，你报：',['3','7','9'],'7');
  else if(mode==='wires')choice(role==='A'?'B 让你剪第 2 根，点击对应线号。':'练习线序：1黄、2蓝、3红。红线不足2根时剪蓝线，应剪：',['1','2','3'],'2');
  else if(mode==='code')choice(role==='A'?'同伴报回数字 4，输入：':'练习密码本：圆圈向左下伸线 → 4。A 描述相同符号，你报：',['2','4','8'],'4');
- else if(mode==='vault'){choice(role==='A'?'第 2 位亮起数字 7，你应该报：':'同伴说“第 2 位，7”，选择正确记录。',['第 7 位，2','第 2 位，7','第 1 位，7'],'第 2 位，7');}
+ else if(mode==='vault'){choice(role==='A'?'格子随机亮起时，怎样让同伴准确记录？':'听到同伴描述亮格的位置和内容后，应该怎么做？',role==='A'?['只报内容，让同伴猜位置','描述亮格的位置和内容','等全部闪完再一起回忆']:['按听到的先后顺序依次填入','点击对应位置的空格，记录内容','只记内容，不区分空格'],role==='A'?'描述亮格的位置和内容':'点击对应位置的空格，记录内容');}
  else if(mode==='pressure'&&role==='A'){var value=40;var gauge=document.createElement('p');box.appendChild(gauge);gauge.textContent='练习压力 40 · 目标 50';button(box,'＋ 加压',function(){value+=5;gauge.textContent='练习压力 '+value;if(value>=50)pass();});}
  else if(mode==='boss')choice(role==='A'?'B 报弱点是右臂，你攻击：':'A 报泡泡弹从左侧来，你防御：',['左侧','右臂','上方'],role==='A'?'右臂':'左侧');
  else if(mode==='beat'){var ready=false;var b=button(box,'等待绿色提示',function(){if(ready)pass();else say('提前了，等绿色提示再按。');});setTimeout(function(){if(b.isConnected){ready=true;b.textContent='现在点击';b.style.background='#8cd2a2';}},900);}

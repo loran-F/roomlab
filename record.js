@@ -706,8 +706,8 @@ function driveVault() {
       driveState.vaultIdx = i;
       var idx = s.order[i];
       driveState.vaultPending = { idx: idx, want: String(s.answer[idx]) };
-      aOp = '🗣 报：第 ' + (idx + 1) + ' 位是「' + s.clues[idx] + '」';
-      bOp = 'B · 记录第 ' + (idx + 1) + ' 位';
+      aOp = 'A · 观察并描述';
+      bOp = 'B · 听同伴记录';
     }
   }
   /* B 把最近报的一位记到对应格子（按期望值校验，占位符字符不限） */
@@ -735,7 +735,7 @@ function driveVault() {
         sl.click();
         var nx2 = want2.charAt(!cur2 || cur2 === '—' || cur2 === '·' ? 0 : cur2.length);
         if (nx2) wb.dispatchEvent(new KeyboardEvent('keydown', { key: nx2.toLowerCase() }));
-        aOp = 'A · 补报第 ' + (i2 + 1) + ' 位'; bOp = 'B · 补记录';
+        aOp = 'A · 核对记录'; bOp = 'B · 补记录';
         return;
       }
     }

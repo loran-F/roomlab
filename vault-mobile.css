@@ -37,3 +37,11 @@
 .vm-shell[data-theme=photos] .vm-observation-slot{border:1px solid #bacbdc;border-bottom-width:8px;background:linear-gradient(145deg,#e0e9f2,#f8fafc);border-radius:3px}
 .vm-shell[data-theme=photos] .vm-observation-slot.is-revealed{background:#e2ecfa;border-color:#4269b1}
 .vm-shell[data-theme=photos] .vm-observation{gap:10px;padding:16px 8px;background:#d3dde8;border-radius:12px}
+.vm-shell .vm-observation,.vm-shell .vm-slots{grid-template-columns:repeat(var(--columns),minmax(0,1fr));gap:4px;padding:0}
+.vm-shell .vm-observation-slot,.vm-shell .vm-slot{min-width:0;min-height:88px;padding:8px 0;justify-content:center}
+.vm-shell .vm-observation-slot strong,.vm-shell .vm-slot strong{font-size:clamp(22px,7vw,36px);white-space:nowrap}
+.vm-shell[data-kind=math] .vm-observation-slot strong{font-size:clamp(16px,4.8vw,24px);letter-spacing:-1px}
+.vm-shell[data-theme=photos] .vm-observation{gap:4px;padding:8px 0}
+
+
+.vm-help:not([open])>p{display:none}
