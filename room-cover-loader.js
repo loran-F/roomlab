@@ -1,0 +1,30 @@
+/* Bounded, decoded cover delivery. Original PNGs remain the fallback/source of truth. */
+(function(g){
+'use strict';
+let current=null;
+function assetURL(source){const url=new URL(source,document.baseURI),version=String(g.APP_VER||'').match(/^v(\d+(?:\.\d+)*)/);if(version)url.searchParams.set('v',version[1]);return url.href;}
+function mount(options){if(current)current.destroy();const {root,image,rooms,onReady}=options;
+ const cache=new Map(),buttons=Array.from(root.querySelectorAll('#dm2,#dm3'));let target=rooms.findIndex(r=>r.id===options.initialId),shown=-1,ticket=0,dead=false,preloadTimer=null;
+ const placeholder=document.createElement('div');placeholder.className='room-cover room-cover-placeholder';placeholder.setAttribute('role','img');placeholder.setAttribute('aria-label','密室封面正在加载');placeholder.textContent='封面加载中';image.after(placeholder);image.hidden=true;image.decoding='async';image.fetchPriority='high';
+ const status=document.createElement('div');status.className='room-cover-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');root.querySelector('.room-carousel').after(status);
+ function busy(value){root.dataset.coverLoading=String(value);image.setAttribute('aria-busy',String(value));buttons.forEach(button=>{if(value){if(button.dataset.coverDisabled===undefined)button.dataset.coverDisabled=String(button.disabled);button.disabled=true;}else if(button.dataset.coverDisabled!==undefined){button.disabled=button.dataset.coverDisabled==='true';delete button.dataset.coverDisabled;}});}
+ function discard(id){const e=cache.get(id);if(!e)return;e.controller.abort();if(e.url)URL.revokeObjectURL(e.url);cache.delete(id);}
+ function prune(){const keep=new Set([target,shown,(target+1)%rooms.length,(target+rooms.length-1)%rooms.length].filter(i=>i>=0).map(i=>rooms[i].id));for(const [id,e]of cache)if(!keep.has(id)&&(!e.ready||cache.size>4))discard(id);}
+ async function fetchDecoded(url,controller,priority){const response=await fetch(url,{signal:controller.signal,priority,cache:'default'});if(!response.ok)throw new Error('HTTP '+response.status);const blob=await response.blob(),objectURL=URL.createObjectURL(blob),decoded=new Image();decoded.decoding='async';decoded.src=objectURL;
+  try{await decoded.decode();if(controller.signal.aborted)throw new DOMException('Aborted','AbortError');return objectURL;}catch(e){URL.revokeObjectURL(objectURL);throw e;}
+ }
+ function load(index,priority){const r=rooms[index];if(cache.has(r.id))return cache.get(r.id).promise;const entry={controller:new AbortController(),ready:false,url:null,source:null,promise:null};cache.set(r.id,entry);
+  entry.promise=(async()=>{let lastError;for(const source of [assetURL('assets/rooms/webp/'+r.id+'.webp'),assetURL(r.image)]){try{entry.url=await fetchDecoded(source,entry.controller,priority);entry.source=source;entry.ready=true;return entry;}catch(e){if(e.name==='AbortError')throw e;lastError=e;}}throw lastError;})().catch(e=>{if(cache.get(r.id)===entry)cache.delete(r.id);throw e;});return entry.promise;
+ }
+ function neighbors(version){clearTimeout(preloadTimer);preloadTimer=setTimeout(async()=>{for(const index of [(shown+1)%rooms.length,(shown+rooms.length-1)%rooms.length]){if(dead||version!==ticket)return;try{await load(index,'low');}catch(e){/* Optional preloads retry when explicitly selected. */}if(dead||version!==ticket)return;prune();}},180);}
+ async function select(index){if(dead)return;target=(index+rooms.length)%rooms.length;const version=++ticket;clearTimeout(preloadTimer);for(const [id,e]of cache)if(!e.ready&&id!==rooms[target].id)discard(id);prune();busy(true);status.textContent='正在打开「'+rooms[target].name+'」…';const selected=target;
+  try{const entry=await load(selected,'high');if(dead||version!==ticket)return;shown=selected;image.src=entry.url;image.alt=rooms[selected].name+'密室封面';image.dataset.roomId=rooms[selected].id;image.dataset.coverSource=entry.source;image.hidden=false;placeholder.hidden=true;busy(false);onReady(rooms[selected],entry.source);status.replaceChildren();prune();neighbors(version);
+  }catch(e){if(dead||version!==ticket||e.name==='AbortError')return;shown=selected;image.hidden=true;image.removeAttribute('src');image.dataset.roomId=rooms[selected].id;image.dataset.coverSource='placeholder';placeholder.hidden=false;placeholder.textContent='封面暂不可用';placeholder.setAttribute('aria-label',rooms[selected].name+'暂时没有封面');busy(false);onReady(rooms[selected],null);status.textContent='图片暂未加载，可继续进入「'+rooms[selected].name+'」。';prune();neighbors(version);const retry=document.createElement('button');retry.type='button';retry.textContent='重新加载';retry.onclick=()=>select(target);status.appendChild(retry);}
+ }
+ const observer=new MutationObserver(()=>{if(!root.isConnected)destroy();else if(root.dataset.coverLoading==='true')buttons.forEach(b=>{if(!b.disabled)b.disabled=true;});});observer.observe(root.parentNode,{childList:true});buttons.forEach(b=>observer.observe(b,{attributes:true,attributeFilter:['disabled']}));
+ function destroy(){if(dead)return;dead=true;ticket++;clearTimeout(preloadTimer);observer.disconnect();for(const id of Array.from(cache.keys()))discard(id);if(current===api)current=null;}
+ const api={move:delta=>select(target+delta),select:id=>{const index=rooms.findIndex(r=>r.id===id);if(index>=0)return select(index);},destroy,stats:()=>({target:rooms[target]?.id,shown:rooms[shown]?.id,entries:cache.size,pending:Array.from(cache.values()).filter(e=>!e.ready).length,decoded:Array.from(cache.values()).filter(e=>e.ready).length})};current=api;select(Math.max(0,target));return api;
+}
+g.RoomCoverLoader={mount,assetURL,stats:()=>current?current.stats():null};
+const oldClear=clearTimers;clearTimers=function(){if(current)current.destroy();return oldClear.apply(this,arguments);};
+})(window);

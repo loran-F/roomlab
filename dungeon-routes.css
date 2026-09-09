@@ -1,3 +1,8 @@
 .room-info .route-preview{font-size:13px;line-height:1.6;color:#ddd1e7;margin:8px 0 0}.route-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;padding:0 16px 10px;font-size:11px;color:#d8cce3}.route-summary b{color:#ffe19b;font-weight:700}.route-details{border-top:1px solid #77638b;margin-top:12px;padding-top:12px}.dg-map-help{top:100px}
 @media(max-width:350px){.route-summary{padding:0 10px 8px;gap:4px;font-size:10px}.room-info .route-preview{font-size:12px}}
 .dungeon-screen .route-stage{display:block;font:600 10px/1.4 "Microsoft YaHei",sans-serif;color:#82613f;margin-top:2px}
+/* F-02: one flat node surface in every state, including pointer-down. */
+.dungeon-screen .dg-node{border-width:2px;border-radius:12px;box-shadow:none;transition:background .16s,border-color .16s,transform .16s}
+.dungeon-screen .dg-node:is(.start,.boss){border-radius:50%}
+.dungeon-screen .dg-node:active{transform:translateY(1px);box-shadow:none}
+@media(prefers-reduced-motion:reduce){.dungeon-screen .dg-node{transition:none}}

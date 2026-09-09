@@ -338,7 +338,7 @@ function newSet(){
 
 /* ============ 状态 ============ */
 var S = {
-  mod: (function(){ var m=location.search.match(/[?&]m=(\w+)/); return m&&!['bridge','shield'].includes(m[1])?m[1]:null; })(),
+  mod: new URLSearchParams(location.search).get('m') || null,
   role: (function(){ var m=location.search.match(/[?&]role=(A|B)/i); return m?m[1].toUpperCase():null; })(),
   started: 0,
   time: 120
@@ -436,6 +436,7 @@ function netAskCancel(){ showFB(window._fbState||{ok:true,duration:0,timeLeft:0,
 function startCountdown(){
   clearTimers();
   var iv=setInterval(function(){
+    if(S.mod==='catch'&&!window._dungeon&&window.CatchConnection&&CatchConnection.paused())return;
     S.time--;
     if(S.time<=0){ S.time=0; clearInterval(iv); timers=[]; explode('时间到'); return; }
     if(window._dungeon && window._netMode==='host'){ netSend({t:'dgT', time:S.time}); }
@@ -904,16 +905,16 @@ function renderDungeonMenu(){
     '<div class="room-actions"><button class="room-action" id="dm2">创建房间<small>角色 A · 现场</small></button>'+
     '<button class="room-action join" id="dm3">加入房间<small>角色 B · 后方</small></button></div></section>';
   var page=document.querySelector('.room-select');
-  function paint(){
-    var r=selectedRoom(), i=ROOM_CATALOG.indexOf(r);
+  function paint(r){
+    var i=ROOM_CATALOG.indexOf(r);
     $('room-title').textContent=r.theme+' | '+r.name;
-    $('room-cover').src=r.image; $('room-cover').alt=r.name+'密室封面';
     $('room-info').innerHTML='<div class="room-recommend">['+r.recommend+']</div><div class="room-meta">'+
       (r.rating?'<span class="room-rating">'+r.rating+'分</span>　|　':'')+r.minutes+'分钟　|　2人开场</div>'+
       '<span class="room-tag">'+r.difficulty+'</span><span class="room-tag">'+r.tag+'</span>';
     $('room-pagination').textContent=(i+1)+' / '+ROOM_CATALOG.length;
   }
-  function move(delta){var i=ROOM_CATALOG.indexOf(selectedRoom());selectRoom(ROOM_CATALOG[(i+delta+ROOM_CATALOG.length)%ROOM_CATALOG.length].id);paint();}
+  var covers=RoomCoverLoader.mount({root:page,image:$('room-cover'),rooms:ROOM_CATALOG,initialId:selectedRoomId,onReady:function(r){selectRoom(r.id);paint(r);}});
+  function move(delta){covers.move(delta);}
   $('room-prev').onclick=function(){move(-1);}; $('room-next').onclick=function(){move(1);};
   page.onkeydown=function(e){if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();move(e.key==='ArrowLeft'?-1:1);}};
   var touch=null;
@@ -921,8 +922,8 @@ function renderDungeonMenu(){
   page.addEventListener('touchend',function(e){if(!touch)return;var dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3)move(dx<0?1:-1);},{passive:true});
   page.addEventListener('touchcancel',function(){touch=null;},{passive:true});
   $('room-back').onclick=function(){location.search='';};
-  $('dm2').onclick=function(){renderHostDungeon();}; $('dm3').onclick=function(){renderDungeonJoin();};
-  paint();
+  $('dm2').onclick=function(){if(page.dataset.coverLoading!=='true')renderHostDungeon();}; $('dm3').onclick=function(){if(page.dataset.coverLoading!=='true')renderDungeonJoin();};
+  paint(selectedRoom());
 }
 function dgSnapshot(){ return { roomId:DUNGEON.roomId, hp:DUNGEON.hp, maxHp:DUNGEON.maxHp, posA:DUNGEON.posA, posB:DUNGEON.posB, over:DUNGEON.over, win:DUNGEON.win,
   nodes:DUNGEON.nodes.map(function(n){ return {id:n.id, done:n.done, locked:!!DUNGEON.locked[n.id], mode:n.mode}; }) }; }
@@ -970,15 +971,16 @@ function renderHostDungeon(){
         var cc=$('copycode'); if(cc) cc.onclick=function(){ try{ navigator.clipboard.writeText(String(code)).then(function(){ cc.textContent='已复制 ✓'; setTimeout(function(){ cc.textContent='复制'; },2000); }); }catch(e){} };
       });
       p.on('connection', function(conn){
+        if(window.DungeonConnection&&DungeonConnection.isBusy()){conn.close();return;}
         clearTimeout(t);
         conn.on('open', function(){
           PEER.conn=conn;
+          DungeonConnection.watch(conn);
           newDungeon();
           dgBroadcast();
-          conn.on('data', function(dd){ if(!dd) return;
+          conn.on('data', function(dd){ if(!dd||!DungeonConnection.accept(conn,dd)) return;
             dgHostOnData(dd);
           });
-          conn.on('close', function(){ if(window._netMode==='host'){ window._netMode=null; DUNGEON=null; window._dgStarted=false; } });
           renderDungeonHostMap();
         });
       });
@@ -1029,7 +1031,8 @@ function startDungeonGuest(code){
       PEER.peer=p; PEER.conn=conn; PEER.room=code; PEER.isHost=false;
       var ct=setTimeout(function(){ jm.innerHTML='<div class="msg err">⏳ 找不到房间。</div>'; try{conn.close();p.destroy();}catch(e){} },12000);
       conn.on('open', function(){ clearTimeout(ct); clearTimeout(t);
-        conn.on('data', function(dd){ if(!dd) return;
+        DungeonConnection.watch(conn);
+        conn.on('data', function(dd){ if(!dd||!DungeonConnection.accept(conn,dd)) return;
           dgGuestOnData(dd);
           if(dd.t==='dg' && S.mod==='dungeon'){ renderDungeonGuestMap(code); }
           else if(dd.t==='enter'){
@@ -1422,7 +1425,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v13·主题密室';
+var APP_VER='v13.1·主题密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -1559,6 +1562,7 @@ function startHostGame(){
   function render(){catchMobileDraw(ctx,px,items);}
   function loop(){
     if(done||window._dead) return;
+    if(window.CatchConnection&&CatchConnection.paused())return;
     t+=16; windT+=16;
     wind=Math.sin(windT*0.0011)*0.5+Math.sin(windT*0.00047+1.3)*0.4;
     nextSpawn-=16;
@@ -1753,9 +1757,11 @@ function startGuest(code){
   });
 }
 function renderGuestUI(code){
+  if(window._catchGuestCleanup) window._catchGuestCleanup();
   if(S.mod==='boss'||S.mod==='pressure'){ renderRealtimeGuest(S.mod); return; }
   if(S.mod==='beat'){ renderGuestBeat(code); return; }
   if(S.mod==='shield'||S.mod==='beam'||S.mod==='bridge'){ renderGuestTwin(code, S.mod); return; }
+  window._dead=false;
   var app=document.getElementById('app');
   app.innerHTML=
     '<div class="topbar"><span class="badge B">加入者 · 你控 → 右移</span><span class="badge n">🧺 房间 '+code+'</span>'+
@@ -1773,15 +1779,33 @@ function renderGuestUI(code){
   var ctx=cv.getContext('2d');
   var started=false, ended=false, last=null;
   function draw(d){catchMobileDraw(ctx,d.px,d.items||[]);}
+  var catchConn=PEER.conn, catchDisposed=false;
   function setGuestDir(v){
+    if(catchDisposed) return;
     PEER.gdir=v?1:0;
-    try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in', v:PEER.gdir}); }catch(e){}
+    try{ if(catchConn&&catchConn.open) catchConn.send({t:'in', v:PEER.gdir}); }catch(e){}
   }
   window._guestSetDir=setGuestDir;
-  window._guestState=function(){ return last; };
-  PEER.conn.on('data', function(d){
+  function catchState(){ return last; }
+  window._guestState=catchState;
+  function catchCleanup(){
+    if(catchDisposed) return;
+    setGuestDir(false); catchDisposed=true;
+    catchConn.off('data',catchData); catchConn.off('close',catchCleanup);
+    catchObserver.disconnect();
+    if(window._guestSetDir===setGuestDir) window._guestSetDir=null;
+    if(window._guestState===catchState) window._guestState=null;
+    if(window._catchGuestCleanup===catchCleanup) window._catchGuestCleanup=null;
+  }
+  var catchObserver=new MutationObserver(function(){if(!cv.isConnected) catchCleanup();});
+  catchObserver.observe(app,{childList:true,subtree:true});
+  window._catchGuestCleanup=catchCleanup;
+  function catchData(d){
+    if(catchDisposed) return;
+    if(!cv.isConnected){catchCleanup();return;}
     if(!d) return;
     dgGuestOnData(d);
+    if(!cv.isConnected){catchCleanup();return;}
     if(d.t==='st'){
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你控制 → 右移。'; } }
@@ -1799,7 +1823,9 @@ function renderGuestUI(code){
     if(d.t==='ask'){ netConfirmRestart(); }
     if(d.t==='ok'){ window._restartAwait=false; if(window._netMode==='host'){ netStartNewRound(); } }
     if(d.t==='no'){ window._restartAwait=false; netAskCancel(); }
-  });
+  }
+  catchConn.on('data',catchData);
+  catchConn.on('close',catchCleanup);
 }
 function guestReset(){ window._guestSetDir(0); try{ if(PEER.conn&&PEER.conn.open) PEER.conn.send({t:'in',v:0}); }catch(e){} }
 /* ---- 加入者端节拍：渲染同步画面 + 按橙/紫B侧上报 ---- */
@@ -3363,41 +3389,45 @@ function pressureDraw(s,role){
 }
 
 </script>
-<link rel="stylesheet" href="expansion-games.css?v=13">
-<script src="expansion-games.js?v=13"></script>
-<link rel="stylesheet" href="coop-upgrade.css?v=13">
-<script src="coop-upgrade.js?v=13"></script>
-<link rel="stylesheet" href="fullscreen-map.css?v=13">
-<script src="fullscreen-map.js?v=13"></script>
-<link rel="stylesheet" href="beam-mobile.css?v=13">
-<script src="beam-mobile.js?v=13"></script>
-<link rel="stylesheet" href="beat-mobile.css?v=13">
-<script src="beat-mobile.js?v=13"></script>
-<link rel="stylesheet" href="catch-mobile.css?v=13">
-<script src="catch-mobile.js?v=13"></script>
-<script src="code-symbols.js?v=13"></script>
-<link rel="stylesheet" href="maze-mobile.css?v=13">
-<script src="maze-mobile.js?v=13"></script>
-<link rel="stylesheet" href="vault-mobile.css?v=13">
-<script src="vault-mobile.js?v=13"></script>
-<link rel="stylesheet" href="radio-mobile.css?v=13">
-<script src="radio-mobile.js?v=13"></script>
-<link rel="stylesheet" href="wires-mobile.css?v=13">
-<script src="wires-mobile.js?v=13"></script>
-<link rel="stylesheet" href="boss-mobile.css?v=13">
-<script src="boss-mobile.js?v=13"></script>
-<link rel="stylesheet" href="puzzle-pack.css?v=13">
-<script src="puzzle-pack.js?v=13"></script>
-<link rel="stylesheet" href="dungeon-routes.css?v=13">
-<script src="dungeon-routes.js?v=13"></script>
-<link rel="stylesheet" href="password-strip.css?v=13">
-<script src="password-strip.js?v=13"></script>
-<link rel="stylesheet" href="rhythm-light.css?v=13">
-<script src="rhythm-light.js?v=13"></script>
-<link rel="stylesheet" href="room-puzzle-themes.css?v=13">
-<script src="room-puzzle-themes.js?v=13"></script>
-<link rel="stylesheet" href="room-progression.css?v=13">
-<script src="room-progression.js?v=13"></script>
-<script>render();</script>
+<link rel="stylesheet" href="expansion-games.css?v=13.1">
+<script src="expansion-games.js?v=13.1"></script>
+<link rel="stylesheet" href="coop-upgrade.css?v=13.1">
+<script src="coop-upgrade.js?v=13.1"></script>
+<link rel="stylesheet" href="fullscreen-map.css?v=13.1">
+<script src="fullscreen-map.js?v=13.1"></script>
+<link rel="stylesheet" href="beam-mobile.css?v=13.1">
+<script src="beam-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="beat-mobile.css?v=13.1">
+<script src="beat-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="catch-mobile.css?v=13.1">
+<script src="catch-mobile.js?v=13.1"></script>
+<script src="code-symbols.js?v=13.1"></script>
+<link rel="stylesheet" href="maze-mobile.css?v=13.1">
+<script src="maze-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="vault-mobile.css?v=13.1">
+<script src="vault-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="radio-mobile.css?v=13.1">
+<script src="radio-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="wires-mobile.css?v=13.1">
+<script src="wires-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="boss-mobile.css?v=13.1">
+<script src="boss-mobile.js?v=13.1"></script>
+<link rel="stylesheet" href="puzzle-pack.css?v=13.1">
+<script src="puzzle-pack.js?v=13.1"></script>
+<link rel="stylesheet" href="dungeon-routes.css?v=13.1">
+<script src="dungeon-routes.js?v=13.1"></script>
+<link rel="stylesheet" href="password-strip.css?v=13.1">
+<script src="password-strip.js?v=13.1"></script>
+<link rel="stylesheet" href="rhythm-light.css?v=13.1">
+<script src="rhythm-light.js?v=13.1"></script>
+<link rel="stylesheet" href="room-puzzle-themes.css?v=13.1">
+<script src="room-puzzle-themes.js?v=13.1"></script>
+<link rel="stylesheet" href="room-progression.css?v=13.1">
+<script src="room-progression.js?v=13.1"></script>
+<link rel="stylesheet" href="dungeon-connection.css?v=13.1">
+<script src="dungeon-connection.js?v=13.1"></script>
+<link rel="stylesheet" href="room-cover-loader.css?v=13.1">
+<script src="room-cover-loader.js?v=13.1"></script>
+<script>if(S.mod!=='dungeon'&&!PLAYGROUNDS.some(function(p){return p.id===S.mod;})){S.mod=null;S.role=null;}render();</script>
 </body>
 </html>

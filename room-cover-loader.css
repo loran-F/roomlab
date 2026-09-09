@@ -1,0 +1,7 @@
+.room-carousel #room-cover[hidden],.room-carousel .room-cover-placeholder[hidden]{display:none!important}
+.room-carousel .room-cover.room-cover-placeholder{display:grid;place-items:center;box-sizing:border-box;border:1px dashed #d7c7dd99;background:#f6eddb12;border-radius:12px;color:#f6eddb;text-align:center;font:14px/1.5 system-ui;padding:16px}
+.room-cover-status{max-width:min(90%,480px);min-height:20px;margin:8px auto 0;text-align:center;color:#f6eddb;font:13px/1.5 system-ui;overflow-wrap:anywhere}
+.room-cover-status:empty{min-height:0;margin:0}
+.room-cover-status button{display:inline-block;min-height:44px;margin:8px;padding:8px 14px;border:1px solid #191923;border-radius:10px;background:#f6eddb;color:#191923;box-shadow:none;font:600 14px system-ui;cursor:pointer}
+.room-cover-status button:focus-visible{outline:3px solid #eac57b;outline-offset:3px}
+.room-select[data-cover-loading="true"] .room-action{cursor:progress;opacity:.6}

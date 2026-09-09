@@ -1,0 +1,6 @@
+#dc-notice{position:fixed;z-index:900;top:max(12px,env(safe-area-inset-top));left:12px;right:12px;max-width:440px;margin:0 auto;padding:14px 16px;border:2px solid #795525;border-radius:12px;background:#fff0ce;color:#503919;font:600 15px/1.5 system-ui;box-sizing:border-box;pointer-events:none}
+#dc-dialog{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:20px;background:#1d233ce0;box-sizing:border-box;font-family:system-ui}
+#dc-dialog .dc-card{width:100%;max-width:380px;padding:24px;box-sizing:border-box;border:2px solid #54465b;border-radius:20px;background:#fff7e6;color:#342b3e}
+#dc-dialog h2{margin:0 0 12px;font-size:22px;line-height:1.35}#dc-dialog p{margin:0 0 24px;font-size:15px;line-height:1.65}
+#dc-dialog button{display:block;width:100%;min-height:48px;margin-top:12px;padding:12px;border:2px solid #66526e;border-radius:12px;background:#e5ddec;color:#342b3e;font:700 16px/1.4 system-ui;cursor:pointer}#dc-dialog #dc-reconnect{background:#ffca73}#dc-dialog button:focus-visible{outline:3px solid #485cb2;outline-offset:3px}
+.dungeon-screen[data-link-state="recovering"] .dg-node,.dungeon-screen[data-link-state="failed"] .dg-node{opacity:.5;cursor:wait;pointer-events:none}

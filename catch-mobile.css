@@ -17,3 +17,5 @@ body:has(.ct-plant){background:#354c43;color:#fff1d4}
 .ct-plant .ct-top strong{color:#ffe3a6}
 .ct-plant .ct-controls p{color:#e0e6cc}
 @media(max-height:650px){.ct-plant .ct-arena canvas{max-height:calc(100dvh - 280px)}}
+#ct-connection{position:fixed;z-index:1300;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,calc(100vw - 32px));box-sizing:border-box;background:#fff0ca;color:#30253a;border:2px solid #30253a;border-radius:12px;padding:20px;font-size:15px;line-height:1.6}
+#ct-connection strong{font-size:20px}#ct-connection p{margin:10px 0 18px}#ct-connection button{display:block;width:100%;min-height:48px;margin-top:10px;background:#ffbc72;color:#30253a;border:2px solid #30253a;border-radius:12px;font-weight:bold;touch-action:manipulation;box-shadow:none}
