@@ -1,11 +1,43 @@
 /* RoomLab expansion: isolated game engines and UI. No dependencies beyond the host bridge. */
 (function (g) {
   'use strict';
+  // Pure seeded plans. Host owns creation; state snapshots carry the resulting plan.
+  function variationPlan(mode,tier,seed){
+    let value=(seed>>>0)||1;const random=()=>{value^=value<<13;value^=value>>>17;value^=value<<5;return(value>>>0)/4294967296;};
+    const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+    const choose=a=>a[Math.floor(random()*a.length)];let plan={tier,seed:seed>>>0};
+    if(mode==='beam'){
+      const types=tier===1?[0,1,2,3,1,2]:shuffle([0,1,2,3,1,2]);
+      const sides=tier===1?[0,1,0,1,0,1]:shuffle([0,0,0,1,1,1]);
+      plan.cargo=types.map((type,i)=>({type,x:tier===1?(sides[i]?265:75):sides[i]?choose(tier>=4?[205,215,230]:tier>=3?[215,230,245]:[255,275]):choose(tier>=4?[110,125,135]:tier>=3?[95,110,125]:[65,85])}));
+    }else if(mode==='shadow'){
+      plan.layout={button:tier===1?2:choose([1,2]),mirror:tier>=3?choose([false,true]):false,recordLength:tier>=4?choose([6,7,8]):8};
+    }else if(mode==='lookback'){
+      let last=null;plan.encounters=[];for(let i=0;i<24;i++){let options=[];for(const door of ['left','right'])for(const monster of ['ears','eyes','nose'])if(door+monster!==last)options.push({door,monster});const c=choose(options);last=c.door+c.monster;plan.encounters.push({...c,travel:tier===1?2:choose([1.6,2,2.4]),warning:tier<3?3.2:choose([2.8,3.2,3.6]),danger:tier<4?1.8:choose([1.5,1.8,2.1])});}
+    }else if(mode==='caller'){
+      let prior='';plan.cases=[];for(let i=0;i<5;i++){const checks=shuffle(choose([['code','task'],['code','route'],['task','route']]));const faults=['real','real',...checks];let fault=choose(faults),person=Math.floor(random()*6);if(person+fault===prior)person=(person+1+Math.floor(random()*5))%6;prior=person+fault;plan.cases.push({person,checks,fault,closed:Math.floor(random()*3),codes:shuffle(Array.from({length:900},(_,j)=>j+100)).slice(0,6),tasks:shuffle([0,1,2,3,4,5]),route:Math.floor(random()*2),falseTask:1+Math.floor(random()*5)});}
+    }else if(mode==='catch'){
+      plan.waves=Array.from({length:24},()=>({side:choose([-1,1]),gap:choose([.95,1,1.1])}));
+      for(let i=2;i<plan.waves.length;i++)if(plan.waves[i].side===plan.waves[i-1].side&&plan.waves[i].side===plan.waves[i-2].side)plan.waves[i].side*=-1;
+    }else if(mode==='beat'){
+      plan.phrases=Array.from({length:30},()=>({types:shuffle(['A','B','AB']),beats:tier===1?[2,2,2]:choose([[1,2,3],[2,1,3],[3,1,2]])}));
+    }
+    return plan;
+  }
+  const variationMemory={};
+  function variationStart(mode){
+    const key='roomlab-variation-v1:'+mode;let saved=variationMemory[key]||{};try{saved=JSON.parse(localStorage.getItem(key)||'null')||saved;}catch(_){}
+    const tier=typeof coopDifficulty==='function'?Math.max(1,Math.min(4,coopDifficulty().tier||1)):1;
+    let plan,fingerprint,seed=Math.floor(Math.random()*4294967295)+1;if(seed===saved.seed)seed++;
+    for(let tries=0;tries<64;tries++){plan=variationPlan(mode,tier,seed+tries*(mode==='shadow'?2654435761:1));const first=mode==='beam'?plan.cargo.slice(0,2).map(x=>[x.type,x.x<170]):mode==='caller'?{checks:plan.cases[0].checks,fault:plan.cases[0].fault}:mode==='lookback'?plan.encounters[0]:mode==='catch'?plan.waves[0]:mode==='shadow'?plan.layout:plan.phrases&&plan.phrases[0];fingerprint=JSON.stringify(first);if(tier===1||fingerprint!==saved.fingerprint)break;}
+    saved={fingerprint,seed:plan.seed};variationMemory[key]=saved;try{localStorage.setItem(key,JSON.stringify(saved));}catch(_){}return plan;
+  }
+  g.RoomVariation={generate:variationPlan,start:variationStart};
   const IDS=['lookback','caller','shadow'];
   const META={
     lookback:{name:'你别回头',tag:'追逃',time:85,a:'你看前路：报门上的箭头，听 B 指挥前进、停步或躲藏。',b:'你看监控：辨认怪物，指挥 A 应对；听 A 报箭头开启对应门。'},
     caller:{name:'真假接线员',tag:'判断',time:110,a:'先听 B 指定今日核验项，再从工号、任务、来路中选择两个问题。交换证据后投票。',b:'先报今日核验项，再听名字点档案。注意封闭通道与来路证词的矛盾，独立投票。'},
-    shadow:{name:'影子替身',tag:'机关',time:100,a:'你录下走动：走到黄色按钮上，多站一会儿。回放时你的影子会帮 B 开门。',b:'你拿钥匙：等 A 录完，启动影子回放。影子踩住按钮时，穿过门去拿钥匙。'}
+    shadow:{name:'影子替身',tag:'机关',time:100,a:'你录下走动：踩按钮留足时间，再走到门禁前的集合出口等待 B。',b:'你取钥匙再集合：播放 A 的轨迹，穿过门禁拿钥匙，再回集合出口。'}
   };
   const pick=a=>a[Math.floor(Math.random()*a.length)];
   const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -34,24 +66,26 @@
     {name:'沈知夏',job:'设施维护',code:'836',task:'检修茶水间照明'},
     {name:'陆言',job:'前台值守',code:'157',task:'核对访客离楼记录'}
   ];
-  function encounter(s){s.phase='travel';s.phaseTime=0;s.travel=0;s.action='stop';s.door=pick(['left','right']);s.openDoor='';s.monster=pick(['ears','eyes','nose']);s.bad=0;s.rescue=false;s.round++;}
+  function encounter(s){const item=s.variation.encounters[s.round%s.variation.encounters.length];s.phase='travel';s.phaseTime=0;s.travel=0;s.action='stop';s.door=item.door;s.openDoor='';s.monster=item.monster;s.travelLimit=item.travel;s.warningLimit=item.warning;s.dangerLimit=item.danger;s.bad=0;s.rescue=false;s.round++;}
   function callCase(s){
-    const roster=(themed(s)?EMPLOYEES:PEOPLE).map(x=>({...x,code:String(Math.floor(100+Math.random()*900))}));
-    const person=pick(roster);s.checks=pick([['code','task'],['code','route'],['task','route']]);
+    const item=s.variation.cases[s.completed],people=themed(s)?EMPLOYEES:PEOPLE;
+    const roster=people.map((x,i)=>({...x,task:people[item.tasks[i]].task,code:String(item.codes[i])}));
+    const person=roster[item.person];s.checks=item.checks.slice();
     const routes=themed(s)?['员工闸机','档案层楼梯','后勤电梯']:['东门','西楼梯','货梯'];
-    s.closed=pick(routes);const kind=pick(['real','real',...s.checks]);
-    s.roster=roster;s.claim={...person,route:pick(routes.filter(x=>x!==s.closed))+'，我直接过来的，没有绕路。'};
+    s.closed=routes[item.closed];const kind=item.fault;
+    s.roster=roster;s.claim={...person,route:routes.filter(x=>x!==s.closed)[item.route]+'，我直接过来的，没有绕路。'};
     if(kind==='code')s.claim.code=String((+person.code+137)%900+100);
-    if(kind==='task')s.claim.task=pick(roster.filter(x=>x.name!==person.name)).task;
+    if(kind==='task')s.claim.task=roster[(item.person+item.falseTask)%6].task;
     if(kind==='route')s.claim.route=s.closed+'，我刚刚直接过来的，畅通无阻。';
     s.real=kind==='real';s.fault=kind;s.questions=[];s.extra=false;s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
   }
   function shadowRound(s){
-    s.positions={A:0,B:0};s.tape=[];s.ghost=0;s.doorOpen=false;s.recordTime=0;s.playTime=0;s.recordLength=8;s.moves={A:-1,B:-1};s.phase='plan';s.phaseTime=0;s.attempts=s.attempts||0;s.round++;
+    s.positions={A:0,B:0};s.tape=[];s.ghost=0;s.doorOpen=false;s.keyCollected=false;s.exit=3;s.recordTime=0;s.playTime=0;s.recordLength=s.layout.recordLength;s.moves={A:-1,B:-1};s.phase='plan';s.phaseTime=0;s.attempts=s.attempts||0;s.round++;
   }
+  function shadowExit(s){if(!s.done&&['replay','escape'].includes(s.phase)&&s.keyCollected&&s.ghost===s.exit&&s.positions.B===s.exit){s.completed=1;finish(s,true,'钥匙和两人都已到出口，成功撤离！');}}
   function create(mode){
     const s={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),mode,time:META[mode].time,elapsed:0,ready:{A:false,B:false},cd:3,done:false,win:false,hp:3,completed:0,round:0,phase:'brief',message:'先试一次按钮，再点准备。双方准备后开始。',messageSeq:0,seq:{A:-1,B:-1},seen:{A:0,B:0}};
-    s.roomId=roomThemeId();
+    s.roomId=roomThemeId();s.variation=variationStart(mode);s.tier=s.variation.tier;if(mode==='shadow')s.layout={...s.variation.layout};
     if(mode==='lookback'){s.lures=1;encounter(s);}if(mode==='caller')callCase(s);if(mode==='shadow')shadowRound(s);
     return s;
   }
@@ -81,17 +115,18 @@
         }
       }
     }else if(s.mode==='shadow'){
-      if(who==='A'&&d.key==='record'&&['plan','waiting','retry'].includes(s.phase)){shadowRound(s);s.phase='record';s.attempts++;message(s,'正在录影：A 走到黄色按钮上，停留越久，影子开门越久。');}
-      if(who==='B'&&d.key==='replay'&&['waiting','retry'].includes(s.phase)&&s.tape.length){s.phase='replay';s.phaseTime=0;s.playTime=0;s.positions.B=0;s.ghost=s.tape[0].x;s.doorOpen=s.ghost===2;s.round++;message(s,'影子出发了！B 朝钥匙走，等门打开再穿过去。');}
+      if(who==='A'&&d.key==='record'&&['plan','waiting','retry','escape'].includes(s.phase)){shadowRound(s);s.phase='record';s.attempts++;message(s,'A 踩按钮留足通行时间，再走到门禁前的集合出口等待。');}
+      if(who==='B'&&d.key==='replay'&&['waiting','retry','escape'].includes(s.phase)&&s.tape.length){s.phase='replay';s.phaseTime=0;s.playTime=0;s.positions.B=0;s.ghost=s.tape[0].x;s.keyCollected=false;s.doorOpen=s.ghost===s.layout.button;s.round++;message(s,'B 趁门禁打开去拿钥匙，再回集合出口与 A 会合。');}
       if(['left','right'].includes(d.key)&&s.elapsed-s.moves[who]>=.12){
-        const allowed=who==='A'?s.phase==='record':s.phase==='replay';
+        const allowed=who==='A'?s.phase==='record':['replay','escape'].includes(s.phase);
         if(allowed){
-          let next=clamp(s.positions[who]+(d.key==='right'?1:-1),0,6);s.moves[who]=s.elapsed;
+          let next=clamp(s.positions[who]+(d.key==='right'?1:-1)*(s.layout.mirror?-1:1),0,6);s.moves[who]=s.elapsed;
           if(who==='A'&&next>=4)next=3;
           if(who==='B'&&((s.positions.B===3&&next===4)||(s.positions.B===4&&next===3))&&!s.doorOpen){message(s,'门还关着，等影子踩到黄色按钮。');return true;}
           s.positions[who]=next;
-          if(who==='A'){s.doorOpen=next===2;s.tape.push({t:s.recordTime,x:next});message(s,next===2?'按钮压下去了，门开了！站住几秒，给 B 留时间。':'A 离开按钮，门就会关上。');}
-          if(who==='B'&&next===6){s.completed=1;finish(s,true,'拿到钥匙！过去的 A 帮现在的 B 打开了门。');}
+          if(who==='A'){s.doorOpen=next===s.layout.button;s.tape.push({t:s.recordTime,x:next});message(s,next===s.layout.button?'按钮已压下。留几秒给 B 过门，再向'+(s.layout.mirror?'左':'右')+'走到集合出口。':next===s.exit?'A 已到集合出口，保持这里直到录影结束。':'A 离开按钮，门禁就会关上。');}
+          if(who==='B'&&next===6&&!s.keyCollected){s.keyCollected=true;s.doorOpen=true;message(s,'钥匙已开门，回出口集合！A、B 都到集合出口才算成功。');}
+          shadowExit(s);
         }
       }
     }
@@ -99,19 +134,19 @@
   }
   function step(s,dt){
     if(s.done||!s.ready.A||!s.ready.B)return;
-    if(s.cd>0){s.cd=Math.max(0,s.cd-dt);if(s.cd===0)message(s,s.mode==='lookback'?'行动开始：先报门向，再一起穿过走廊。':s.mode==='caller'?'第一通来电接通，询问并交换证据。':'先让 A 开始录影，走到黄色按钮上站一会儿。');return;}
+    if(s.cd>0){s.cd=Math.max(0,s.cd-dt);if(s.cd===0)message(s,s.mode==='lookback'?'行动开始：先报门向，再一起穿过走廊。':s.mode==='caller'?'第一通来电接通，询问并交换证据。':'A 先录影：踩按钮留几秒，再走到集合出口。');return;}
     s.time=Math.max(0,s.time-dt);s.elapsed+=dt;s.phaseTime+=dt;
     if(s.mode==='lookback'){
       if(s.elapsed-s.seen.A>.9)s.action='stop';
       if(s.phase==='travel'){
         if(s.action==='go'&&s.openDoor===s.door)s.travel+=dt;
-        if(s.travel>=2){s.phase='warning';s.phaseTime=0;message(s,'监控发现动静！B 快告诉 A 怎么应对。');}
-      }else if(s.phase==='warning'&&s.phaseTime>=3.2){s.phase='danger';s.phaseTime=0;s.bad=0;}
+        if(s.travel>=s.travelLimit){s.phase='warning';s.phaseTime=0;message(s,'监控发现动静！B 快告诉 A 怎么应对。');}
+      }else if(s.phase==='warning'&&s.phaseTime>=s.warningLimit){s.phase='danger';s.phaseTime=0;s.bad=0;}
       else if(s.phase==='danger'){
         const required={ears:'stop',eyes:'go',nose:'hide'}[s.monster];
         if(s.action!==required&&!s.rescue)s.bad+=dt;
         if(s.bad>.65){damage(s,'被怪物发现了');s.phase='safe';s.phaseTime=0;}
-        else if(s.phaseTime>=1.8){s.completed++;message(s,'安全通过第 '+s.completed+' 段走廊。');s.phase='safe';s.phaseTime=0;}
+        else if(s.phaseTime>=s.dangerLimit){s.completed++;message(s,'安全通过第 '+s.completed+' 段走廊。');s.phase='safe';s.phaseTime=0;}
       }else if(s.phase==='safe'&&s.phaseTime>=1.3){if(s.completed>=5)finish(s,true,'出口就在眼前，两人平安撤离！');else encounter(s);}
     }else if(s.mode==='caller'){
       if(s.phase==='verdict'&&s.phaseTime>=2.6&&!s.done)callCase(s);
@@ -119,20 +154,21 @@
       if(s.phase==='record'){
         if(!s.tape.length)s.tape.push({t:0,x:0});
         s.recordTime=Math.min(s.recordLength,s.recordTime+dt);
-        if(s.recordTime>=s.recordLength){s.phase='waiting';s.doorOpen=false;message(s,'8 秒录影完成。B 点「播放影子」开始拿钥匙；A 也可以重新录。');}
+        if(s.recordTime>=s.recordLength){s.phase='waiting';s.doorOpen=false;message(s,'录影完成。B 播放后拿钥匙再返回集合出口；A 也可以重录。');}
       }else if(s.phase==='replay'){
         s.playTime=Math.min(s.recordLength,s.playTime+dt);
-        s.ghost=s.tape.filter(p=>p.t<=s.playTime).slice(-1)[0].x;s.doorOpen=s.ghost===2;
-        if(s.playTime>=s.recordLength){s.phase='retry';s.doorOpen=false;message(s,s.tape.some(p=>p.x===2)?'回放结束，还没拿到钥匙。A 可以多踩一会儿重新录，或 B 再放一次。':'影子没踩到按钮。请 A 重新录：向右走两步，站在黄色按钮上。');}
+        s.ghost=s.tape.filter(p=>p.t<=s.playTime).slice(-1)[0].x;s.doorOpen=s.keyCollected||s.ghost===s.layout.button;
+        if(s.playTime>=s.recordLength){s.phase='escape';message(s,s.ghost===s.exit?'A 的回声已在出口等候，B 拿钥匙后回来集合。':'A 的回声没有停在出口。请重录：踩按钮后走到集合出口等待。');}
+        shadowExit(s);
       }
     }
     if(s.time<=0&&!s.done)finish(s,false,'时间用尽，先和搭档复盘，再挑战一次。');
   }
   function snapshot(s,role){
     const v={id:s.id,mode:s.mode,time:s.time,elapsed:s.elapsed,ready:{...s.ready},cd:s.cd,done:s.done,win:s.win,hp:s.hp,completed:s.completed,round:s.round,phase:s.phase,phaseTime:s.phaseTime,message:s.message,messageSeq:s.messageSeq};
-    v.roomId=s.roomId;
+    v.roomId=s.roomId;v.tier=s.tier;
     if(s.mode==='lookback'){
-      Object.assign(v,{travel:s.travel,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
+      Object.assign(v,{travel:s.travel,travelLimit:s.travelLimit,warningLimit:s.warningLimit,dangerLimit:s.dangerLimit,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
       if(role==='A')v.door=s.door;else v.monster=s.monster;
     }else if(s.mode==='caller'){
       Object.assign(v,{questions:[...s.questions],extra:s.extra,votes:{...s.votes}});
@@ -140,13 +176,15 @@
       else {v.roster=s.roster.map(x=>({...x}));v.checks=[...s.checks];v.closed=s.closed;}
       if(s.phase==='verdict'||s.done)v.explanation=s.explanation;
     }else{
-      Object.assign(v,{positions:{...s.positions},ghost:s.ghost,doorOpen:s.doorOpen,recordTime:s.recordTime,playTime:s.playTime,recordLength:s.recordLength,attempts:s.attempts,tape:s.tape.map(p=>({...p}))});
+      Object.assign(v,{layout:{...s.layout},positions:{...s.positions},ghost:s.ghost,doorOpen:s.doorOpen,keyCollected:s.keyCollected,exit:s.exit,recordTime:s.recordTime,playTime:s.playTime,recordLength:s.recordLength,attempts:s.attempts,tape:s.tape.map(p=>({...p}))});
     }
     return v;
   }
   const API={ids:IDS,meta:META,core:{create,input,step,snapshot}};
   g.RoomLabExpansion=API;
   if(typeof PLAYGROUNDS==='undefined')return;
+const shadowTrack=[26,69,112,167,231,271,309];
+function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate=s.mirror?125:211,exit=x(3),bp=x(s.button),kx=x(6);const person=(n,runner=false)=>{const px=x(n),py=runner?202:146,echo=!runner&&s.echo,label=runner?'B':echo?'回声 A':'A',stroke=echo?'#f4e8ff':'#281f32',fill=runner?'#ffa650':echo?'#aa8dbb':'#54adc5';return `<g class="person" data-character="${runner?'B':'A'}" transform="translate(${px} ${py})"><circle cy="0" r="8" fill="${echo?'#baa3ce':'#ffcd9e'}" stroke="${stroke}" stroke-width="2" ${echo?'stroke-dasharray="3 2"':''}/><rect x="-11" y="9" width="22" height="30" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="2" ${echo?'stroke-dasharray="4 2"':''}/><text x="0" y="29" fill="${echo?'#291e35':'#fff'}" text-anchor="middle" font-size="13" font-weight="bold">${runner?'B':echo?'▶':'A'}</text><text x="0" y="-16" text-anchor="middle" font-size="12" fill="#fff3dc" font-weight="bold">${echo?label:""}</text></g>`};return `<svg viewBox="0 0 336 280" aria-label="${s.mirror?'向左':'向右'}出发；集合出口在门禁入口侧"><rect x="1.5" y="1.5" width="333" height="277" rx="11" fill="#b39cb9" stroke="#281f32" stroke-width="3"/><path d="M3 3h330v190H3z" fill="#776087"/><path d="M3 193h330" stroke="#281f32" stroke-width="3"/><g stroke="#886d98" stroke-width="1"><path d="M3 48h330M3 96h330M3 144h330M48 3v190M96 3v190M144 3v190M192 3v190M240 3v190M288 3v190"/></g><rect x="${exit-21}" y="107" width="42" height="155" rx="8" fill="#b2d2bc" fill-opacity=".35" stroke="#d4edd6" stroke-width="2" stroke-dasharray="5 4"/><path d="M${exit} 52v51" stroke="#d4edd6" stroke-width="2" stroke-dasharray="3 4"/><rect x="${exit-38}" y="25" width="76" height="25" rx="5" fill="#d7e8c8" stroke="#281f32" stroke-width="2"/><text x="${exit}" y="42" text-anchor="middle" font-size="14" fill="#294b3a" font-weight="bold">集合出口</text><path d="M${exit-8} 260h16m-8 0v-10m-4 4 4-4 4 4" stroke="#e8f6dc" stroke-width="2" fill="none"/><path d="M${bp} 210H${gate}" stroke="${s.a===s.button&&s.phase!=='plan'?'#ffda65':'#736178'}" stroke-width="5"/><rect x="${gate-14}" y="105" width="28" height="149" rx="4" fill="#3e304a" stroke="#281f32" stroke-width="3"/><rect x="${gate-10}" y="109" width="20" height="${s.open?9:141}" fill="#54adc5"/><path d="M${gate-10} 113h20" stroke="#317e97" stroke-width="3"/><rect x="${gate-24}" y="72" width="48" height="24" rx="4" fill="${s.open?'#b7ddb9':'#fff0c5'}" stroke="#281f32" stroke-width="2"/><text x="${gate}" y="89" text-anchor="middle" font-size="14" fill="#281f32">门禁</text><rect x="${bp-14}" y="${s.a===s.button&&s.phase!=='plan'?199:193}" width="28" height="${s.a===s.button&&s.phase!=='plan'?7:13}" rx="4" fill="${s.a===s.button&&s.phase!=='plan'?'#9dcca5':'#ffda65'}" stroke="#281f32" stroke-width="2"/><text x="${bp}" y="271" text-anchor="middle" font-size="13" fill="#35273e">按钮</text><g opacity="${s.key?.3:1}" transform="translate(${kx} 159)"><circle cx="0" cy="0" r="8" fill="#ffda65" stroke="#281f32" stroke-width="2"/><circle cx="0" cy="0" r="3" fill="#776087"/><path d="M0 8v17h7m-7-6h5" stroke="#281f32" stroke-width="7" fill="none"/><path d="M0 8v17h7m-7-6h5" stroke="#ffda65" stroke-width="4" fill="none"/></g><text x="${Math.max(42,Math.min(294,kx))}" y="271" text-anchor="middle" font-size="13" fill="#35273e">${s.key?'已取钥匙':'钥匙'}</text>${person(s.a)}${person(s.b,true)}</svg>`}
   let callerFocus=0,callerRound='';
   let active=null,view=null,dispose=null,serial=0,practice=false,localAction='stop',guestConn=null,lobbyTicket=0;
   const el=id=>document.getElementById(id);
@@ -157,9 +195,10 @@
     clearNetZones();window.onkeydown=null;window.onkeyup=null;window._keys={};
     const m=META[mode];practice=false;localAction='stop';
     el('app').innerHTML='<main class="x-shell"><header class="x-top"><button class="x-back" id="back" aria-label="返回">‹</button><span>双人合作 · '+esc(PEER.room)+'</span><b id="x-time">准备中</b></header><div class="x-heading">'+icon(mode)+'<h1>'+m.name+'</h1></div><div class="x-role '+(role==='B'?'is-b':'')+'"><b>'+role+'</b><span id="x-duty">'+esc(m[role.toLowerCase()])+'</span></div><section class="x-paper"><div class="x-stats"><span id="x-health">配合机会 ●●●</span><b id="x-progress"></b></div><div id="x-stage" class="x-stage"></div><div class="x-meter"><i id="x-meter"></i></div><p id="x-hint" class="x-hint"></p><div id="x-actions" class="x-actions"></div><div id="x-message" class="x-message" role="status" aria-live="polite"></div></section><section id="x-brief" class="x-brief"><b>先试一下，再出发</b><p>'+esc(m[role.toLowerCase()])+'</p><div id="x-practice"></div><button id="x-ready" class="x-btn primary" disabled>先完成上面的小练习</button></section><div id="x-result" class="x-result" hidden></div></main>';
+    if(mode==='shadow')el('app').innerHTML='<main class="x-shell x-shadow-shell"><header class="x-top"><button class="x-back" id="back" aria-label="返回">‹</button><div class="x-heading"><h1>影子替身</h1></div><span id="shadow-tier"></span><b id="x-time">准备中</b></header><div class="x-role '+(role==='B'?'is-b':'')+'"><b>'+role+'</b><span id="x-duty"></span></div><section class="x-paper"><div id="x-health" hidden></div><div id="x-progress" hidden></div><div id="x-stage" class="x-stage"></div><div class="x-meter" hidden><i id="x-meter"></i></div></section><p id="x-hint" class="x-hint"></p><div id="x-actions" class="x-actions"></div><div id="x-message" class="x-message" role="status" aria-live="polite"></div><section id="x-brief" class="x-brief"><b>先试一下，再出发</b><p>'+esc(m[role.toLowerCase()])+'</p><div id="x-practice"></div><button id="x-ready" class="x-btn primary" disabled>先完成上面的小练习</button></section><div id="x-result" class="x-result" hidden></div></main>';
     el('back').onclick=()=>{if(window._dungeon)dungeonAbort();else{netSend({t:'bye'});clearTimers();closePeer();location.search='';}};
-    const demo=mode==='lookback'?(role==='A'?'听到「躲起来」时，点这里躲藏':'练习：长耳朵怪物靠听觉追踪，该喊什么？'):mode==='caller'?(role==='A'?'练习：询问来电者的工号':'练习：工号不符，该怎么投票？'):(role==='A'?'练习：踩住黄色按钮，门就会打开。':'练习：等门打开后，穿过去拿钥匙。');
-    el('x-practice').innerHTML='<p>'+demo+'</p>'+button('practice',mode==='lookback'?(role==='A'?'躲藏':'停步'):mode==='caller'?(role==='A'?'请报工号':'拒绝'):(role==='A'?'踩按钮 → 门打开':'门打开 → 去拿钥匙'));
+    const demo=mode==='lookback'?(role==='A'?'听到「躲起来」时，点这里躲藏':'练习：长耳朵怪物靠听觉追踪，该喊什么？'):mode==='caller'?(role==='A'?'练习：询问来电者的工号':'练习：工号不符，该怎么投票？'):(role==='A'?'练习：踩按钮留足过门时间，再走到集合出口。':'练习：拿到钥匙后返回出口，等 A 的回声一起撤离。');
+    el('x-practice').innerHTML='<p>'+demo+'</p>'+button('practice',mode==='lookback'?(role==='A'?'躲藏':'停步'):mode==='caller'?(role==='A'?'请报工号':'拒绝'):(role==='A'?'踩按钮 → 出口等待':'取钥匙 → 回出口集合'));
     el('x-practice').onclick=e=>{if(!e.target.closest('[data-x]'))return;practice=true;el('x-practice').innerHTML='<p class="x-practiced">✓ 练习完成。正式行动要听搭档的情报。</p>';el('x-ready').disabled=false;el('x-ready').textContent='我准备好了';};
     el('x-ready').onclick=()=>{if(practice)send('ready',role);};
     el('x-actions').onclick=e=>{const b=e.target.closest('[data-x]');if(!b||b.disabled)return;const k=b.dataset.x;if(['go','stop','hide'].includes(k))localAction=k;send(k,role);};
@@ -181,7 +220,7 @@
   function draw(s,role){
     if(!el('x-stage'))return;
     view=s;API.view=s;const wait=!s.ready.A||!s.ready.B||s.cd>0;
-    const isTheme=themed(s),root=document.querySelector('.x-shell');root.dataset.roomTheme=isTheme?s.roomId:'';
+    const isTheme=themed(s)&&s.mode!=='shadow',root=document.querySelector('.x-shell');root.dataset.roomTheme=isTheme?s.roomId:'';
     root.querySelector('.x-heading h1').textContent=isTheme?themeName(s):META[s.mode].name;
     el('x-time').textContent=!s.ready.A||!s.ready.B?'准备中':s.cd>0?Math.ceil(s.cd):Math.ceil(s.time)+'s';
     el('x-health').textContent='配合机会 '+'●'.repeat(Math.max(0,s.hp))+'○'.repeat(Math.max(0,3-s.hp));
@@ -201,40 +240,35 @@
         const m=monsters[s.monster];
         html='<div class="x-monitor '+(danger?'danger':'')+'"><div class="x-monitor-label">后方监控 · '+(warn?'发现目标':danger?'接近中':'巡查中')+'</div><div class="x-monster '+s.monster+'"><i></i><i></i><b></b></div><h2>'+(warn||danger?m[0]:'走廊暂时安全')+'</h2><p>'+(warn||danger?m[2]+' · 喊「'+m[1]+'」':'听 A 报方向，打开对应的门')+'</p></div>';
         actions(button('left','← 开左门')+button('right','开右门 →')+button('lure',s.lures?'应急诱饵 · 本局 1 次':'诱饵已用完','wide'));
-        hint=warn?'还有 '+Math.max(0,3.2-s.phaseTime).toFixed(1)+' 秒，告诉 A 应对方式。':danger?'来不及应对时可以救场：整局只有一次应急诱饵。':'开门只看 A 报的方向，两扇门可以随时切换。';
+        hint=warn?'还有 '+Math.max(0,s.warningLimit-s.phaseTime).toFixed(1)+' 秒，告诉 A 应对方式。':danger?'来不及应对时可以救场：整局只有一次应急诱饵。':'开门只看 A 报的方向，两扇门可以随时切换。';
       }
-      meter=s.phase==='travel'?s.travel/2:warn?s.phaseTime/3.2:danger?s.phaseTime/1.8:1;
+      meter=s.phase==='travel'?s.travel/s.travelLimit:warn?s.phaseTime/s.warningLimit:danger?s.phaseTime/s.dangerLimit:1;
     }else if(s.mode==='caller'){
       if(role==='A'){
         const c=s.claim;
-        html='<div class="x-call-head">'+icon('caller')+'<span>线路 0'+(s.completed+(s.phase==='call'?1:0))+' · 来电接通</span></div><div class="x-speech"><b>“我是'+esc(c.name)+'，'+esc(c.job)+'。请开门。”</b><p>工号：'+esc(c.code||'还没问到')+'</p><p>任务：'+esc(c.task||'还没问到')+'</p><p>来路：'+esc(c.route||'还没问到')+'</p></div><p class="x-small">把这些话报给 B；你手里没有值班表。</p>';
+        html='<div class="x-call-head">'+icon('caller')+'<span>线路 0'+(s.completed+(s.phase==='call'?1:0))+' · 来电接通</span></div><div class="x-speech"><b>“我是'+esc(c.name)+'，'+esc(c.job)+'。请开门。”</b><p>工号：'+esc(c.code||'还没问到')+'</p><p>任务：'+esc(c.task||'还没问到')+'</p><p>来路：'+esc(c.route||'还没问到')+'</p></div><p class="x-small">把这些话报给 B；今日任务按档案核对，不凭岗位猜。</p>';
         actions(button('code','询问工号')+button('task','询问任务')+button('route','追问来路')+button('extra','追加追问 −8秒')+button('admit','放行','primary')+button('reject','拒绝'));
       }else{
         const roundKey=s.id+':'+s.round;if(callerRound!==roundKey){callerRound=roundKey;callerFocus=0;}const p=s.roster[callerFocus]||s.roster[0];
-        html='<div class="x-speech"><b>今日核验：'+s.checks.map(k=>({code:'工号',task:'任务',route:'来路'})[k]).join('＋')+'</b><p>先告诉 A 该问哪两项。'+(s.checks.includes('route')?s.closed+'整晚封闭，声称刚从这里直接经过的人在撒谎。':'')+'</p></div><div class="x-file-title">听名字，点开对应档案</div><div class="caller-people">'+s.roster.map((p,i)=>'<button data-person="'+i+'" class="'+(i===callerFocus?'selected':'')+'">'+esc(p.name)+'</button>').join('')+'</div><div class="x-roster"><article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b><strong>'+p.code+'</strong><p>'+esc(p.task)+'</p></article></div>';
+        html='<div class="x-speech"><b>今日核验：'+s.checks.map(k=>({code:'工号',task:'任务',route:'来路'})[k]).join('＋')+'</b><p>先告诉 A 该问哪两项。任务以今日档案为准。'+(s.checks.includes('route')?s.closed+'整晚封闭，声称刚从这里直接经过的人在撒谎。':'')+'</p></div><div class="x-file-title">听名字，点开对应档案</div><div class="caller-people">'+s.roster.map((p,i)=>'<button data-person="'+i+'" class="'+(i===callerFocus?'selected':'')+'">'+esc(p.name)+'</button>').join('')+'</div><div class="x-roster"><article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b><strong>'+p.code+'</strong><p>'+esc(p.task)+'</p></article></div>';
         actions(button('admit','核对无误 · 放行','primary')+button('reject','发现矛盾 · 拒绝'));
       }
       hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':(s.extra?'已追加追问 · 共问 '+s.questions.length+' / 3':'免费提问 '+s.questions.length+' / 2')+'；先听 B 指定核验内容，再询问。';
       meter=Math.min(1,s.questions.length/2);
     }else{
-      const recording=s.phase==='record',replay=s.phase==='replay';
-      el('x-health').textContent='一个按钮 · 一扇门';el('x-progress').textContent=s.done&&s.win?'钥匙到手':'目标：拿到钥匙';
-      el('x-duty').textContent=role==='A'?'你是 A：录下走动，踩住黄色按钮。你的影子会替 B 开门。':'你是 B：看影子踩按钮，等门打开，向右走去拿钥匙。';
-      const actor=recording?s.positions.A:s.ghost;
-      const position=x=>(7+x*14.3)+'%';
-      html='<div class="x-file-title">'+({plan:'先让 A 录下动作',record:'● A 正在录影',waiting:'录好了，轮到 B！',replay:'▶ 影子正在回放',retry:'再试一下，就差一点'}[s.phase]||'拿到钥匙')+'</div>'+
-        '<div class="shadow-room" aria-label="按钮在左边，门在中间，钥匙在右边">'+
-        '<div class="shadow-wall"></div><div class="shadow-wire '+(s.doorOpen?'on':'')+'"></div>'+
-        '<div class="shadow-switch '+(s.doorOpen?'down':'')+'" style="left:'+position(2)+'"><b></b><span>踩这里</span></div>'+
-        '<div class="shadow-gate '+(s.doorOpen?'open':'')+'" style="left:'+position(3.5)+'"><div class="shadow-gate-leaf"></div><span>'+(s.doorOpen?'门开了！':'门关着')+'</span></div>'+
-        '<div class="shadow-key '+(s.done&&s.win?'taken':'')+'" style="left:'+position(6)+'"><svg viewBox="0 0 32 40" aria-hidden="true"><path d="M19 19v16h8v-6h-4v-4h4v-6" fill="#ffda65" stroke="#281f32" stroke-width="3"/><circle cx="17" cy="11" r="9" fill="#ffda65" stroke="#281f32" stroke-width="3"/><circle cx="17" cy="11" r="3" fill="#776087"/></svg><span>钥匙</span></div>'+
-        '<div class="shadow-person '+(recording?'live':'echo')+'" style="left:'+position(actor)+'"><b>'+(recording?'A':'影')+'</b><small>'+(recording?'正在录':'A 的影子')+'</small></div>'+
-        '<div class="shadow-person runner" style="left:'+position(s.positions.B)+'"><b>B</b><small>拿钥匙</small></div></div>'+
-        '<div class="shadow-cause"><b class="'+(s.doorOpen?'on':'')+'">'+(s.doorOpen?'按钮被踩住':'按钮松开')+'</b><span>→</span><b>'+ (s.doorOpen?'门打开':'门关闭')+'</b></div>'+
-        '<div class="shadow-timeline">'+(recording?'录影剩余 '+Math.ceil(s.recordLength-s.recordTime)+' 秒':replay?'回放剩余 '+Math.ceil(s.recordLength-s.playTime)+' 秒':'每段录影 8 秒 · 没成功可以立即重录')+'</div>';
-      actions(button('left','← 向左走')+button('right','向右走 →')+(role==='A'?button('record',s.attempts?'重新录一遍':'开始录影 · 8 秒','wide primary'):button('replay',s.phase==='retry'?'再放一次影子':'播放影子 · 出发','wide primary')));
-      hint=recording?(role==='A'?'向右走两步，站上黄色按钮。看到门开后，停在那里给 B 留时间。':'看 A 踩住按钮时门会打开。录完后，你就能跟着影子出发。'):replay?(role==='B'?'向右走！门关着就等一等，影子踩住按钮时马上穿门。':'提醒 B 什么时候开门。现在开门的是你刚才录下的影子。'):s.phase==='plan'?'A 先录影：向右走到黄色按钮，停留几秒。':s.phase==='waiting'?'B 点播放影子，再向右穿门拿钥匙。':s.message;
-      meter=recording?s.recordTime/s.recordLength:replay?s.playTime/s.recordLength:0;
+      const recording=s.phase==='record',replay=s.phase==='replay',echo=replay||s.phase==='escape';
+      const actor=echo?s.ghost:s.positions.A,layout=s.layout,dir=layout.mirror?'左':'右',back=layout.mirror?'右':'左';
+      const aAt=echo&&actor===s.exit,bAt=s.positions.B===s.exit,won=s.done&&s.win;
+      el('shadow-tier').textContent=['','入门','进阶','挑战','极限'][s.tier||1];
+      el('x-duty').textContent=role==='A'?'录下踩按钮，再走到集合出口等待。':'播放回声，拿钥匙后回集合出口。';
+      const title=s.done?(s.win?'共同撤离成功':'时间用尽 · 撤离失败'):{plan:'先让 A 录下动作',record:'● A 正在录影',waiting:'录好了，轮到 B',replay:'▶ 回声正在回放',escape:aAt?'A 在出口等你':'回声没有到出口',retry:'重新配合，再试一次'}[s.phase];
+      const status=s.keyCollected?'钥匙已开门禁 · 可以回来':s.doorOpen?'按钮被踩住 → 门禁打开':'按钮松开 → 门禁关闭';
+      const timeline=s.done?(won?'两人一起离开密室':'本局已结束，重新开局再挑战'):recording?'录影剩余 '+Math.ceil(s.recordLength-s.recordTime)+' 秒':replay?'回放剩余 '+Math.ceil(s.recordLength-s.playTime)+' 秒':s.phase==='escape'?'回放已结束 · 回声保留末位':'本次录影 '+s.recordLength+' 秒';
+      const check=(yes,text)=>'<span class="'+(yes?'yes':'no')+'">'+(yes?'✓':'○')+' '+text+'</span>';
+      html='<div class="shadow-body"><h2>'+title+'</h2><div class="shadow-approved-scene">'+shadowSVG({phase:s.phase,button:layout.button,mirror:layout.mirror,a:actor,b:s.positions.B,echo,open:s.doorOpen,key:s.keyCollected})+'</div><div class="shadow-status">'+status+'</div><div class="shadow-clock">'+timeline+'</div><div class="shadow-checklist">'+check(s.keyCollected,'钥匙')+check(aAt,'A 回声到达')+check(bAt,'B 到达')+'</div></div>';
+      actions(button('left','← 向左走')+button('right','向右走 →')+(role==='A'?button('record',s.done?(won?'共同撤离成功':'本局已结束'):s.attempts?'重新录一遍':'开始录影 · '+s.recordLength+' 秒','wide primary'):button('replay',s.done?(won?'共同撤离成功':'本局已结束'):s.phase==='escape'?'再放一次影子':'播放影子 · 出发','wide primary')));
+      hint=s.done?s.message:s.phase==='plan'?'A 先向'+dir+'找按钮，踩住几秒，再到集合出口停下。':recording?(role==='A'?'先留足开门时间，再走到集合出口；录影结束前不要离开。':'观察 A 的轨迹；录完后由你播放回声。'):s.phase==='waiting'?(role==='A'?'录好了。等 B 播放，再提醒他何时过门。':'播放后向'+dir+'取钥匙，再向'+back+'回出口集合。'):s.phase==='escape'&&!aAt?(role==='A'?'回声没有停在出口。重新录：踩按钮后走到集合出口。':'回声没到出口。请 A 重新录好轨迹。'):s.keyCollected?(role==='A'?'提醒 B 回集合出口，等待回声一起撤离。':'钥匙已解开门禁。向'+back+'回集合出口，与 A 的回声会合。'):role==='A'?'现在踩按钮的是回声。提醒 B 趁门开时穿过。':'向'+dir+'穿门禁取钥匙，拿到后还要回集合出口。';
+      if(s.message==='门还关着，等影子踩到黄色按钮。')hint=s.message;
     }
     // Keep controls stable during state broadcasts; only the scene is redrawn.
     const focusedPerson=document.activeElement&&document.activeElement.getAttribute('data-person');
@@ -246,20 +280,25 @@
         if(!practice)el('x-practice').querySelector('p').textContent=role==='A'?'练习：听到「扫描」时，点躲藏。':'练习：观察台亮起红灯，应该喊什么？';
       }
     }
-    el('x-stage').innerHTML=html;
-    el('x-stage').querySelectorAll('[data-person]').forEach(b=>{
+    // Broadcasts update the clock every 80 ms. Keep unchanged scene nodes alive
+    // so a touch can finish on its original button and static icons do not reload.
+    const stage=el('x-stage');
+    if(stage._sceneHTML!==html){
+    stage.innerHTML=html;stage._sceneHTML=html;
+    stage.querySelectorAll('[data-person]').forEach(b=>{
       b.setAttribute('aria-pressed',String(+b.dataset.person===callerFocus));
-      b.onclick=()=>{callerFocus=+b.dataset.person;draw(s,role);const selected=el('x-stage').querySelector('[data-person="'+callerFocus+'"]');if(selected)selected.focus({preventScroll:true});};
+      b.onclick=()=>{callerFocus=+b.dataset.person;draw(view,role);const selected=el('x-stage').querySelector('[data-person="'+callerFocus+'"]');if(selected)selected.focus({preventScroll:true});};
     });
     if(focusedPerson!==null){const restored=el('x-stage').querySelector('[data-person="'+focusedPerson+'"]');if(restored)restored.focus({preventScroll:true});}
+    }
     el('x-hint').textContent=wait?(s.ready.A&&s.ready.B?'双方就绪，倒计时后开始。':'完成小练习，然后准备。'):themeText(s,hint);el('x-meter').style.width=clamp(meter*100,0,100)+'%';
-    if(isTheme){const duties={caller:['你守门禁：按 B 指定的两项核验员工身份，交换证据后共同放行。','你查人事档案：报核验项、查员工编号与任务，留意封闭通道。'],shadow:['你是姐姐 A：录下踩按钮的动作，让回声替妹妹开门。','你是妹妹 B：播放姐姐的回声，趁门打开穿过去拿钥匙。'],lookback:['你看前路：向 B 报门向；听信号选择前进、停步或躲藏。','你看观察台：红灯喊停、绿灯喊走、扫描喊躲；按 A 报的方向开门。']};el('x-duty').textContent=duties[s.mode][role==='A'?0:1];root.querySelector('#x-brief>p').textContent=el('x-duty').textContent;}
+    if(isTheme){const duties={caller:['你守门禁：按 B 指定的两项核验员工身份，交换证据后共同放行。','你查人事档案：报核验项、查员工编号与任务，留意封闭通道。'],shadow:['姐姐 A：录下踩按钮、走到集合出口等待的轨迹。','妹妹 B：播放回声，穿门取钥匙后回出口与姐姐集合。'],lookback:['你看前路：向 B 报门向；听信号选择前进、停步或躲藏。','你看观察台：红灯喊停、绿灯喊走、扫描喊躲；按 A 报的方向开门。']};el('x-duty').textContent=duties[s.mode][role==='A'?0:1];root.querySelector('#x-brief>p').textContent=el('x-duty').textContent;}
     document.querySelectorAll('#x-actions [data-x]').forEach(b=>{
       const k=b.dataset.x;
       b.disabled=wait||s.done;
       if(s.mode==='lookback'){if(k==='lure')b.disabled=b.disabled||s.phase!=='danger'||s.rescue||!s.lures;b.classList.toggle('selected',k===s.action||k===s.openDoor);}
       if(s.mode==='caller'){if(['code','task','route'].includes(k))b.disabled=b.disabled||s.questions.includes(k)||s.questions.length>=(s.extra?3:2);if(k==='extra')b.disabled=b.disabled||s.extra||s.questions.length!==2;b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<2);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
-      if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':s.phase!=='replay');if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry'].includes(s.phase)||!s.tape.length;}
+      if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':!['replay','escape'].includes(s.phase));if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry','escape'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry','escape'].includes(s.phase)||!s.tape.length;}
       if(s.mode==='lookback'&&['go','stop','hide','left','right'].includes(k)||s.mode==='caller'&&['admit','reject'].includes(k))b.setAttribute('aria-pressed',String(b.classList.contains('selected')));
     });
     if(s.done&&!window._dungeon)result(s,role);

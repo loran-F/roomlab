@@ -1,5 +1,6 @@
 (function(){
 'use strict';
+window.BeatVariation={create:function(){var plan=RoomVariation.start('beat'),index=0;return {tier:plan.tier,plan:plan,next:function(){if(plan.tier===1)return null;var phrase=plan.phrases[Math.floor(index/3)%plan.phrases.length],at=index++%3;return {type:phrase.types[at],beats:phrase.beats[at]};}};} };
 window.beatMobileDraw=function(c,notes,lives,bpm){
  c.clearRect(0,0,340,400);c.fillStyle='#ffe8ac';c.fillRect(0,0,340,400);
  c.fillStyle='#f4d28b';c.fillRect(0,158,340,84);c.strokeStyle='#d5ad69';c.lineWidth=1;

@@ -1,5 +1,10 @@
 (function(){
 'use strict';
+window.CatchVariation={create:function(){
+ var plan=RoomVariation.start('catch'),index=0,seed=plan.seed||1;
+ function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}
+ return {tier:plan.tier,plan:plan,spawn:function(score){if(plan.tier===1)return null;var wave=plan.waves[Math.floor(index++/3)%plan.waves.length],r=random(),type=score<4?(r<.7?'good':'gold'):(r<.5?'good':r<.82?'bad':'gold');return {type:type,x:(wave.side<0?24:182)+random()*134,vy:1.5+score*.04+random()*.8,delay:(Math.max(230,620-score*34)+random()*240)*wave.gap};}};
+}};
 // Standalone catch only. Reuses the existing protocol dispatchers, never adds data listeners.
 var link=null;
 function linkLive(s){return link===s&&PEER.conn===s.conn&&S.mod==='catch'&&!window._dungeon&&s.canvas.isConnected;}

@@ -11,8 +11,8 @@ function fish(c,x,y,size){c.save();c.translate(x,y);c.scale(size,size);c.fillSty
 function fishBackdrop(c){c.fillStyle='#d8eeeb';c.fillRect(0,0,340,400);c.strokeStyle='#bad8d4';c.lineWidth=1;for(var y=75;y<350;y+=32){c.beginPath();c.moveTo(0,y);c.lineTo(340,y);c.stroke();}for(var x=0;x<340;x+=34){c.beginPath();c.moveTo(x,75);c.lineTo(x,350);c.stroke();}c.fillStyle='#518b8c';c.fillRect(0,0,340,59);c.fillStyle='#f0c889';for(var x=0;x<340;x+=48)c.fillRect(x,0,24,10);c.fillStyle='#b7d4d0';c.fillRect(0,350,340,50);}
 function send(d){netSend(d);}
 function clean(){if(dispose){dispose();dispose=null;}active=null;view=null;held=false;}
-function make(){return {roomId:roomId(),id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),time:window._dungeon?coopTime(65):65,ready:{A:false,B:false},cd:3,inputs:{A:false,B:false},seen:{A:0,B:0},seq:{A:-1,B:-1},yL:285,yR:285,bricks:[],spawn:1.2,got:0,goal:6,spills:0,limit:3,rescue:null,rescueUsed:false,done:false,win:false,msg:'六件不同货物：倾斜运到中央，放平保持半秒入库。'};}
-function snapshot(s){return {roomId:s.roomId,id:s.id,time:s.time,ready:s.ready,cd:s.cd,inputs:s.inputs,yL:s.yL,yR:s.yR,bricks:s.bricks,got:s.got,goal:s.goal,spills:s.spills,limit:s.limit,rescue:s.rescue,rescueUsed:s.rescueUsed,done:s.done,win:s.win,msg:s.msg};}
+function make(){var variation=RoomVariation.start('beam');return {tier:variation.tier,cargo:variation.cargo,roomId:roomId(),id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),time:window._dungeon?coopTime(65):65,ready:{A:false,B:false},cd:3,inputs:{A:false,B:false},seen:{A:0,B:0},seq:{A:-1,B:-1},yL:285,yR:285,bricks:[],spawn:1.2,got:0,goal:6,spills:0,limit:3,rescue:null,rescueUsed:false,done:false,win:false,msg:'六件不同货物：倾斜运到中央，放平保持半秒入库。'};}
+function snapshot(s){return {tier:s.tier,cargo:s.cargo,roomId:s.roomId,id:s.id,time:s.time,ready:s.ready,cd:s.cd,inputs:s.inputs,yL:s.yL,yR:s.yR,bricks:s.bricks,got:s.got,goal:s.goal,spills:s.spills,limit:s.limit,rescue:s.rescue,rescueUsed:s.rescueUsed,done:s.done,win:s.win,msg:s.msg};}
 function input(d,who){var s=active;if(!s||d.id!==s.id||s.done)return;if(d.t==='bmReady'){s.ready[who]=true;return;}if(!Number.isInteger(d.seq)||d.seq<=s.seq[who])return;s.seq[who]=d.seq;s.inputs[who]=!!d.v;s.seen[who]=performance.now();}
 function act(v){held=!!v;var s=role==='A'?active:view;if(!s)return;var d={t:'bmInput',id:s.id,seq:++seq,v:held};if(role==='A')input(d,'A');else send(d);}
 function end(s,win,message){s.done=true;s.win=win;s.msg=message;s.inputs={A:false,B:false};}
@@ -22,7 +22,7 @@ function step(s,dt){
  s.time=Math.max(0,s.time-dt);if(s.time===0){end(s,false,'时间到，和同伴再配合一次。');return;}
  if(s.rescue){s.rescue.left-=dt;s.rescue.held=s.inputs.A&&s.inputs.B?s.rescue.held+dt:0;if(s.rescue.held>=.5){var b=s.bricks.find(function(b){return b.id===s.rescue.brick;});if(b)b.x=b.x<170?65:275;s.yL=s.yR=285;s.rescue=null;s.msg='扶稳了！继续把砖块送到中央。';}else if(s.rescue.left<=0){s.bricks=s.bricks.filter(function(b){return b.id!==s.rescue.brick;});s.rescue=null;s.spills++;s.msg='没有扶住，失误 '+s.spills+' / '+s.limit;}return;}
  s.yL=Math.max(205,Math.min(325,s.yL+(s.inputs.A?-65:32)*dt));s.yR=Math.max(205,Math.min(325,s.yR+(s.inputs.B?-65:32)*dt));
- s.spawn-=dt;if(s.spawn<=0&&s.bricks.length===0){var spec=cargoTypes[s.got];s.bricks.push({id:Math.random().toString(36),type:s.got,x:s.got%2?265:75,y:65,on:false,vy:100,vx:0,charge:0,stress:0});s.spawn=.7;s.msg=spec.name+'：'+spec.tip;}
+ s.spawn-=dt;if(s.spawn<=0&&s.bricks.length===0){var item=s.cargo[s.got],spec=cargoTypes[item.type];s.bricks.push({id:Math.random().toString(36),type:item.type,x:item.x,y:65,on:false,vy:100,vx:0,charge:0,stress:0});s.spawn=.7;s.msg=spec.name+'：'+spec.tip;}
  for(var i=s.bricks.length-1;i>=0;i--){var b=s.bricks[i],line=s.yL+(s.yR-s.yL)*(b.x-40)/260;
   if(!b.on){b.y+=b.vy*dt;if(b.y>=line){b.on=true;b.y=line;}}
   else{var spec=cargoTypes[b.type],tilt=s.yR-s.yL;

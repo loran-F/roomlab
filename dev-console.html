@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RoomLab · 开发者验收台</title><link rel="stylesheet" href="dev-console.css?v=13.3"><script defer src="dev-console-bot.js?v=13.3"></script><script defer src="dev-console.js?v=13.3"></script></head>
+<body data-phase="catalog">
+<header class="app-head"><div class="brand"><b>RoomLab</b><span class="divider"></span><h1>开发者验收台</h1></div><span class="header-note">本地验收 · 不记录正式通关进度</span></header>
+<main class="workspace">
+ <section class="toolbar" aria-label="开局配置">
+  <div class="field room"><label for="dc-room">密室</label><select id="dc-room" disabled><option>正在读取游戏目录…</option></select></div>
+  <div class="field mode"><label for="dc-mode">玩法</label><select id="dc-mode" disabled><option>加载中</option></select></div>
+  <div class="field level"><label for="dc-level">难度</label><select id="dc-level" disabled><option>加载中</option></select></div>
+  <button id="dc-start" class="toolbutton primary" disabled>一键开局</button>
+  <span class="tools-divider" aria-hidden="true"></span>
+  <div class="field"><label for="dc-retry-mode">重试方式</label><div class="retry"><select id="dc-retry-mode" aria-describedby="dc-capability"><option value="new">换题</option><option value="same" disabled>同题（尚不支持）</option></select><button id="dc-retry" class="toolbutton" disabled>重试本关</button></div></div>
+  <button id="dc-back" class="toolbutton return" disabled>返回选择</button>
+ </section>
+ <section class="toolbar bot-toolbar" aria-label="同伴托管"><div class="field"><label for="dc-control">操作方式</label><select id="dc-control"><option value="manual">双端手动</option><option value="A">托管 A · 手动 B</option><option value="B">托管 B · 手动 A</option></select></div><button id="dc-bot-pause" class="toolbutton" disabled>暂停托管</button><span id="dc-bot-status" role="status" aria-live="polite">双端手动</span><p id="dc-bot-capability"></p></section>
+ <div class="session" role="status" aria-live="polite"><div class="session-left"><strong id="dc-status">读取游戏目录</strong><span id="dc-room-code">房间 —</span><span id="dc-ready">等待开局</span></div><span>自动建房、加入并准备 · 可选择单端同伴托管</span></div>
+ <p id="dc-error" class="error" role="alert" hidden></p>
+ <div class="screens">
+  <section class="endpoint"><header class="endpoint-head"><div><b class="role-symbol A">A</b><strong>创建端</strong></div><span id="dc-state-a" class="endpoint-state">未连接</span></header><div class="viewport" id="dc-slot-a"><p class="placeholder">选择配置，然后一键开局</p><iframe id="dc-frame-a" title="角色 A 游戏画面" width="390" height="844" allow="autoplay" hidden></iframe></div></section>
+  <section class="endpoint"><header class="endpoint-head"><div><b class="role-symbol B">B</b><strong>加入端</strong></div><span id="dc-state-b" class="endpoint-state">未连接</span></header><div class="viewport" id="dc-slot-b"><p class="placeholder">自动加入 A 创建的房间</p><iframe id="dc-frame-b" title="角色 B 游戏画面" width="390" height="844" allow="autoplay" hidden></iframe></div></section>
+ </div>
+ <p id="dc-capability" class="page-note">换题会重新生成开局；同题重试尚无统一接口，暂不可用。</p>
+ <p class="page-note">两端视口均为 390 × 844 · 点击对应画面后使用键盘 · 人工输入托管端会自动暂停 · 不合成录像</p>
+</main>
+</body></html>

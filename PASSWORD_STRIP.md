@@ -1,72 +1,56 @@
-# 密码推条（pwslide）
+# 密码推条：共享切片拼图（pwslide）
 
-本地原型，未提交、未上传。保留独立大厅入口，新增 RoomGameAdapters 密室接入；抽取/解锁由目录模块控制，不修改 APP_VER。
+本轮按用户的同图横切参考重做。本地待总控验收发布，未提交、未升级 APP_VER。
 
-## 玩法与分工
+## 玩法
 
-- A 只看见 B 的密码条，操作 A 自己的条带背面；B 相反。上方观察、下方操作，页面不会出现操作者自己的数字或目标位置。
-- 首轮各一条水平带，共四位数字。双方准备后开始，不限时。观察者看纸条与固定窗口的边缘，口头指挥同伴向左或向右移动。
-- 第二轮把密码分成横条前两位、竖条后两位；竖条自上而下读。轮间双方再次准备，避免自动跳到更复杂的操作。
-- 每条带九个卡点。起点在两端随机选择，正确卡点独立随机为第 3–7 档，不是默认中心。背面仅显示当前位置及机械限位，不显示目标、高亮对齐或建议方向。
-- 选择条带后，点击方向按钮、相应方向键或滑动背面控制区一次移动一格；指针位移不足 24px 不移动，取消/失焦取消本次滑动。到限位后方向按钮禁用。
-- 观察窗实际裁切移动中的纸条。采用非线性视觉位移：离开目标第一格偏移 24 个 SVG 坐标，之后横向每格增 7、竖向增 4，避免差一格时四位数字仍完整；最远偏移仍保留部分可观察内容。未对齐时至少一个数字被窗口裁切，不能确认。对齐反馈只显示在观察者一端。
-- 由观察者确认同伴密码，确认后同伴的条带锁定。两人的条带都被确认才过轮/成功；没有输入密码、自动归位或一键自动成功。
-- 完成后双方点击重新开始，生成新的对局 ID 和随机密码，再回到准备页。
+两端看到同一幅四位数字图形，横向切成 6 或 8 条并左右错位。A 只能移动第 1、3、5（7）条；B 只能移动第 2、4、6（8）条。基础教学为 6 条、数字 1234；进阶为 8 条、随机不重复的四位数字。独立入口两轮，密室教学/进阶各一轮。没有逐位输入、互看不同密码、纵向条带或答案底图。
 
-## 文件与接入
+双方读规则并手动准备后开始，不限时。直接拖动己方切片，数字跟手，移动过程实时发给同伴；下方 48px 条号按钮可选择细条，60px 拖动区和左右微调按钮提供替代。方向键移动所选己方条。指针松开、取消或失焦只就近停到 4 单位档位，不自动寻找答案。移动范围为 ±64 SVG 单位，界面不显示偏移或目标数值。
 
-产品文件：`password-strip.js`、`password-strip.css`、本文档。
+完成要求是所有切片处于同一水平偏移，并且整图处于外框内（保守完整范围 ±44）；可在 +8、+12、-12 等位置拼成完整数字，不要求隐藏的零点。拼齐后两人各点一次“拼好了 · 确认”，没有额外密码输入。任何条片继续移动都会撤销双方确认。错位/裁切时确认只提示继续观察，不扣机会。
 
-共享 `roomlab.html` 仅在最终 `render()` 之前增加引用。本轮协调后的末尾顺序是：
+## 图形与布局
 
-1. 原有 `puzzle-pack.css/js`
-2. 原有 `dungeon-routes.css/js`
-3. 新增 `password-strip.css/js`
-4. 任务（6）的 `rhythm-light.css/js`
-5. 原有最终 `render()`
+沿用紫色页面、奶油卡片，中心白板配大灰数字。一个 SVG defs 字形源被 6/8 个相邻且不重叠的 y 区间引用；没有未切割的可见答案图层。源图字体 Arial 128、总字宽 270，切片范围 y36–132，总高96，切片 DOM 与 viewBox 同比例。白板上下留白独立于切片，不纵向拉长字形。不同角色只有操作归属/所选条号不同，数字图形位置完全共享。按钮为单层平面，没有嵌套色底。
 
-未修改其他引用、缓存后缀和版本号。`rhythm-light` 文件由任务（6）负责，本任务只按总对话指令接入。
+## 文件与共享边界
 
-`password-strip.js` 向 `PLAYGROUNDS` 注册独立入口，包装 `render`（仅处理 `S.mod === 'pwslide'`）与 `clearTimers`（清理本模块定时器、输入事件和视图）。没有包装 `dgHostOnData` / `dgGuestOnData`，不改变 puzzle-pack 规则或消息。复用 `loadPeerLib`、`newPeerId`、`peerOpts`、`PEER`、`closePeer`、`clearNetZones`。
+本轮产品改动只有 password-strip.js、password-strip.css、本文档，以及总控授权的 record.js 两个 pwslide hunk（进度文字与 drivePWSlide）。不改 HTML、Loading、lightsearch、vault 或其他玩法。原 room-progression 文案由目录负责人另行更新。
 
-访问：`roomlab.html?m=pwslide&role=A` 创建，`roomlab.html?m=pwslide&role=B` 输入四位房间码加入；无 role 时显示角色选择页。
+保留 MODE=pwslide、独立 role=A/B 大厅、RoomGameAdapters.pwslide.host(ctx)/guest(ctx)、clearTimers 包装、ctx.isActive/abort/finish。密室复用原 Peer/conn 和数据分发，不新增 data listener。成功或机会耗尽后700ms调用捕获 ctx.finish(win) 一次；清理会取消心跳、指针/键盘监听、连接监听和未执行结算。
 
-## 联网及隐私边界
+独立协议升级为 password-slices/2，metadata 和握手均要求新版。输入、快照及密室心跳附 proto，旧版包不生效。密室继续校验 roomSession/match/frame，输入继续校验 id/round/递增 seq。角色由连接确定，主机拒绝越权条号、非整数/越界偏移、过期对局/轮次。
 
-- 独立 Peer ID 前缀 `pwstrip-`，不同玩法四位房间码不会串入。连接 metadata 和握手同时校验 `pwslide` / `password-strip/1`；额外连接拒绝，错 metadata 不占用房主位置。
-- 房主保存权威完整状态，但绘制也使用 `snapshot(state, 'A')`。发给 B 的只可能是 `snapshot(state, 'B')`。
-- `own` 字段严格只有 axis / pos / min / max，没有 digits / target；`observed` 只包含同伴的条带数据。确认完成状态属于双方可见进度。
-- 输入由连接确定角色，不接受客户端指定角色；校验对局 ID、轮次、递增安全整数序号、输入种类、条带索引和 ±1 方向；准备、锁定、阶段与限位均在权威端检查。
-- 快照包含连接 match 与单调 frame，B 忽略旧 match / 旧 frame；新局使用新 ID。双方重开不重置连接 frame。
-- 连接关闭或错误时立即停止更新与输入；无响应超过七秒停用。退出调用既有清理及关闭连接。失败后保留退出按钮，提示返回重建。
-- `PasswordStrip` 导出纯规则 create/input/snapshot 供回归；`state()` 只返回当前角色的视图，连 A 的调试入口也不返回权威完整状态。
+独立250ms、密室150ms更新/心跳保持。拖动本地即时预览并最多约25次/秒发送，松手强制发最后一帧；主机输入后立即广播，B以 ack 序号确认本地预览，避免旧快照覆盖正在拖动的位置。play 内只更新 transform/按钮状态，不重建指针目标。关闭连接或七秒无响应后停止操作。
 
-## 本地验收
+## 测试接口
 
-脚本：`G:/hh/coc2/release-staging/qa_password_strip.cjs`
+PasswordStrip.create(ctx)/input(state,message,role)/snapshot(state,role)/state() 保留。
 
-运行：在 `G:/hh/coc2` 执行 `node release-staging/qa_password_strip.cjs`，要求 HTTP 8080 与 PeerJS 9000 服务已运行。
+共享快照：win/remaining/maxMistakes/startRound/endRound/id/round/phase/ready/again/confirmed/notice/picture/rows/ack。rows 为 {owner,offset}；无旧 own/observed/target/locked 字段。phase 为 ready/play/between/done。
 
-结果：`G:/hh/coc2/release-staging/password-strip-qa/results.json`。
+DOM：.ps-board、[data-ps-row="全局零基序号"]、[data-ps-band="序号"]；己方 [data-ps-select="序号"]；#ps-minus/#ps-plus、.ps-touch、#ps-confirm；原 #ps-ready/#ps-again/#ps-back 和大厅选择器保留。record 自动驱动取共享第1条可见偏移作为相对拼合位置，再点击所属按钮，不直接改状态。
 
-- 500 个随机双轮案例：目标变化、隐私字段、双方准备、错误确认、条带锁定、索引/方向边界、限位、旧 ID / 轮次与重开投票。
-- 真实 Edge A/B 页面：错玩法连接被拒且不占房；正确握手；双方准备；使用实际鼠标拖动、浏览器模拟触屏滑动、方向键和方向按钮完成横向/纵向两轮；由观察者确认；双方重开；旧局消息与旧快照回放无效；关闭连接后操作停用；无浏览器脚本异常。
-- 320 / 390 / 720px，A/B 两端各轮检查无页面横向溢出、按钮至少 48×48、按钮无阴影及文字溢出，并保存整页截图。
-- 图片目录同结果目录。`ready-A/B.png`、`round1/2-A/B-320/390/720.png`、`aligned-round1/2-A/B.png`、`done-A/B.png`、`disconnect-B.png` 均为真实页面截图；aligned 文件尾角色表示被观察/操作条带的拥有者。
+## 本轮验证
 
-追加边界验收：`release-staging/qa_password_strip_edges.cjs` 使用真实 A/B 逐格按钮操作，验证四位横条、两位横条、两位竖条的目标 ±1 / 最远 / 归位。偏离时至少一个数字字形边界被窗口裁切，最远仍有数字片段与窗口相交，归位时所有数字边界完整在窗内；12 张截图和机器结果位于 `release-staging/password-strip-qa/edges/`。入口标题已核对为“看同伴的密码，听同伴的指挥”。
+主脚本 G:/hh/coc2/qa/tools/qa_password_slices.cjs；证据 G:/hh/coc2/qa/reports/evidence/password-slices/results.json 和同目录真实截图。
 
-限制：仅本机 Edge / WebRTC 信令实测，尚未验证公网中继和真实手机硬件；密室接入详见下节；保存进度由目录模块负责。无自动通关提示，但观察者可通过观察窗判断对齐，首轮有意保持简单。未正式发布。
+覆盖200个随机双轮规则案例，双方准备/确认、奇偶权限、越界输入、过期ID、共同非零位置成功、完整范围外失败、移动撤销确认；真实 A 拖动未松手时 B 同步且 DOM 不重建、B 浏览器触控、A 键盘、按钮微调；320/390/720无横向溢出且按钮至少48px；独立两轮完成及双方重开、真实关闭A页面后B停止；真实密室教学/进阶完整通关、每次唯一结算、Peer/conn与单data listener保留；结算延迟内退出后重进，旧回调/输入/快照不影响新局。
+
+旧 release-staging 中针对“私有密码窗口/横竖两带”的脚本与报告是历史版本证据，不适用于本次重定义。总控维护的新 GP09 与本脚本为当前验收入口。
+
+限制：本机 Edge/WebRTC 与浏览器模拟触控；尚未进行实体手机、公网中继/高延迟、长时间压力测试。完整随机密室路线由总控组合验收，本模块用真实节点入口验证教学和进阶。细切片提供大操作区替代，不能将每条图像本身等同48px按钮。
 
 
-## 出口密码锁密室适配（本地待统一发布）
+## 2026-09-09 有限确认机会与随机变化（本地待发布）
 
-`RoomGameAdapters.pwslide.host(ctx)/guest(ctx)` 复用既有房间连接，不进入独立 lobby，不安装 data listener。消息经原 dgHostOnData/dgGuestOnData 链，以 psRoomInput/psRoomState/psRoomPulse 单独前缀隔离；roomSession/match/frame 与原 id/round/seq 双层守卫。七秒无响应或连接关闭停用操作，clearTimers取消心跳、指针/键盘/连接监听和延迟结算。
+独立两轮共用5次错误确认机会；密室教学5次、进阶4次。没有倒计时。拖动或微调不扣机会，未拼成完整数字时正式确认扣1次；双方500ms内对同一排列重复确认只扣一次，同一错误500ms后再次确认仍扣机会。实际改变排列后可立即计入新一次确认。按住Enter/空格的键盘自动重复不触发连续确认。
 
-教学只做一轮四位横条；进阶直接做横向前两位+竖向后两位，共一轮。独立入口仍保留从横向到横竖的两轮流程。进阶目前以加入纵向协作为复杂度上限，tier2以上不继续增加密码位数，始终保留四位密码、随机目标偏移与差一格裁切。
+机会耗尽进入done且win=false，双方显示失败，密室仅调用一次ctx.finish(false)；成功为done且win=true。外部托管、录制、统计不得仅凭done判断通关。双方重新开局重置机会，新id隔离旧包。独立第一轮结束不补充机会。
 
-room-13 专属标题、门锁图标、出口联锁A/B状态与纸面窗口。联锁状态仅在观察者确认后改变，不泄露操作者自己的正确位置。其他房间复习此玩法时不套用出口主题。
+随机初始化保证各角色的条片至少有两种偏移，并避免同档紧邻重开生成完全相同题面与偏移；进阶仍是8条和随机4个不重复数字。选定教学或进阶不会因重开自动升档。使用sessionStorage保存最近题面，存储不可用时退回内存。
 
-成功后主机700ms再调用捕获的ctx.finish(true)一次，B等待dgEnd；密室不出现独立重开按钮。退出用ctx.abort，断线后允许返回重建。旧回调校验session对象、失败状态及ctx.isActive，无法结算新节点。
+本增量产品文件只有password-strip.js与本文档；password-strip.css沿用已验收样式。不修改record、托管或共享入口。托管继续只读rows/confirmed、点击己方选择/微调/确认按钮，并在done时停止、区分win。
 
-实际验收包含教学横条、进阶横竖条、AB原Peer/conn不变、没有重复data监听、旧进入消息/快照拒绝、通关动画内退出后再次进入不被旧回调结算，以及320/390/720截图。详见 `release-staging/qa_room_puzzle_adapters.cjs` 和 `release-staging/room-puzzle-adapters-qa/results.json`。独立 `qa_password_strip.cjs` 全流程再次通过。地图挑选与整室解锁由目录任务独立验收。
+补充验证入口：qa/tools/qa_password_limits_rules.cjs（200组扣次边界与终态隔离），qa/tools/qa_password_limits_final.cjs（真实双端同错去重、耗尽失败、重开、地图唯一失败结算，以及完整原回归）。证据位于qa/reports/evidence/password-limits-final。公网延迟、实体手机仍未验证；去重是主机接收时间500ms窗口，超过该窗口的确认按新尝试处理。

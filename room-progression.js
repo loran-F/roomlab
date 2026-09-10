@@ -6,7 +6,7 @@ const NATIVE=['lockbox','silhouette','evidence','mirrors','pwslide','lightsearch
 const LEGACY=['catch','beam','beat','maze','dial','wires','code','vault','pressure','lookback','caller','shadow','boss'];
 const ROWS=[
  ['room-1','catch','接住小花盆','接住窗边落下的花盆，守护两个人的小家。',['beam','pwslide'],false],
- ['room-13','pwslide','出口密码锁','交换密码视野，把出口锁的条带推到正确位置。',['code','lockbox'],false],
+ ['room-13','pwslide','出口密码锁','A 水平拖动奇数条，B 水平拖动偶数条，共同还原同一个四位密码。',['code','lockbox'],false],
  ['room-14','silhouette','衣帽间剪影','借灯光与服饰的影子，还原镜前的目标轮廓。',['mirrors','pwslide'],false],
  ['room-15','beam','鱼箱入库','两人托稳搬运梁，把鱼箱安全送进收货口。',['catch','pressure'],false],
  ['room-18','vault','旧照片里的秘密','记住一闪而过的旧档案，拼出他漫长的过去。',['evidence','code'],false],
@@ -58,7 +58,7 @@ const oldDifficulty=coopDifficulty;coopDifficulty=function(){const c=oldDifficul
 const oldLabel=dgNodeLabel;dgNodeLabel=function(n){const p=DUNGEON&&getPlan(DUNGEON.roomId);return p&&n.type==='event'&&n.mode===p.primary?p.title:oldLabel(n);};
 const oldPG=dgPG;dgPG=function(mode){const p=DUNGEON&&getPlan(DUNGEON.roomId),game=oldPG(mode);return game&&p&&mode===p.primary?{...game,name:p.title}:game;};
 const oldOver=renderDungeonOver;renderDungeonOver=function(win){let fresh=false,p=null;if(win&&DUNGEON&&DUNGEON.over&&DUNGEON.win){p=getPlan(DUNGEON.roomId);if(p)fresh=unlock(p.roomId);}oldOver.apply(this,arguments);if(p){const el=document.createElement('section');el.className='rp-unlocked';const game=PLAYGROUNDS.find(x=>x.id===p.primary);el.innerHTML='<strong></strong><p></p>';el.querySelector('strong').textContent=(fresh?'新玩法已解锁：':'已掌握：')+(game?game.name:p.title);el.querySelector('p').textContent=storageWorks?'今后会出现在主题相符的密室里。进度已保存在这台设备。':'本次已解锁；浏览器未允许保存，关闭页面后可能丢失进度。';$('app').prepend(el);}};
-function menu(){const info=$('room-info');if(!info)return;function refresh(){if(!info.isConnected)return;const p=getPlan(selectedRoom());if(!p)return;let card=info.querySelector('.rp-preview');if(!card){card=document.createElement('div');card.className='rp-preview';info.appendChild(card);}const game=PLAYGROUNDS.find(x=>x.id===p.primary),known=completed().includes(p.roomId),ready=supportsDungeon(p.primary),label=(known?'已解锁 · ':'通关解锁 · ')+(game?game.name:p.title);if(card.dataset.room!==p.roomId||card.dataset.label!==label){card.dataset.room=p.roomId;card.dataset.label=label;card.replaceChildren();const strong=document.createElement('strong'),text=document.createElement('p');strong.textContent=label;text.textContent=p.brief;card.append(strong,text);}const create=$('dm2');if(create){create.disabled=!ready;create.title=ready?'':'该玩法正在接入中';}const route=info.querySelector('.route-preview');if(route&&!p.boss)route.textContent=route.textContent.replace('首领','主玩法终章');}
+function menu(){const info=$('room-info');if(!info)return;function refresh(){if(!info.isConnected)return;const p=getPlan(selectedRoom());if(!p)return;const ready=supportsDungeon(p.primary),create=$('dm2');if(create){create.disabled=!ready;create.title=ready?'':'该玩法正在接入中';}}
  refresh();if(g._roomProgressObserver)g._roomProgressObserver.disconnect();const observer=new MutationObserver(refresh);observer.observe(info,{childList:true});g._roomProgressObserver=observer;
 }
 const oldMenu=renderDungeonMenu;renderDungeonMenu=function(){invalidate();settled=null;oldMenu.apply(this,arguments);menu();};

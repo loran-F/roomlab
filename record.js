@@ -13,20 +13,17 @@ async function waitFor(fn, timeout, iv) {
 
 /* ---------- 玩法配置（15 个，与 PLAYGROUNDS/expansion 一致） ---------- */
 var MODES = [
-  { id: 'maze',     name: '通风潜行',   net: false, time: 120, exp: false },
   { id: 'dial',     name: '双人搜台',   net: true,  time: 100, exp: false },
   { id: 'wires',    name: '警报拆线',   net: true,  time: 90,  exp: false },
   { id: 'code',     name: '接头暗号',   net: false, time: 120, exp: false },
   { id: 'vault',    name: '档案窃取',   net: true,  time: 120, exp: false },
   { id: 'catch',    name: '情报空投',   net: true,  time: 60,  exp: false },
-  { id: 'shield',   name: '双人屏障',   net: true,  time: 60,  exp: false },
   { id: 'beam',     name: '破障搬运',   net: true,  time: 65,  exp: false },
   { id: 'beat',     name: '信号节拍',   net: true,  time: 60,  exp: false },
   { id: 'pressure', name: '动力稳压',   net: true,  time: 90,  exp: false },
   { id: 'boss',     name: '双人拆机战', net: true,  time: 120, exp: false },
   { id: 'lookback', name: '你别回头',   net: true,  time: 85,  exp: true },
   { id: 'caller',   name: '真假接线员', net: true,  time: 110, exp: true },
-  { id: 'shadow',   name: '影子替身',   net: true,  time: 100, exp: true },
   { id: 'lockbox',   name: '机关盒',   net: true, time: 240, exp: false },
   { id: 'silhouette',name: '影子拼图', net: true, time: 240, exp: false },
   { id: 'evidence',  name: '证物还原', net: true, time: 240, exp: false },

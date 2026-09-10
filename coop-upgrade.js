@@ -23,7 +23,7 @@ function watchPrep(){if(prepConn&&prepConn.off)prepConn.off('close',lostPrep);pr
 try{seen=JSON.parse(sessionStorage.getItem('coop-practice-v1')||'{}');}catch(e){}
 function remember(mode,role){seen[mode+role]=true;try{sessionStorage.setItem('coop-practice-v1',JSON.stringify(seen));}catch(e){}}
 function removePanel(){var el=$('coop-panel');if(el)el.remove();}
-function panel(title,txt){removePanel();var el=document.createElement('div');el.id='coop-panel';el.className='coop-overlay';el.innerHTML='<section class="coop-card"><h2>'+title+'</h2><p>'+txt+'</p><div id="coop-work"></div><p id="coop-status" role="status"></p><button id="coop-cancel" class="coop-cancel">返回</button></section>';document.body.appendChild(el);$('coop-cancel').onclick=function(){cancelPrep();};return $('coop-work');}
+function panel(title,txt){removePanel();var el=document.createElement('div');el.id='coop-panel';el.className='coop-overlay';el.innerHTML='<section class="coop-card"><h2>'+title+'</h2><p>'+txt+'</p><div class="coop-controls"><div id="coop-work"></div><button id="coop-cancel" class="coop-cancel">返回</button></div><p id="coop-status" role="status"></p></section>';document.body.appendChild(el);$('coop-cancel').onclick=function(){cancelPrep();};return $('coop-work');}
 function button(parent,txt,fn){var b=document.createElement('button');b.className='coop-action';b.textContent=txt;b.onclick=fn;parent.appendChild(b);return b;}
 function say(txt){if($('coop-status'))$('coop-status').textContent=txt;}
 function hold(parent,label,ms,done){var b=button(parent,label,function(){}),started=0,iv=null,finished=false;

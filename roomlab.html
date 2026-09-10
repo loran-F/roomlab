@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>玩法试炼场 · roomlab-v13（主题密室）</title>
+<script>window.__roomLoadFailures=[];window.addEventListener('error',function(e){var t=e.target;if(t&&((t.tagName==='SCRIPT'&&t.src)||(t.tagName==='LINK'&&t.hasAttribute('data-room-style')))){window.__roomLoadFailures.push(t.src||t.href);}else if(e.filename&&!window.__roomBootComplete){window.__roomLoadFailures.push(e.filename);}},true);</script>
+<style>#room-boot{position:fixed;inset:0;z-index:10001;background:#343047;color:#f6eddb;display:grid;place-content:center;text-align:center;font:16px/1.6 'Microsoft YaHei',sans-serif;padding:24px}#room-boot .boot-door{width:100px;height:148px;background:#eac57b;border:3px solid #191923;border-radius:42px 42px 4px 4px;margin:0 auto 24px;display:grid;place-content:center;color:#191923;transform:rotate(-2deg)}#room-boot button{min-height:48px;padding:10px 20px;margin-top:16px;border:1px solid #b3a4bc;border-radius:8px;background:transparent;color:#f6eddb}</style>
 <style>
   :root{
     --a:#2563eb; --a-bg:#eff6ff;
@@ -208,6 +210,7 @@ body:has(.dungeon-screen){background:linear-gradient(155deg,#454065,#2b243f);col
 </style>
 </head>
 <body>
+<section id="room-boot" role="status"><div class="boot-door" aria-hidden="true">两位，请进</div><strong>正在打开怪房子</strong><span id="room-boot-detail">准备游戏界面…</span><button type="button" onclick="location.reload()">重新加载</button></section>
 <div class="wrap" id="app"></div>
 <script>
 /* ============ 规则集：roomlab-v12（合作解谜） ============ */
@@ -438,7 +441,7 @@ function startCountdown(){
   var iv=setInterval(function(){
     if(S.mod==='catch'&&!window._dungeon&&window.CatchConnection&&CatchConnection.paused())return;
     S.time--;
-    if(S.time<=0){ S.time=0; clearInterval(iv); timers=[]; explode('时间到'); return; }
+    if(S.time<=0){ S.time=0; clearInterval(iv); explode('时间到'); return; }
     if(window._dungeon && window._netMode==='host'){ netSend({t:'dgT', time:S.time}); }
     var c=$('count'); if(c){ c.textContent=S.time+'s'; c.classList.toggle('warn', S.time<=15); }
     if(S.time<=10) beep(880,0.05,'square',0.06);
@@ -509,13 +512,13 @@ function renderMain(){
       '<div class="main-top"><button class="main-play" id="main-play">🏆 玩法</button></div>'+
       '<div class="main-mid">'+
         '<h1 class="main-title">再做一分钟朋友</h1>'+
-        '<div class="main-pic-wrap"><img src="pic.png" class="main-pic" alt=""></div>'+
+        (window.PaperHouseLobby?'':'<div class="main-pic-wrap"><img src="'+(window.RoomAssets?RoomAssets.url('pic.png'):'pic.png')+'" class="main-pic" alt=""></div>')+
         '<button class="main-enter" id="main-enter">选择密室行动</button>'+
       '</div>'+
       '<div class="main-ver">version:'+APP_VER+'</div>'+
     '</div>';
   $('main-play').onclick=function(){ renderHall(); };
-  $('main-enter').onclick=function(){ location.href='?m=dungeon'; };
+  $('main-enter').onclick=function(){ RoomLoading.navigate('dungeon'); };
 }
 /* ---- 玩法列表：主界面「玩法」进入，所有小玩法都在这 ---- */
 function renderHall(){
@@ -921,7 +924,7 @@ function renderDungeonMenu(){
   page.addEventListener('touchstart',function(e){if(e.touches.length!==1||e.target.closest('button')){touch=null;return;}touch={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:true});
   page.addEventListener('touchend',function(e){if(!touch)return;var dx=e.changedTouches[0].clientX-touch.x,dy=e.changedTouches[0].clientY-touch.y;touch=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3)move(dx<0?1:-1);},{passive:true});
   page.addEventListener('touchcancel',function(){touch=null;},{passive:true});
-  $('room-back').onclick=function(){location.search='';};
+  $('room-back').onclick=function(){RoomLoading.navigate('home');};
   $('dm2').onclick=function(){if(page.dataset.coverLoading!=='true')renderHostDungeon();}; $('dm3').onclick=function(){if(page.dataset.coverLoading!=='true')renderDungeonJoin();};
   paint(selectedRoom());
 }
@@ -979,6 +982,7 @@ function renderHostDungeon(){
           newDungeon();
           dgBroadcast();
           conn.on('data', function(dd){ if(!dd||!DungeonConnection.accept(conn,dd)) return;
+            if(window.RoomLoading&&RoomLoading.consume(conn,dd))return;
             dgHostOnData(dd);
           });
           renderDungeonHostMap();
@@ -1033,6 +1037,8 @@ function startDungeonGuest(code){
       conn.on('open', function(){ clearTimeout(ct); clearTimeout(t);
         DungeonConnection.watch(conn);
         conn.on('data', function(dd){ if(!dd||!DungeonConnection.accept(conn,dd)) return;
+          if(window.RoomLoading&&RoomLoading.consume(conn,dd))return;
+          if(dd.t==='enter'&&dd.mode==='maze'&&window.mazeAcceptEnter&&!window.mazeAcceptEnter(dd,conn))return;
           dgGuestOnData(dd);
           if(dd.t==='dg' && S.mod==='dungeon'){ renderDungeonGuestMap(code); }
           else if(dd.t==='enter'){
@@ -1041,7 +1047,7 @@ function startDungeonGuest(code){
             if(dd.mode==='boss'){ window._dgNode=dd.node; S.mod='boss'; renderGuestBoss(code); return; }
             window._dgNode=dd.node; S.mod=dd.mode;
             if(dd.mode==='vault') window._vaultConfig=dd.vault;
-            if(dd.mode==='maze' && dd.maze!=null) setMaze(dd.maze);
+            if(dd.mode==='maze' && dd.maze!=null){if(!(window.mazeApplyScenario&&window.mazeApplyScenario(dd.mazeScenario)===true))setMaze(dd.maze);}
             if(dd.mode==='catch') renderGuestUI(String(code));
             else if(dd.mode==='pressure') renderRealtimeGuest('pressure');
             else if(dd.mode==='beat') renderGuestBeat(String(code));
@@ -1117,9 +1123,10 @@ function dgEnterHost(id){
   DUNGEON.nodes.forEach(function(x){ if(x.layer===n.layer && x.id!==id && !x.done){ DUNGEON.locked[x.id]=true; } });
   if(n.type==='rest'){ dgRestHost(id); return; }
   window._dungeon=true; window._dgNode=id; S.mod=n.mode;
-  if(n.mode==='maze') window._mazeSeed=Math.floor(Math.random()*MAZES.length);
+  var mazeScenario;
+  if(n.mode==='maze'){if(typeof window.mazePrepareHost==='function')mazeScenario=window.mazePrepareHost();else window._mazeSeed=Math.floor(Math.random()*MAZES.length);}
   dgBroadcast();
-  netSend({t:'enter', node:id, mode:n.mode, vault:n.mode==='vault'?vaultSettings():undefined, maze: (n.mode==='maze'? window._mazeSeed : undefined)});
+  netSend({t:'enter', node:id, mode:n.mode, vault:n.mode==='vault'?vaultSettings():undefined, maze: (n.mode==='maze'? window._mazeSeed : undefined), mazeScenario:mazeScenario});
   if(n.mode==='catch'||n.mode==='beat'||n.mode==='pressure'){ renderHost(); }
   else if(n.mode==='shield'){ renderShieldHost(); }
   else if(n.mode==='beam'){ renderBeamHost(); }
@@ -1425,7 +1432,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v13.2·主题密室';
+var APP_VER='v13.3·主题密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -1543,17 +1550,23 @@ function startHostGame(){
   var cv=document.createElement('canvas'); cv.width=340; cv.height=400; stg.appendChild(cv);
   var ctx=cv.getContext('2d');
   var W=340,H=400,BOT=360,px=W/2,pv=0,pW=64,score=0,t=0,done=false,win=false,items=[],nextSpawn=400,wind=0,windT=0;
+  var catchVariation=window.CatchVariation?CatchVariation.create():null;
   window._inL=false; window._dead=false;
-  window._host={ px:px, score:score, items:items, done:done };
+  var hostState=window._host={ mode:'catch', px:px, score:score, items:items, done:done, terminal:false, finishPending:false };
   function broadcast(finalWin){
+    if(window._host!==hostState||hostState.terminal)return;
+    if(finalWin!==undefined){hostState.terminal=true;done=true;win=!!finalWin;hostState.done=true;}
     if(PEER.conn&&PEER.conn.open){
       try{ PEER.conn.send({t:'st', px:px, score:score, time:S.time,
         items:items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
-        goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:window._dead,
+        goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:finalWin!==undefined?!win:window._dead,
         msg:window._lastMsg||null}); }catch(e){}
     }
   }
+  hostState.publishFinal=function(ok){broadcast(!!ok);};
   function spawn(){
+    var varied=catchVariation&&catchVariation.spawn(score);
+    if(varied){items.push({x:varied.x,y:-18,vy:varied.vy,type:varied.type,vx:0});return varied.delay;}
     var r=Math.random(), type;
     if(score<4) type = r<0.7 ? 'good' : 'gold';
     else type = r<0.5 ? 'good' : (r<0.82 ? 'bad' : 'gold');
@@ -1566,7 +1579,7 @@ function startHostGame(){
     t+=16; windT+=16;
     wind=Math.sin(windT*0.0011)*0.5+Math.sin(windT*0.00047+1.3)*0.4;
     nextSpawn-=16;
-    if(nextSpawn<=0){ spawn(); nextSpawn=Math.max(230, 620-score*34)+Math.random()*240; }
+    if(nextSpawn<=0){ var delay=spawn(); nextSpawn=delay===undefined?Math.max(230, 620-score*34)+Math.random()*240:delay; }
     var dir=(PEER.gdir?1:0)-(window._inL?1:0);
     pv+=dir*0.7; pv*=0.72; px+=pv; px=Math.max(pW/2, Math.min(W-pW/2, px));
     for(var i=items.length-1;i>=0;i--){
@@ -1600,7 +1613,9 @@ function startHostGame(){
   window._hostInject=function(type,x){ items.push({x:x,y:BOT-6,vy:0.4,type:type,vx:0}); };
   window._host.px=px; window._host.score=score; window._host.items=items;
   window._host.reset=function(){
+    clearTimers();hostState.terminal=false;hostState.finishPending=false;
     done=false; win=false; score=0; items.length=0; px=W/2; pv=0; nextSpawn=400;
+    catchVariation=window.CatchVariation?CatchVariation.create():null;
     window._dead=false; window._inL=false; PEER.gdir=0;
     S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+CATCH_GOAL;
     window._lastMsg=null;
@@ -1636,17 +1651,21 @@ function startHostBeat(){
   var W=340,H=400, LINE=70, GOAL=30, LIVES=8;
   var notes=[], next=520, score=0, lives=LIVES, done=false, win=false;
   var bpm=96, beatT=0, beatCount=0, t=0;
+  var beatVariation=window.BeatVariation?BeatVariation.create():null;
   window._inL=false; window._dead=false;
-  window._host={ px:0, score:score, notes:notes, done:done };
+  var hostState=window._host={ mode:'beat', px:0, score:score, notes:notes, done:done, terminal:false, finishPending:false };
   function playKick(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='sine'; o.frequency.setValueAtTime(160,ac.currentTime); o.frequency.exponentialRampToValueAtTime(45,ac.currentTime+0.1); g.gain.setValueAtTime(0.42,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.25); }catch(e){} }
   function playHat(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='square'; o.frequency.value=2400; g.gain.setValueAtTime(0.09,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.05); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.07); }catch(e){} }
   function broadcast(finalWin){
+    if(window._host!==hostState||hostState.terminal)return;
+    if(finalWin!==undefined){hostState.terminal=true;done=true;win=!!finalWin;hostState.done=true;}
     if(PEER.conn&&PEER.conn.open){
       try{ PEER.conn.send({t:'st', notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
-        score:score, lives:lives, bpm:bpm, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:window._dead,
+        score:score, lives:lives, bpm:bpm, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:finalWin!==undefined?!win:window._dead,
         msg:window._lastMsg||null}); }catch(e){}
     }
   }
+  hostState.publishFinal=function(ok){broadcast(!!ok);};
   function render(){beatMobileDraw(ctx,notes,lives,bpm);}
   function press(who){
     if(done||window._dead) return;
@@ -1672,7 +1691,7 @@ function startHostBeat(){
     beatT+=16;
     if(beatT>=beatMs){ beatT-=beatMs; beatCount++; playKick(); if(beatCount%2===0) playHat(); }
     next-=16;
-    if(next<=0){ var r=Math.random(); var type=r<0.5?'A':(r<0.8?'B':'AB'); notes.push({x:W+16,hit:false,type:type}); next=beatMs*2; }
+    if(next<=0){ var pattern=beatVariation&&beatVariation.next(); var r=pattern?0:Math.random(); var type=pattern?pattern.type:(r<0.5?'A':(r<0.8?'B':'AB')); notes.push({x:W+16,hit:false,type:type}); next=beatMs*(pattern?pattern.beats:2); }
     for(var i=notes.length-1;i>=0;i--){
       var n=notes[i]; n.x-=2.4;
       if(!n.hit && n.x<LINE-24){ n.hit=true; lives--; dualBeep(120,0.1,'square',0.12); msg('err','✘ 漏了音符！机会剩 '+lives); if(lives<=0){ explode('节拍乱了'); return; } }
@@ -1694,7 +1713,9 @@ function startHostBeat(){
   window._hostInject=function(type,x){ notes.push({x:x||80,hit:false,type:type||'A'}); };
   window._host.px=0; window._host.score=score; window._host.notes=notes;
   window._host.reset=function(){
+    clearTimers();hostState.terminal=false;hostState.finishPending=false;
     done=false; win=false; score=0; lives=LIVES; notes.length=0; next=520; bpm=96; beatT=0; beatCount=0; t=0;
+    beatVariation=window.BeatVariation?BeatVariation.create():null;
     window._dead=false; S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+GOAL;
     window._lastMsg=null;
     try{ PEER.conn.send({t:'rst'}); }catch(e){}
@@ -2541,7 +2562,7 @@ function runModule(set){
   if(S.mod==='maze'){
     dp.style.display='grid';
     if(!(window._dungeon && window._netMode==='host')) setMaze(Math.floor(Math.random()*MAZES.length));
-    var mm=$('msg'); if(mm){ mm.className='msg warn'; mm.textContent='🎲 本次迷宫 = 图 '+(window._mazeSeed+1)+'/'+MAZES.length+' —— 先报给 B，让他切到对应图！'; }
+    var mm=$('msg'); if(mm){ mm.className='msg warn'; mm.textContent='本局地图已同步，听 B 指路。'; }
     runMaze(set);
   }
   else if(S.mod==='dial'){ dp.style.display='grid'; runDial(set); }
@@ -3131,13 +3152,19 @@ function drawMazeFull(ctx, cell){
 
 /* ---- 爆炸 / 通关 ---- */
 function explode(reason){
+  var terminalHost=window._netMode==='host'&&window._host&&window._host.mode===S.mod&&window._host.publishFinal?window._host:null;
+  if(terminalHost&&terminalHost.terminal)return;
   clearTimers();
   window._dead=true;
   window._mazeMove=null; window._wireKey=null; window._wirePick=null; window._dialLock=null;
   window._inL=false; window._inR=false; window._catchMove=null; window._catchStop=null;
   if(window._catchZones){ window._catchZones.forEach(function(z){ if(z.parentNode) z.parentNode.removeChild(z); }); window._catchZones=null; }
   // 联网房主：爆炸时主动广播最终失败状态给同伴
-  if(window._netMode==='host' && PEER.conn && window._host){
+  if(terminalHost){
+    window._lastMsg={kind:'err',txt:'失败：'+reason};
+    var count=$('count');if(count)count.textContent=S.time+'s';
+    terminalHost.publishFinal(false);
+  }else if(window._netMode==='host' && PEER.conn && window._host&&Array.isArray(window._host.items)){
     try{ PEER.conn.send({t:'st', px:window._host.px, score:window._host.score, time:S.time,
       items:window._host.items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
       goal:CATCH_GOAL, win:false, dead:true}); }catch(e){}
@@ -3152,9 +3179,13 @@ function explode(reason){
   finish(false);
 }
 function finish(ok){
+  var terminalHost=window._netMode==='host'&&window._host&&window._host.mode===S.mod&&window._host.publishFinal?window._host:null;
+  if(terminalHost){if(terminalHost.finishPending)return;terminalHost.finishPending=true;terminalHost.publishFinal(!!ok);}
   clearTimers();
+  var finishEpoch=window._timerEpoch;
   var dur=Math.round((Date.now()-S.started)/1000);
   setTimeout(function(){
+    if(terminalHost&&(window._host!==terminalHost||window._timerEpoch!==finishEpoch||!terminalHost.finishPending))return;
     closeFB();
     if(window._dungeon && (window._netMode==='host'||window._netMode==='guest')){ dungeonEnd(ok); return; }
     showFB({ok:ok, duration:dur, timeLeft:S.time, role:S.role});
@@ -3389,45 +3420,51 @@ function pressureDraw(s,role){
 }
 
 </script>
-<link rel="stylesheet" href="expansion-games.css?v=13.2">
-<script src="expansion-games.js?v=13.2"></script>
-<link rel="stylesheet" href="coop-upgrade.css?v=13.2">
-<script src="coop-upgrade.js?v=13.2"></script>
-<link rel="stylesheet" href="fullscreen-map.css?v=13.2">
-<script src="fullscreen-map.js?v=13.2"></script>
-<link rel="stylesheet" href="beam-mobile.css?v=13.2">
-<script src="beam-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="beat-mobile.css?v=13.2">
-<script src="beat-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="catch-mobile.css?v=13.2">
-<script src="catch-mobile.js?v=13.2"></script>
-<script src="code-symbols.js?v=13.2"></script>
-<link rel="stylesheet" href="maze-mobile.css?v=13.2">
-<script src="maze-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="vault-mobile.css?v=13.2">
-<script src="vault-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="radio-mobile.css?v=13.2">
-<script src="radio-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="wires-mobile.css?v=13.2">
-<script src="wires-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="boss-mobile.css?v=13.2">
-<script src="boss-mobile.js?v=13.2"></script>
-<link rel="stylesheet" href="puzzle-pack.css?v=13.2">
-<script src="puzzle-pack.js?v=13.2"></script>
-<link rel="stylesheet" href="dungeon-routes.css?v=13.2">
-<script src="dungeon-routes.js?v=13.2"></script>
-<link rel="stylesheet" href="password-strip.css?v=13.2">
-<script src="password-strip.js?v=13.2"></script>
-<link rel="stylesheet" href="rhythm-light.css?v=13.2">
-<script src="rhythm-light.js?v=13.2"></script>
-<link rel="stylesheet" href="room-puzzle-themes.css?v=13.2">
-<script src="room-puzzle-themes.js?v=13.2"></script>
-<link rel="stylesheet" href="room-progression.css?v=13.2">
-<script src="room-progression.js?v=13.2"></script>
-<link rel="stylesheet" href="dungeon-connection.css?v=13.2">
-<script src="dungeon-connection.js?v=13.2"></script>
-<link rel="stylesheet" href="room-cover-loader.css?v=13.2">
-<script src="room-cover-loader.js?v=13.2"></script>
-<script>if(S.mod!=='dungeon'&&!PLAYGROUNDS.some(function(p){return p.id===S.mod;})){S.mod=null;S.role=null;}render();</script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.3">
+<script defer src="room-assets.js?v=13.3"></script>
+<script defer src="room-loading.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="expansion-games.css?v=13.3">
+<script defer src="expansion-games.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.3">
+<script defer src="coop-upgrade.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="fullscreen-map.css?v=13.3">
+<script defer src="fullscreen-map.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beam-mobile.css?v=13.3">
+<script defer src="beam-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beat-mobile.css?v=13.3">
+<script defer src="beat-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="catch-mobile.css?v=13.3">
+<script defer src="catch-mobile.js?v=13.3"></script>
+<script defer src="code-symbols.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="maze-mobile.css?v=13.3">
+<script defer src="maze-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="vault-mobile.css?v=13.3">
+<script defer src="vault-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="radio-mobile.css?v=13.3">
+<script defer src="radio-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="wires-mobile.css?v=13.3">
+<script defer src="wires-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="boss-mobile.css?v=13.3">
+<script defer src="boss-mobile.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="puzzle-pack.css?v=13.3">
+<script defer src="puzzle-pack.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-routes.css?v=13.3">
+<script defer src="dungeon-routes.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="password-strip.css?v=13.3">
+<script defer src="password-strip.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="rhythm-light.css?v=13.3">
+<script defer src="rhythm-light.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-puzzle-themes.css?v=13.3">
+<script defer src="room-puzzle-themes.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-progression.css?v=13.3">
+<script defer src="room-progression.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-connection.css?v=13.3">
+<script defer src="dungeon-connection.js?v=13.3"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.3">
+<script defer src="room-cover-loader.js?v=13.3"></script>
+<script>
+window.__roomStylesReady=Promise.all(Array.from(document.querySelectorAll('link[data-room-style]')).map(function(link){return new Promise(function(resolve){if(link.sheet||window.__roomLoadFailures.includes(link.href)){resolve();return;}var timer=setTimeout(function(){window.__roomLoadFailures.push(link.href);resolve();},30000);function done(){clearTimeout(timer);resolve();}link.addEventListener('load',done,{once:true});link.addEventListener('error',done,{once:true});});}));
+document.addEventListener('DOMContentLoaded',function(){if(window.RoomLoading){RoomLoading.boot();}else{document.getElementById('room-boot-detail').textContent='界面没有加载完成，请重新加载。';}},{once:true});
+</script>
 </body>
 </html>

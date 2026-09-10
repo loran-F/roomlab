@@ -169,7 +169,7 @@ dgDrawMap=function(){
 const oldMenu=renderDungeonMenu;
 renderDungeonMenu=function(){
  oldMenu();const target=document.getElementById('room-info');if(!target)return;
- function update(){let line=target.querySelector('.route-preview');if(!line){line=document.createElement('p');line.className='route-preview';target.appendChild(line);}const text=describe(selectedRoom());if(line.textContent!==text)line.textContent=text;const meta=target.querySelector('.room-meta');if(meta&&!meta.textContent.includes('约'))meta.innerHTML=meta.innerHTML.replace(/(\d+)分钟/,'约$1分钟');}
+ function update(){const meta=target.querySelector('.room-meta');if(meta&&!meta.textContent.includes('约'))meta.innerHTML=meta.innerHTML.replace(/(\d+)分钟/,'约$1分钟');}
  update();const observer=new MutationObserver(()=>{if(!target.isConnected){observer.disconnect();return;}update();});observer.observe(target,{childList:true});
  const previous=window._routeMenuObserver;if(previous)previous.disconnect();window._routeMenuObserver=observer;
 };

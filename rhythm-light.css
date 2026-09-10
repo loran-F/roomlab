@@ -19,3 +19,12 @@
 .ls-game[data-role=B][data-phase=play] .ls-dpad{gap:6px}
 .ls-game[data-theme=ghost] .ls-shade{fill:#777ba5}
 .ls-game[data-theme=ghost] .ls-arena{border-color:#747f9a}
+
+/* The challenge switch never reflects B's light expiry. */
+.ls-switch-art{height:220px;display:flex;justify-content:center;align-items:center}
+.ls-switch-art svg{width:170px;height:170px;fill:none;stroke:#bed7fa;stroke-width:10;stroke-linecap:round}
+.ls-game #ls-cue{height:54px;line-height:54px;font:700 36px/54px Consolas,monospace}
+.ls-game #ls-pull{min-height:64px;font-size:21px}
+.ls-game #ls-pull[aria-pressed=true]{background:#2448a7;border-color:#2448a7}
+.ls-game .ls-intro details:not([open]) p{display:none}
+@media(max-height:680px){.ls-switch-art{height:160px}.ls-switch-art svg{height:125px;width:125px}}
