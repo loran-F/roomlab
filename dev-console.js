@@ -129,9 +129,10 @@ async function start(config){
  }catch(e){if(e.name!=='AbortError')fail(r,e);}
 }
 function monitor(r){if(current!==r||r.controller.signal.aborted)return;const e=paintEndpoints(r);
+ r.bot?.syncResult();
  if(!e.A.connected||!e.B.connected||e.A.link==='failed'||e.B.link==='failed'){fail(r,new Error((!e.A.connected?'A':'B')+' 端连接已断开'));return;}
  if(e.A.link==='recovering'||e.B.link==='recovering')setPhase('playing','连接不稳定，等待游戏恢复');
- else if(e.A.mode==='dungeon'||e.B.mode==='dungeon'||e.A.stage==='已结束'||e.B.stage==='已结束'){const s=readGame(r.windows.A,r.config.mode);r.bot?.stop(s?.win===false?'本关失败，托管已停止':'本局已结束，托管已停止');setPhase('ended','本局已结束或已返回地图，可重试本关');}
+ else if(e.A.mode==='dungeon'||e.B.mode==='dungeon'||e.A.stage==='已结束'||e.B.stage==='已结束'){const s=readGame(r.windows.A,r.config.mode);r.bot?.stop(s?.win===false?'本关失败，托管已停止':s?.win===true?'本关成功，托管已停止':'本关已结束，托管已停止');setPhase('ended','本局已结束或已返回地图，可重试本关');}
  else setPhase('playing',r.config.mode==='vault'?'手动操作 · A 可开始或重看扫描':'双方已准备 · 手动操作');
  r.monitor=setTimeout(()=>monitor(r),350);
 }
