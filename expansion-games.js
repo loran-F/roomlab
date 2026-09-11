@@ -48,8 +48,8 @@
   const themeName=s=>({caller:'员工身份核验',shadow:'双胞胎的影子',lookback:'观察者停走'}[s.mode]);
   function themeText(s,text){if(!themed(s))return text;let t=String(text);if(s.mode==='caller')t=t.replace(/值班室/g,'夜班公司').replace(/值班人员/g,'夜班员工').replace(/工号/g,'员工编号').replace(/来电/g,'门禁呼叫');if(s.mode==='lookback')t=t.replace(/怪物/g,'观察者').replace(/诱饵灯/g,'干扰灯').replace(/走廊/g,'游戏场').replace(/柜子/g,'掩体');return t;}
   function message(s,text){s.message=text;s.messageSeq++;}
-  function finish(s,win,text){s.done=true;s.win=win;message(s,text);}
-  function damage(s,text){s.hp--;message(s,text+' · 配合机会 −1');if(s.hp<=0)finish(s,false,text+'，机会用尽。');}
+  function finish(s,win,text,reasonCode){if(s.done)return;s.done=true;s.win=win;s.reasonCode=reasonCode||(win?'objective_complete':'objective_failed');message(s,text);}
+  function damage(s,text){s.hp--;message(s,text+' · 配合机会 −1');if(s.hp<=0)finish(s,false,text+'，机会用尽。','attempts_exhausted');}
   const PEOPLE=[
     {name:'林小满',job:'维修员',code:'413',task:'更换东侧保险丝'},
     {name:'周阿岚',job:'配送员',code:'728',task:'把药箱送到值班室'},
@@ -162,10 +162,10 @@
         shadowExit(s);
       }
     }
-    if(s.time<=0&&!s.done)finish(s,false,'时间用尽，先和搭档复盘，再挑战一次。');
+    if(s.time<=0&&!s.done)finish(s,false,'时间用尽，先和搭档复盘，再挑战一次。','time_expired');
   }
   function snapshot(s,role){
-    const v={id:s.id,mode:s.mode,time:s.time,elapsed:s.elapsed,ready:{...s.ready},cd:s.cd,done:s.done,win:s.win,hp:s.hp,completed:s.completed,round:s.round,phase:s.phase,phaseTime:s.phaseTime,message:s.message,messageSeq:s.messageSeq};
+    const v={id:s.id,mode:s.mode,time:s.time,elapsed:s.elapsed,ready:{...s.ready},cd:s.cd,done:s.done,win:s.win,hp:s.hp,completed:s.completed,round:s.round,phase:s.phase,phaseTime:s.phaseTime,message:s.message,messageSeq:s.messageSeq,reasonCode:s.reasonCode};
     v.roomId=s.roomId;v.tier=s.tier;
     if(s.mode==='lookback'){
       Object.assign(v,{travel:s.travel,travelLimit:s.travelLimit,warningLimit:s.warningLimit,dangerLimit:s.dangerLimit,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
@@ -185,7 +185,7 @@
   if(typeof PLAYGROUNDS==='undefined')return;
 const shadowTrack=[26,69,112,167,231,271,309];
 function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate=s.mirror?125:211,exit=x(3),bp=x(s.button),kx=x(6);const person=(n,runner=false)=>{const px=x(n),py=runner?202:146,echo=!runner&&s.echo,label=runner?'B':echo?'回声 A':'A',stroke=echo?'#f4e8ff':'#281f32',fill=runner?'#ffa650':echo?'#aa8dbb':'#54adc5';return `<g class="person" data-character="${runner?'B':'A'}" transform="translate(${px} ${py})"><circle cy="0" r="8" fill="${echo?'#baa3ce':'#ffcd9e'}" stroke="${stroke}" stroke-width="2" ${echo?'stroke-dasharray="3 2"':''}/><rect x="-11" y="9" width="22" height="30" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="2" ${echo?'stroke-dasharray="4 2"':''}/><text x="0" y="29" fill="${echo?'#291e35':'#fff'}" text-anchor="middle" font-size="13" font-weight="bold">${runner?'B':echo?'▶':'A'}</text><text x="0" y="-16" text-anchor="middle" font-size="12" fill="#fff3dc" font-weight="bold">${echo?label:""}</text></g>`};return `<svg viewBox="0 0 336 280" aria-label="${s.mirror?'向左':'向右'}出发；集合出口在门禁入口侧"><rect x="1.5" y="1.5" width="333" height="277" rx="11" fill="#b39cb9" stroke="#281f32" stroke-width="3"/><path d="M3 3h330v190H3z" fill="#776087"/><path d="M3 193h330" stroke="#281f32" stroke-width="3"/><g stroke="#886d98" stroke-width="1"><path d="M3 48h330M3 96h330M3 144h330M48 3v190M96 3v190M144 3v190M192 3v190M240 3v190M288 3v190"/></g><rect x="${exit-21}" y="107" width="42" height="155" rx="8" fill="#b2d2bc" fill-opacity=".35" stroke="#d4edd6" stroke-width="2" stroke-dasharray="5 4"/><path d="M${exit} 52v51" stroke="#d4edd6" stroke-width="2" stroke-dasharray="3 4"/><rect x="${exit-38}" y="25" width="76" height="25" rx="5" fill="#d7e8c8" stroke="#281f32" stroke-width="2"/><text x="${exit}" y="42" text-anchor="middle" font-size="14" fill="#294b3a" font-weight="bold">集合出口</text><path d="M${exit-8} 260h16m-8 0v-10m-4 4 4-4 4 4" stroke="#e8f6dc" stroke-width="2" fill="none"/><path d="M${bp} 210H${gate}" stroke="${s.a===s.button&&s.phase!=='plan'?'#ffda65':'#736178'}" stroke-width="5"/><rect x="${gate-14}" y="105" width="28" height="149" rx="4" fill="#3e304a" stroke="#281f32" stroke-width="3"/><rect x="${gate-10}" y="109" width="20" height="${s.open?9:141}" fill="#54adc5"/><path d="M${gate-10} 113h20" stroke="#317e97" stroke-width="3"/><rect x="${gate-24}" y="72" width="48" height="24" rx="4" fill="${s.open?'#b7ddb9':'#fff0c5'}" stroke="#281f32" stroke-width="2"/><text x="${gate}" y="89" text-anchor="middle" font-size="14" fill="#281f32">门禁</text><rect x="${bp-14}" y="${s.a===s.button&&s.phase!=='plan'?199:193}" width="28" height="${s.a===s.button&&s.phase!=='plan'?7:13}" rx="4" fill="${s.a===s.button&&s.phase!=='plan'?'#9dcca5':'#ffda65'}" stroke="#281f32" stroke-width="2"/><text x="${bp}" y="271" text-anchor="middle" font-size="13" fill="#35273e">按钮</text><g opacity="${s.key?.3:1}" transform="translate(${kx} 159)"><circle cx="0" cy="0" r="8" fill="#ffda65" stroke="#281f32" stroke-width="2"/><circle cx="0" cy="0" r="3" fill="#776087"/><path d="M0 8v17h7m-7-6h5" stroke="#281f32" stroke-width="7" fill="none"/><path d="M0 8v17h7m-7-6h5" stroke="#ffda65" stroke-width="4" fill="none"/></g><text x="${Math.max(42,Math.min(294,kx))}" y="271" text-anchor="middle" font-size="13" fill="#35273e">${s.key?'已取钥匙':'钥匙'}</text>${person(s.a)}${person(s.b,true)}</svg>`}
-  let callerFocus=0,callerRound='';
+  let callerFocus=0,callerRound='',resultConnection=null;const retiredRuns=new Set();
   let active=null,view=null,dispose=null,serial=0,practice=false,localAction='stop',guestConn=null,lobbyTicket=0;
   const el=id=>document.getElementById(id);
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -301,37 +301,54 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
       if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':!['replay','escape'].includes(s.phase));if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry','escape'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry','escape'].includes(s.phase)||!s.tape.length;}
       if(s.mode==='lookback'&&['go','stop','hide','left','right'].includes(k)||s.mode==='caller'&&['admit','reject'].includes(k))b.setAttribute('aria-pressed',String(b.classList.contains('selected')));
     });
-    if(s.done&&!window._dungeon)result(s,role);
+    if(s.done&&!window._dungeon&&!g.RoomResults)result(s,role);
   }
   function result(s,role){
     const r=el('x-result');if(!r||r.dataset.id===s.id)return;
     r.dataset.id=s.id;r.hidden=false;r.innerHTML='<h2>'+(s.win?'配合成功！':'再试一次？')+'</h2><p>'+esc(s.message)+'</p>'+button('restart','我准备再来一局','primary');
     r.onclick=e=>{if(!e.target.closest('button'))return;e.target.disabled=true;e.target.textContent='等待搭档准备';if(role==='A'){active.restart.A=true;restartCheck();}else netSend({t:'xRestart',id:s.id});};
   }
+  function beginResult(s,role){
+    if(!g.RoomResults)return;
+    if(!window._dungeon)g.RoomResults.begin({runId:s.id,role,connection:PEER.conn,gameId:s.mode,title:META[s.mode].name,dungeon:null,onContinue:()=>{if(role==='A')host(s.mode);},onExit:()=>{netSend({t:'bye'});clearTimers();closePeer();renderHall();}});
+    s.resultRunId=g.RoomResults.status()?.runId;
+    s.resultContext=window._dungeon?window._roomGameContext:null;
+  }
+  function reportResult(s){
+    if(!g.RoomResults||s.resultReported)return;
+    if(!s.resultRunId||g.RoomResults.status()?.runId!==s.resultRunId)return;
+    const data={win:s.win,reasonCode:s.win?'completed':s.reasonCode==='time_expired'?'timeout':s.reasonCode||'objective_failed',reason:s.reasonCode==='time_expired'?'行动时间用尽。':s.reasonCode==='attempts_exhausted'?'配合机会已用尽。':s.win?'双方已完成本次目标。':'本次目标未完成。',metrics:{durationMs:Math.round(s.elapsed*1000),timeLeftMs:Math.max(0,Math.round(s.time*1000)),completed:s.completed,goal:s.mode==='shadow'?1:5}};
+    if(s.mode!=='shadow')Object.assign(data.metrics,{hp:Math.max(0,s.hp),mistakesRemaining:Math.max(0,s.hp),maxMistakes:3});
+    s.resultReported=s.resultContext?s.resultContext.finish(data):g.RoomResults.report(data);
+  }
   function cleanup(){if(dispose){const f=dispose;dispose=null;f();}active=null;view=null;API.state=null;API.view=null;}
   function restartCheck(){if(active&&active.restart.A&&active.restart.B)host(active.mode);}
   function host(mode){
     clearTimers();closeFB();S.mod=mode;window._dead=false;serial=0;
     active=create(mode);if(window._dungeon&&typeof window.coopTime==='function')active.time=window.coopTime(active.time);active.restart={A:false,B:false};API.state=active;shell(mode,'A');
-    const s=active;let last=performance.now(),next=0,endAt=null;
+    const s=active;beginResult(s,'A');let last=performance.now(),next=0,endAt=null,loop;
     function tick(){
       if(active!==s)return;
       const now=performance.now(),dt=Math.min(.1,(now-last)/1000);last=now;step(s,dt);
       if(now>=next){draw(snapshot(s,'A'),'A');netSend({t:'xState',state:snapshot(s,'B')});next=now+80;}
+      if(s.done&&g.RoomResults){draw(snapshot(s,'A'),'A');netSend({t:'xState',state:snapshot(s,'B')});window._dead=true;reportResult(s);if(s.resultReported)clearInterval(loop);return;}
       if(s.done){window._dead=true;if(endAt===null)endAt=now+1600;if(window._dungeon&&now>=endAt){const won=s.win;clearTimers();dungeonEnd(won);}}
     }
-    timers.push(setInterval(tick,20));tick();
+    loop=setInterval(tick,20);timers.push(loop);tick();
   }
   function guest(mode){clearTimers();closeFB();S.mod=mode;serial=0;window._dead=false;shell(mode,'B');
-    if(!window._dungeon&&PEER.conn!==guestConn){guestConn=PEER.conn;guestConn.on('data',d=>dgGuestOnData(d));}
+    if(!window._dungeon&&PEER.conn!==guestConn){guestConn=PEER.conn;const conn=guestConn;conn.on('data',d=>{if(g.RoomResults&&g.RoomResults.consume(d,conn))return;if(PEER.conn===conn)dgGuestOnData(d);});}
   }
   function incoming(d){
     if(d&&d.t==='xWelcome'&&IDS.includes(d.mode)&&!window._dungeon){guest(d.mode);return true;}
     if(!d)return false;
     if(d.t!=='xState'||!d.state||!IDS.includes(d.state.mode))return false;
     const s=d.state;if(S.mod!==s.mode)return true;
+    if(resultConnection!==PEER.conn){resultConnection=PEER.conn;retiredRuns.clear();}
+    if(retiredRuns.has(s.id))return true;
+    if(view&&view.id!==s.id)retiredRuns.add(view.id);
     if(!el('x-stage')||!view||view.id!==s.id){if(!el('x-stage')||view&&view.id!==s.id)guest(s.mode);}
-    draw(s,'B');return true;
+    beginResult(s,'B');draw(s,'B');return true;
   }
   function wrap(name,fn){const old=g[name];g[name]=function(...args){return fn.call(this,old,args);};}
   function lobby(mode,role){
@@ -350,7 +367,7 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
         function opened(conn){
           if(ticket!==lobbyTicket){conn.close();return;}connected=true;clearTimeout(timeout);PEER.conn=conn;
           if(role==='A'){
-            conn.on('data',d=>dgHostOnData(d));netSend({t:'xWelcome',mode});host(mode);
+            conn.on('data',d=>{if(g.RoomResults&&g.RoomResults.consume(d,conn))return;if(PEER.conn===conn)dgHostOnData(d);});netSend({t:'xWelcome',mode});host(mode);
           }else guest(mode);
         }
         p.on('open',()=>{
@@ -377,8 +394,8 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
     wrap('renderGuestUI',(old,args)=>IDS.includes(S.mod)?guest(S.mod):old(...args));
     wrap('renderPlayDungeonHost',(old,args)=>IDS.includes(S.mod)?host(S.mod):old(...args));
     wrap('renderManual',(old,args)=>IDS.includes(S.mod)?guest(S.mod):old(...args));
-    wrap('dgHostOnData',(old,args)=>{const d=args[0];if(d&&d.t==='xInput'){input(active,'B',d);return;}if(d&&d.t==='xRestart'){if(active&&active.done&&active.id===d.id){active.restart.B=true;restartCheck();}return;}return old(...args);});
-    wrap('dgGuestOnData',(old,args)=>incoming(args[0])?undefined:old(...args));
+    wrap('dgHostOnData',(old,args)=>{const d=args[0];if(g.RoomResults&&g.RoomResults.consume(d,PEER.conn))return;if(d&&d.t==='xInput'){input(active,'B',d);return;}if(d&&d.t==='xRestart'){if(g.RoomResults)return;if(active&&active.done&&active.id===d.id){active.restart.B=true;restartCheck();}return;}return old(...args);});
+    wrap('dgGuestOnData',(old,args)=>g.RoomResults&&g.RoomResults.consume(args[0],PEER.conn)?undefined:incoming(args[0])?undefined:old(...args));
     API.startHost=host;API.startGuest=guest;
   }
   install();

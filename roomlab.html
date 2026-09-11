@@ -512,7 +512,7 @@ function renderMain(){
       '<div class="main-top"><button class="main-play" id="main-play">🏆 玩法</button></div>'+
       '<div class="main-mid">'+
         '<h1 class="main-title">再做一分钟朋友</h1>'+
-        (window.PaperHouseLobby?'':'<div class="main-pic-wrap"><img src="'+(window.RoomAssets?RoomAssets.url('pic.png'):'pic.png')+'" class="main-pic" alt=""></div>')+
+        '<div class="main-pic-wrap"><img src="'+(window.RoomAssets?RoomAssets.url('pic.png'):'pic.png')+'" class="main-pic" alt=""></div>'+
         '<button class="main-enter" id="main-enter">选择密室行动</button>'+
       '</div>'+
       '<div class="main-ver">version:'+APP_VER+'</div>'+
@@ -942,6 +942,7 @@ function applyDungeon(dd){
 function renderDungeonHostMap(){renderDungeonMapShell('A',String(PEER.room||''));}
 function renderDungeonGuestMap(code){renderDungeonMapShell('B',String(code));}
 function dgHostOnData(dd){
+  if(window.RoomResults&&RoomResults.consume(dd,PEER.conn))return;
   if(dd.t==='rtInput'||dd.t==='rtReady'){ realtimeHostData(dd); return; }
   if(dd.t==='mvB'){ hostMoveB(dd.id); }
   else if(dd.t==='in'){ PEER.gdir=dd.v?1:0; }
@@ -1011,6 +1012,7 @@ function renderDungeonJoin(){
   };
 }
 function dgGuestOnData(dd){
+  if(window.RoomResults&&RoomResults.consume(dd,PEER.conn))return;
   if(dd.t==='rtState'){ realtimeGuestData(dd); return; }
   if(dd.t==='dg'){ applyDungeon(dd.d); }
   else if(dd.t==='dgcd'){ if(dd.n>0){ showDgBar(dd.id,dd.n); } else { hideDgBar(); } }
@@ -1044,8 +1046,9 @@ function startDungeonGuest(code){
           else if(dd.t==='enter'){
             window._dungeon=true;
             if(dd.mode==='rest'){ applyDungeon(dd.d); renderDungeonGuestMap(code); return; }
-            if(dd.mode==='boss'){ window._dgNode=dd.node; S.mod='boss'; renderGuestBoss(code); return; }
+            if(dd.mode==='boss'){ window._dgNode=dd.node; S.mod='boss'; if(dd.resultRunId&&window.roomResultsBeginLegacy)roomResultsBeginLegacy('B',dd.resultRunId); renderGuestBoss(code); return; }
             window._dgNode=dd.node; S.mod=dd.mode;
+            if(dd.resultRunId&&window.roomResultsBeginLegacy)roomResultsBeginLegacy('B',dd.resultRunId);
             if(dd.mode==='vault') window._vaultConfig=dd.vault;
             if(dd.mode==='maze' && dd.maze!=null){if(!(window.mazeApplyScenario&&window.mazeApplyScenario(dd.mazeScenario)===true))setMaze(dd.maze);}
             if(dd.mode==='catch') renderGuestUI(String(code));
@@ -1124,9 +1127,10 @@ function dgEnterHost(id){
   if(n.type==='rest'){ dgRestHost(id); return; }
   window._dungeon=true; window._dgNode=id; S.mod=n.mode;
   var mazeScenario;
+  var resultRunId=window.roomResultsBeginLegacy?roomResultsBeginLegacy('A'):null;
   if(n.mode==='maze'){if(typeof window.mazePrepareHost==='function')mazeScenario=window.mazePrepareHost();else window._mazeSeed=Math.floor(Math.random()*MAZES.length);}
   dgBroadcast();
-  netSend({t:'enter', node:id, mode:n.mode, vault:n.mode==='vault'?vaultSettings():undefined, maze: (n.mode==='maze'? window._mazeSeed : undefined), mazeScenario:mazeScenario});
+  netSend({t:'enter', node:id, mode:n.mode, resultRunId:resultRunId, vault:n.mode==='vault'?vaultSettings():undefined, maze: (n.mode==='maze'? window._mazeSeed : undefined), mazeScenario:mazeScenario});
   if(n.mode==='catch'||n.mode==='beat'||n.mode==='pressure'){ renderHost(); }
   else if(n.mode==='shield'){ renderShieldHost(); }
   else if(n.mode==='beam'){ renderBeamHost(); }
@@ -1144,7 +1148,8 @@ function dgRestHost(id){
 }
 function dgBossHost(){
   window._dungeon=true; window._dgNode=DUNGEON.boss; S.mod='boss';
-  netSend({t:'enter',node:DUNGEON.boss,mode:'boss'});
+  var resultRunId=window.roomResultsBeginLegacy?roomResultsBeginLegacy('A'):null;
+  netSend({t:'enter',node:DUNGEON.boss,mode:'boss',resultRunId:resultRunId});
   startRealtime('boss');
 }
 function dgBossWin(){
@@ -1432,7 +1437,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v13.4·主题密室';
+var APP_VER='v13.5·主题密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -1553,11 +1558,13 @@ function startHostGame(){
   var catchVariation=window.CatchVariation?CatchVariation.create():null;
   window._inL=false; window._dead=false;
   var hostState=window._host={ mode:'catch', px:px, score:score, items:items, done:done, terminal:false, finishPending:false };
+  hostState.resultRunId=Date.now().toString(36)+Math.random().toString(36).slice(2);hostState.resultElapsed=0;
+  if(window.catchResultBegin)catchResultBegin(hostState.resultRunId,'A',PEER.conn);
   function broadcast(finalWin){
     if(window._host!==hostState||hostState.terminal)return;
     if(finalWin!==undefined){hostState.terminal=true;done=true;win=!!finalWin;hostState.done=true;}
     if(PEER.conn&&PEER.conn.open){
-      try{ PEER.conn.send({t:'st', px:px, score:score, time:S.time,
+      try{ PEER.conn.send({t:'st', resultRunId:hostState.resultRunId, px:px, score:score, time:S.time,
         items:items.map(function(it){ return {x:it.x,y:it.y,type:it.type}; }),
         goal:CATCH_GOAL, win: finalWin!==undefined?finalWin:win, dead:finalWin!==undefined?!win:window._dead,
         msg:window._lastMsg||null}); }catch(e){}
@@ -1576,6 +1583,7 @@ function startHostGame(){
   function loop(){
     if(done||window._dead) return;
     if(window.CatchConnection&&CatchConnection.paused())return;
+    hostState.resultElapsed+=16;
     t+=16; windT+=16;
     wind=Math.sin(windT*0.0011)*0.5+Math.sin(windT*0.00047+1.3)*0.4;
     nextSpawn-=16;
@@ -1609,11 +1617,13 @@ function startHostGame(){
   var zL=makeZone('l',function(v){ window._inL=v; });
   window._netZones=[zL];
   S.started=Date.now(); S.time=60;
-  window._hostState=function(){ return {px:px,score:score,win:win,dead:window._dead,items:items.length}; };
+  window._hostState=function(){ return {px:px,score:score,done:done,win:win,dead:window._dead,items:items.length}; };
   window._hostInject=function(type,x){ items.push({x:x,y:BOT-6,vy:0.4,type:type,vx:0}); };
   window._host.px=px; window._host.score=score; window._host.items=items;
   window._host.reset=function(){
     clearTimers();hostState.terminal=false;hostState.finishPending=false;
+    hostState.resultRunId=Date.now().toString(36)+Math.random().toString(36).slice(2);hostState.resultElapsed=0;
+    var resultBegin=window[hostState.mode+'ResultBegin'];if(resultBegin)resultBegin(hostState.resultRunId,'A',PEER.conn);
     done=false; win=false; score=0; items.length=0; px=W/2; pv=0; nextSpawn=400;
     catchVariation=window.CatchVariation?CatchVariation.create():null;
     window._dead=false; window._inL=false; PEER.gdir=0;
@@ -1654,13 +1664,15 @@ function startHostBeat(){
   var beatVariation=window.BeatVariation?BeatVariation.create():null;
   window._inL=false; window._dead=false;
   var hostState=window._host={ mode:'beat', px:0, score:score, notes:notes, done:done, terminal:false, finishPending:false };
+  hostState.resultRunId=Date.now().toString(36)+Math.random().toString(36).slice(2);hostState.resultElapsed=0;
+  if(window.beatResultBegin)beatResultBegin(hostState.resultRunId,'A',PEER.conn);
   function playKick(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='sine'; o.frequency.setValueAtTime(160,ac.currentTime); o.frequency.exponentialRampToValueAtTime(45,ac.currentTime+0.1); g.gain.setValueAtTime(0.42,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.22); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.25); }catch(e){} }
   function playHat(){ try{ var ac=audio(); if(!ac) return; var o=ac.createOscillator(),g=ac.createGain(); o.type='square'; o.frequency.value=2400; g.gain.setValueAtTime(0.09,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.05); o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime+0.07); }catch(e){} }
   function broadcast(finalWin){
     if(window._host!==hostState||hostState.terminal)return;
     if(finalWin!==undefined){hostState.terminal=true;done=true;win=!!finalWin;hostState.done=true;}
     if(PEER.conn&&PEER.conn.open){
-      try{ PEER.conn.send({t:'st', notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
+      try{ PEER.conn.send({t:'st', resultRunId:hostState.resultRunId, notes:notes.map(function(n){ return {x:n.x,type:n.type,hit:n.hit}; }),
         score:score, lives:lives, bpm:bpm, time:S.time, goal:GOAL, win:finalWin!==undefined?finalWin:win, dead:finalWin!==undefined?!win:window._dead,
         msg:window._lastMsg||null}); }catch(e){}
     }
@@ -1685,7 +1697,7 @@ function startHostBeat(){
   }
   function loop(){
     if(done||window._dead) return;
-    t+=16;
+    t+=16;hostState.resultElapsed+=16;
     bpm=Math.min(150, 96+Math.floor(score/3)*3);
     var beatMs=60000/bpm;
     beatT+=16;
@@ -1709,11 +1721,13 @@ function startHostBeat(){
   window._beatPress=function(who){ if(who==='A') press('A'); };
   window._hostBeatPress=function(who){ press(who==='B'?'B':'A'); };
   S.started=Date.now(); S.time=60;
-  window._hostState=function(){ return {score:score,lives:lives,notes:notes.length,dead:window._dead}; };
+  window._hostState=function(){ return {score:score,lives:lives,done:done,win:win,notes:notes.length,dead:window._dead}; };
   window._hostInject=function(type,x){ notes.push({x:x||80,hit:false,type:type||'A'}); };
   window._host.px=0; window._host.score=score; window._host.notes=notes;
   window._host.reset=function(){
     clearTimers();hostState.terminal=false;hostState.finishPending=false;
+    hostState.resultRunId=Date.now().toString(36)+Math.random().toString(36).slice(2);hostState.resultElapsed=0;
+    var resultBegin=window[hostState.mode+'ResultBegin'];if(resultBegin)resultBegin(hostState.resultRunId,'A',PEER.conn);
     done=false; win=false; score=0; lives=LIVES; notes.length=0; next=520; bpm=96; beatT=0; beatCount=0; t=0;
     beatVariation=window.BeatVariation?BeatVariation.create():null;
     window._dead=false; S.time=60; S.started=Date.now(); $('goal').textContent='0 / '+GOAL;
@@ -1828,6 +1842,7 @@ function renderGuestUI(code){
     dgGuestOnData(d);
     if(!cv.isConnected){catchCleanup();return;}
     if(d.t==='st'){
+      if(window.catchResultBegin&&catchResultBegin(d.resultRunId,'B',catchConn)===false)return;
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你控制 → 右移。'; } }
       if(d.msg && d.msg.txt){ var mm=$('msg'); if(mm && mm.textContent!==d.msg.txt){ mm.className='msg '+d.msg.kind; mm.textContent=d.msg.txt; } }
@@ -1879,6 +1894,7 @@ function renderGuestBeat(code){
     if(!d) return;
     dgGuestOnData(d);
     if(d.t==='st'){
+      if(window.beatResultBegin&&beatResultBegin(d.resultRunId,'B',PEER.conn)===false)return;
       last=d;
       if(!started){ started=true; var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 已连接，开局！你按橙音符（B），紫色要两人同时按。'; } }
       if(d.msg && d.msg.txt){ var mm=$('msg'); if(mm && mm.textContent!==d.msg.txt){ mm.className='msg '+d.msg.kind; mm.textContent=d.msg.txt; } }
@@ -2903,6 +2919,7 @@ function makeNumpad(container, onNum, onDel){
   container.appendChild(wrap);
 }
 function runCode(set){
+  if(!window._dungeon&&window.RoomResults)RoomResults.begin({runId:'code:'+Date.now()+':'+Math.random(),role:'A',connection:null,gameId:'code',title:'接头暗号',onContinue:function(){renderPlay();},onExit:function(){S.mod=null;renderMain();}});
   var stage=$('stage'), pa=$('playarea');
   var cv=document.createElement('canvas'); cv.width=300; cv.height=300; cv.style.background='#ffe8ac'; stage.appendChild(cv);
   var ctx=cv.getContext('2d');
@@ -3179,6 +3196,21 @@ function explode(reason){
   finish(false);
 }
 function finish(ok){
+  if(S.mod==='code'&&!window._dungeon&&window.RoomResults&&RoomResults.status()){clearTimers();RoomResults.report({win:!!ok,reasonCode:ok?'completed':'timeout',metrics:{timeLeftMs:Math.max(0,S.time)*1000,completed:ok?4:undefined,goal:4}});return;}
+  if(!window._dungeon&&window._netMode==='host'&&window.RoomResults&&RoomResults.status()&&window._host&&['catch','beat'].includes(window._host.mode)){
+    var terminal=window._host;if(terminal.publishFinal)terminal.publishFinal(!!ok);
+    var finalState=typeof window._hostState==='function'?window._hostState():{};
+    clearTimers();
+    RoomResults.report({win:!!ok,reasonCode:ok?'completed':S.time<=0?'timeout':'health_exhausted',metrics:{durationMs:terminal.resultElapsed,timeLeftMs:Math.max(0,S.time)*1000,completed:finalState.score,goal:terminal.mode==='catch'?CATCH_GOAL:30,mistakesRemaining:terminal.mode==='beat'?finalState.lives:undefined,maxMistakes:terminal.mode==='beat'?8:undefined}});return;
+  }
+  if(window._dungeon&&window._roomGameContext&&window._roomGameContext.role==='A'&&window.RoomResults){
+    var resultHost=window._host&&window._host.mode===S.mod?window._host:null;
+    if(resultHost&&resultHost.publishFinal)resultHost.publishFinal(!!ok);
+    var resultState=resultHost&&typeof window._hostState==='function'?window._hostState():null;
+    if(S.mod==='code'||resultHost&&['catch','beat'].includes(resultHost.mode))clearTimers();
+    window._roomGameContext.finish({win:!!ok,reasonCode:ok?'completed':S.time<=0?'timeout':'objective_failed',metrics:{durationMs:resultHost&&resultHost.resultElapsed,timeLeftMs:Math.max(0,S.time)*1000,completed:resultState&&resultState.score,goal:resultHost?resultHost.mode==='catch'?CATCH_GOAL:resultHost.mode==='beat'?30:undefined:undefined,mistakesRemaining:resultHost&&resultHost.mode==='beat'?resultState.lives:undefined,maxMistakes:resultHost&&resultHost.mode==='beat'?8:undefined}});
+    return;
+  }
   var terminalHost=window._netMode==='host'&&window._host&&window._host.mode===S.mod&&window._host.publishFinal?window._host:null;
   if(terminalHost){if(terminalHost.finishPending)return;terminalHost.finishPending=true;terminalHost.publishFinal(!!ok);}
   clearTimers();
@@ -3317,11 +3349,22 @@ function rtSnapshot(s,role){
   if(s.mode==='pressure')return pressureSnapshot(s,role);
   return {id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,phase:s.phase,progress:s.progress,target:s.target,next:s.next,round:s.round,hp:s.hp,heat:s.heat,lock:s.lock,taps:s.taps,transition:s.transition,inputs:s.inputs};
 }
+var pressureResultRuns=new WeakMap();
+function pressureResultBegin(s,role){
+  if(window._dungeon||!window.RoomResults)return true;
+  var conn=PEER.conn;if(!conn)return false;var runs=pressureResultRuns.get(conn);
+  if(!runs){runs={current:null,retired:new Set()};pressureResultRuns.set(conn,runs);}
+  if(runs.retired.has(s.id))return false;
+  if(runs.current&&runs.current!==s.id)runs.retired.add(runs.current);runs.current=s.id;
+  RoomResults.begin({runId:s.id,role:role,connection:PEER.conn,gameId:'pressure',title:'动力稳压',onContinue:function(){if(role==='A')startRealtime('pressure');},onExit:function(){netSend({t:'bye'});clearTimers();closePeer();S.mod=null;renderMain();}});
+  return true;
+}
 function startRealtime(mode){
   clearTimers();closeFB();window._dead=false;window._restartAwait=false;S.mod=mode;S.started=Date.now();
   realtimeUI(mode,'A');
   var s=Object.assign(mode==='pressure'?pressureCreate():bossCreate(),{id:Date.now().toString(36)+'-'+(++RT_SERIAL),mode:mode,ready:false,cd:3,time:mode==='pressure'?90:100,elapsed:0,done:false,win:false,inputs:{A:false,B:false},seq:{A:-1,B:-1},seen:{A:0,B:0}});
   RT=s;rtMessage(s,'两名特工就绪后，3 秒倒计时开始。');
+  if(mode==='pressure')pressureResultBegin(s,'A');
   var cleanup=rtControls('A',mode);rtWireCleanup(cleanup);
   var last=performance.now(),broadcastAt=0,endAt=null;
   function loop(){
@@ -3335,6 +3378,8 @@ function startRealtime(mode){
     if(now>=broadcastAt||s.done){rtDraw(rtSnapshot(s,'A'),'A');netSend({t:'rtState',state:rtSnapshot(s,'B')});broadcastAt=now+66;}
     if(s.done){
       if(endAt===null){endAt=now+900;window._dead=true;}
+      if(mode==='pressure'&&!window._dungeon&&window.RoomResults){RoomResults.report({win:s.win,reason:s.msg&&s.msg.txt,reasonCode:s.win?'completed':s.time<=0?'timeout':s.hp<=0?'health_exhausted':'pressure_overflow',metrics:{durationMs:s.elapsed*1000,timeLeftMs:s.time*1000,completed:s.seals,goal:3,hp:s.hp}});return;}
+      if(mode==='pressure'&&window._dungeon&&window._roomGameContext&&window.RoomResults){window._roomGameContext.finish({win:s.win,reason:s.msg&&s.msg.txt,reasonCode:s.win?'completed':s.time<=0?'timeout':s.hp<=0?'health_exhausted':'pressure_overflow',metrics:{durationMs:s.elapsed*1000,timeLeftMs:s.time*1000,completed:s.seals,goal:3,hp:s.hp}});return;}
       if(now>=endAt){
         var wasDungeon=window._dungeon,won=s.win;clearTimers();
         if(wasDungeon){if(mode==='boss'&&won)dgBossWin();else dungeonEnd(won);}
@@ -3358,11 +3403,12 @@ function renderRealtimeGuest(mode){
 }
 function realtimeGuestData(d){
   var s=d.state;if(!s||s.mode!==S.mod||!$('rt-cue'))return;
+  if(s.mode==='pressure'&&!pressureResultBegin(s,'B'))return;
   var previous=RT_VIEW;
   if(!previous||previous.id!==s.id){closeFB();window._dead=false;window._restartAwait=false;}
   rtDraw(s,'B');
   if(!s.ready)netSend({t:'rtReady',id:s.id});
-  if(s.done&&!window._dungeon&&(!previous||!previous.done)){window._dead=true;showFB({ok:s.win,duration:Math.round((s.mode==='pressure'?90:100)-s.time),timeLeft:Math.ceil(s.time),role:'B'});}
+  if(s.done&&!window._dungeon&&(!previous||!previous.done)){window._dead=true;if(s.mode!=='pressure'||!window.RoomResults)showFB({ok:s.win,duration:Math.round((s.mode==='pressure'?90:100)-s.time),timeLeft:Math.ceil(s.time),role:'B'});}
 }
 
 function pressureCreate(){
@@ -3420,48 +3466,50 @@ function pressureDraw(s,role){
 }
 
 </script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.4">
-<script defer src="room-assets.js?v=13.4"></script>
-<script defer src="room-loading.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="expansion-games.css?v=13.4">
-<script defer src="expansion-games.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.4">
-<script defer src="coop-upgrade.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="fullscreen-map.css?v=13.4">
-<script defer src="fullscreen-map.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beam-mobile.css?v=13.4">
-<script defer src="beam-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beat-mobile.css?v=13.4">
-<script defer src="beat-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="catch-mobile.css?v=13.4">
-<script defer src="catch-mobile.js?v=13.4"></script>
-<script defer src="code-symbols.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="maze-mobile.css?v=13.4">
-<script defer src="maze-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="vault-mobile.css?v=13.4">
-<script defer src="vault-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="radio-mobile.css?v=13.4">
-<script defer src="radio-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="wires-mobile.css?v=13.4">
-<script defer src="wires-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="boss-mobile.css?v=13.4">
-<script defer src="boss-mobile.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="puzzle-pack.css?v=13.4">
-<script defer src="puzzle-pack.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-routes.css?v=13.4">
-<script defer src="dungeon-routes.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="password-strip.css?v=13.4">
-<script defer src="password-strip.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="rhythm-light.css?v=13.4">
-<script defer src="rhythm-light.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-puzzle-themes.css?v=13.4">
-<script defer src="room-puzzle-themes.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-progression.css?v=13.4">
-<script defer src="room-progression.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-connection.css?v=13.4">
-<script defer src="dungeon-connection.js?v=13.4"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.4">
-<script defer src="room-cover-loader.js?v=13.4"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.5">
+<script defer src="room-assets.js?v=13.5"></script>
+<script defer src="room-loading.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="expansion-games.css?v=13.5">
+<script defer src="expansion-games.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.5">
+<script defer src="coop-upgrade.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="fullscreen-map.css?v=13.5">
+<script defer src="fullscreen-map.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beam-mobile.css?v=13.5">
+<script defer src="beam-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beat-mobile.css?v=13.5">
+<script defer src="beat-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="catch-mobile.css?v=13.5">
+<script defer src="catch-mobile.js?v=13.5"></script>
+<script defer src="code-symbols.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="maze-mobile.css?v=13.5">
+<script defer src="maze-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="vault-mobile.css?v=13.5">
+<script defer src="vault-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="radio-mobile.css?v=13.5">
+<script defer src="radio-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="wires-mobile.css?v=13.5">
+<script defer src="wires-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="boss-mobile.css?v=13.5">
+<script defer src="boss-mobile.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="puzzle-pack.css?v=13.5">
+<script defer src="puzzle-pack.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-routes.css?v=13.5">
+<script defer src="dungeon-routes.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="password-strip.css?v=13.5">
+<script defer src="password-strip.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="rhythm-light.css?v=13.5">
+<script defer src="rhythm-light.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-puzzle-themes.css?v=13.5">
+<script defer src="room-puzzle-themes.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-progression.css?v=13.5">
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-results.css?v=13.5">
+<script defer src="room-results.js?v=13.5"></script>
+<script defer src="room-progression.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-connection.css?v=13.5">
+<script defer src="dungeon-connection.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.5">
+<script defer src="room-cover-loader.js?v=13.5"></script>
 <script>
 window.__roomStylesReady=Promise.all(Array.from(document.querySelectorAll('link[data-room-style]')).map(function(link){return new Promise(function(resolve){if(link.sheet||window.__roomLoadFailures.includes(link.href)){resolve();return;}var timer=setTimeout(function(){window.__roomLoadFailures.push(link.href);resolve();},30000);function done(){clearTimeout(timer);resolve();}link.addEventListener('load',done,{once:true});link.addEventListener('error',done,{once:true});});}));
 document.addEventListener('DOMContentLoaded',function(){if(window.RoomLoading){RoomLoading.boot();}else{document.getElementById('room-boot-detail').textContent='界面没有加载完成，请重新加载。';}},{once:true});

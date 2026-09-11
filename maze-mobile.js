@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-var observer=null;
+var observer=null, mazeTerminal=null, mazeStartedAt=null, mazeContext=null;
 var scenario=null, serial=0, acceptedEntries=new WeakMap();
 function generate(){
  var best=null;
@@ -15,7 +15,7 @@ function generate(){
 }
 function valid(s){if(!s||s.schema!==1||typeof s.mapId!=='string'||typeof s.sessionId!=='string'||!s.map)return false;var m=s.map;if(!Array.isArray(m.walls)||m.walls.length!==15||m.walls.some(function(r){return typeof r!=='string'||!/^[01]{11}$/.test(r);}))return false;var walk=function(p){return Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&m.walls[p[0]]&&m.walls[p[0]][p[1]]==='0';};if(!walk(m.start)||!walk(m.end)||!Array.isArray(m.traps)||!m.traps.every(walk)||!m.path||!Array.isArray(m.path[0])||m.path[0].length<12)return false;var path=m.path[0].map(function(p){return typeof p==='string'?p.split(',').map(Number):[];});return path.every(function(p,i){return walk(p)&&(!i||Math.abs(p[0]-path[i-1][0])+Math.abs(p[1]-path[i-1][1])===1);})&&String(path[0])===String(m.start)&&String(path[path.length-1])===String(m.end);}
 window.mazeApplyScenario=function(s){if(!valid(s))return false;scenario=JSON.parse(JSON.stringify(s));MAZE=scenario.map;MAZE.rows=15;MAZE.cols=11;MAZES=[MAZE];window._mazeSeed=0;return true;};
-window.mazePrepareHost=function(){window._mazeGates=null;window._mazeMove=null;var m=generate(),key='roomlab.maze.last.v1',previous='';try{previous=localStorage.getItem(key)||'';}catch(e){}if(m.walls.join('')===previous){m.walls=m.walls.map(function(r){return r.split('').reverse().join('');});m.start[1]=10-m.start[1];m.end[1]=10-m.end[1];m.traps=m.traps.map(function(p){return[p[0],10-p[1]];});m.path=[m.path[0].map(function(p){var q=p.split(',').map(Number);return q[0]+','+(10-q[1]);})];}try{localStorage.setItem(key,m.walls.join(''));}catch(e){}var id=Date.now().toString(36)+'-'+(++serial)+'-'+Math.random().toString(36).slice(2,9);var s={schema:1,mapId:id,sessionId:id,generation:serial,initialTime:typeof coopTime==='function'?coopTime(PG().time):PG().time,loadingAttempt:window.RoomLoading?RoomLoading.status().attemptId:null,map:m};window.mazeApplyScenario(s);return s;};
+window.mazePrepareHost=function(){mazeTerminal=null;mazeStartedAt=null;window._mazeGates=null;window._mazeMove=null;var m=generate(),key='roomlab.maze.last.v1',previous='';try{previous=localStorage.getItem(key)||'';}catch(e){}if(m.walls.join('')===previous){m.walls=m.walls.map(function(r){return r.split('').reverse().join('');});m.start[1]=10-m.start[1];m.end[1]=10-m.end[1];m.traps=m.traps.map(function(p){return[p[0],10-p[1]];});m.path=[m.path[0].map(function(p){var q=p.split(',').map(Number);return q[0]+','+(10-q[1]);})];}try{localStorage.setItem(key,m.walls.join(''));}catch(e){}var id=Date.now().toString(36)+'-'+(++serial)+'-'+Math.random().toString(36).slice(2,9);var s={schema:1,mapId:id,sessionId:id,generation:serial,initialTime:typeof coopTime==='function'?coopTime(PG().time):PG().time,loadingAttempt:window.RoomLoading?RoomLoading.status().attemptId:null,map:m};window.mazeApplyScenario(s);return s;};
 window.mazeAcceptEnter=function(d,conn){
  if(!d||d.t!=='enter'||d.mode!=='maze')return true;
  if(!conn||!valid(d.mazeScenario))return false;
@@ -24,7 +24,7 @@ window.mazeAcceptEnter=function(d,conn){
  var seen=acceptedEntries.get(conn);if(!seen){seen=new Set();acceptedEntries.set(conn,seen);}if(seen.has(s.sessionId))return false;
  seen.add(s.sessionId);return true;
 };
-window.MazeMobile={generate:generate,validate:valid,scenario:function(){return scenario;}};
+window.MazeMobile={generate:generate,validate:valid,scenario:function(){return scenario;},state:function(){if(S.mod!=='maze')return null;var status=window.RoomResults&&RoomResults.status();return mazeTerminal||(S.mod==='maze'&&status&&status.outcome?{done:true,win:status.outcome==='success',runId:status.runId}:null);}};
 function mountain(){return !!(window._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON&&DUNGEON.roomId==='room-16');}
 var symbols=['○','△','□','⊕','◇','☆'];
 function marker(ctx,x,y,cell,text,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x+cell/2,y+cell/2,cell*.4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font='700 '+Math.floor(cell*.6)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x+cell/2,y+cell/2+1);}
@@ -52,13 +52,14 @@ function polish(manual){
  var messages=app.querySelectorAll('#msg');messages.forEach(function(m,i){if(i)m.remove();else{m.setAttribute('aria-live','polite');caption.after(m);}});
  if(again){again.classList.add('mz-again');app.append(again);}var help=document.createElement('details');help.className='mz-help';help.innerHTML='<summary>玩法说明</summary><p>'+(manual?'你看完整地图，A 只能看周围五格。引导 A 打开三个阀门后走到 E；◆ 是陷阱。':'先听 B 指路。遇到阀门报符号，按 B 说的选。碰墙 −5 秒，陷阱 −8 秒，选错 −4 秒。')+'</p>';app.append(help);
 }
-var run=runMaze;runMaze=function(set){run(set);polish(false);if(window._dungeon&&window._netMode==='host')netSend({t:'dgT',time:S.time});};
+var run=runMaze;runMaze=function(set){mazeTerminal=null;mazeStartedAt=performance.now();mazeContext=window._dungeon?window._roomGameContext:null;run(set);polish(false);if(window._dungeon&&window._netMode==='host')netSend({t:'dgT',time:S.time});};
 var manual=renderManual;renderManual=function(){var result=manual.apply(this,arguments);if(S.mod==='maze')polish(true);return result;};
 
 // Independent play uses the same host-owned map, with both players ready first.
 var solo=null, soloConn=null, basePlay=renderPlay, baseHost=startHostGame, baseGuest=renderGuestUI, baseManual=renderManual;
 function soloValid(){return solo&&S.mod==='maze'&&!window._dungeon&&PEER.conn===soloConn;}
-function soloPrep(role){
+function soloResult(role){if(!window.RoomResults)return;RoomResults.begin({runId:solo.id,role:role,connection:soloConn,gameId:'maze',title:'通风潜行',dungeon:null,onResult:function(r){mazeTerminal={done:true,win:r.win,runId:solo.id};solo.running=false;window._dead=true;},onContinue:function(){mazeTerminal=null;if(solo)solo.running=false;if(role==='A')soloSetup();},onExit:gobackMenu});}
+function soloPrep(role){soloResult(role);
  var app=$('app');app.className='maze-mobile';app.dataset.mazeRole=role;app.innerHTML='<div class="topbar"><button id="back" aria-label="返回玩法">‹</button><strong>通风潜行</strong><span class="mz-role">'+role+' · 准备</span></div><div class="mz-notice">双方准备好后开始，限时 120 秒。</div><section class="mz-controls"><h3>'+(role==='A'?'听指路，操作方向':'看地图，口头指挥')+'</h3><p>'+(role==='A'?'你只看周围五格。遇阀门报符号，听 B 选择颜色。':'引导 A 打开三个阀门并到出口；听现场符号，查表报颜色。')+'</p><button id="mz-ready">准备好了</button><p id="mz-wait">先读规则，再准备。</p></section>';$('back').onclick=gobackMenu;$('mz-ready').onclick=function(){if(!soloValid())return;this.disabled=true;$('mz-wait').textContent='已准备，等待同伴。';if(role==='A'){solo.a=true;soloLaunch();}else netSend({t:'mzReady',id:solo.id});};
 }
 function soloBMap(){
@@ -71,11 +72,19 @@ renderPlay=function(){if(S.mod==='maze'&&!window._dungeon)return renderHost();re
 renderManual=function(){if(S.mod==='maze'&&!window._dungeon)return renderJoin();return baseManual.apply(this,arguments);};
 startHostGame=function(){if(S.mod==='maze'&&!window._dungeon)return soloSetup();return baseHost.apply(this,arguments);};
 renderGuestUI=function(){if(S.mod!=='maze'||window._dungeon)return baseGuest.apply(this,arguments);clearTimers();soloConn=PEER.conn;solo=null;if(!soloConn._mazeListener){var bound=soloConn;soloConn._mazeListener=function(d){if(PEER.conn===bound)dgGuestOnData(d);};soloConn.on('data',soloConn._mazeListener);}soloWatch();$('app').innerHTML='<div class="msg">正在接收本局地图…</div>';};
-var soloHD=dgHostOnData;dgHostOnData=function(d){if(d.t==='mzReady'){if(soloValid()&&d.id===solo.id){solo.b=true;soloLaunch();}return;}return soloHD(d);};
-var soloGD=dgGuestOnData;dgGuestOnData=function(d){
+var soloHD=dgHostOnData;dgHostOnData=function(d){if(window.RoomResults&&RoomResults.consume(d,PEER.conn))return;if(d.t==='mzReady'){if(soloValid()&&d.id===solo.id){solo.b=true;soloLaunch();}return;}return soloHD(d);};
+var soloGD=dgGuestOnData;dgGuestOnData=function(d){if(window.RoomResults&&RoomResults.consume(d,PEER.conn)){var rs=RoomResults.status();if(rs&&rs.outcome&&S.mod==='maze'){mazeTerminal={done:true,win:rs.outcome==='success',runId:rs.runId};if(solo)solo.running=false;window._dead=true;}return;}
  if(d.t==='mzOffer'){if(S.mod!=='maze'||window._dungeon||!valid(d.scenario))return;if(solo&&(solo.id===d.scenario.sessionId||d.scenario.generation<=solo.generation))return;if(solo&&solo.running)return;window.mazeApplyScenario(d.scenario);solo={id:d.scenario.sessionId,generation:d.scenario.generation,running:false};soloPrep('B');return;}
  if(/^mz(Go|Clock|Done)$/.test(d.t)){if(!soloValid()||d.id!==solo.id)return;if(d.t==='mzGo'){if(!solo.running){solo.running=true;soloBMap();}}else if(d.t==='mzClock'){var c=$('count');if(c)c.textContent=d.time+'s';}else{solo.running=false;window._dead=true;var endClock=$('count');if(endClock)endClock.textContent=d.time+'s';var m=$('msg');if(m)m.textContent=d.win?'已到出口，行动完成。':'时间耗尽，行动失败。';}return;}return soloGD(d);
 };
-var mazeFinish=finish;finish=function(ok){if(S.mod==='maze'&&soloValid()&&window._netMode==='host'&&solo.running){solo.running=false;netSend({t:'mzDone',id:solo.id,win:!!ok,time:S.time});}return mazeFinish.apply(this,arguments);};
+var mazeFinish=finish;finish=function(ok){
+ if(S.mod!=='maze'||!window.RoomResults)return mazeFinish.apply(this,arguments);
+ if(window._netMode==='guest'||mazeTerminal)return;
+ mazeTerminal={done:true,win:!!ok,runId:RoomResults.status()&&RoomResults.status().runId};window._dead=true;if(solo)solo.running=false;
+ timers.forEach(function(t){clearInterval(t);clearTimeout(t);});timers=[];
+ var metrics={timeLeftMs:Math.max(0,S.time)*1000,completed:(window._mazeGates||[]).filter(function(g){return g.open;}).length,goal:3};if(mazeStartedAt!==null)metrics.durationMs=Math.max(0,performance.now()-mazeStartedAt);
+ var data={win:!!ok,reasonCode:ok?'completed':'timeout',reason:ok?'三个阀门已打开，成功到达出口。':'时间耗尽，未能及时到达出口。',metrics:metrics};
+ if(mazeContext)mazeContext.finish(data);else RoomResults.report(data);
+};
 var shellObserver=new MutationObserver(function(){var app=$('app');if(app&&app.classList.contains('maze-mobile')&&!app.querySelector('.mz-main,.mz-controls')){app.classList.remove('maze-mobile');delete app.dataset.mazeRole;delete app.dataset.mazeValve;delete app.dataset.mazeTheme;}});shellObserver.observe($('app'),{childList:true});
 })();

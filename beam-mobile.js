@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 var cargoTypes=[{name:'标准箱',speed:150,tip:'倾斜送到中央，再放平入库',color:'#d9a45b'},{name:'重箱',speed:90,tip:'需要更大倾角，接近中央提前放平',color:'#8b99aa'},{name:'玻璃箱',speed:145,tip:'轻轻倾斜！倾角过大会震碎',color:'#9edbc9'},{name:'圆筒',speed:230,tip:'滚得快且有惯性，提前反向刹车',color:'#eaa56f'},{name:'重箱',speed:90,tip:'大倾角起步，中央放平',color:'#8b99aa'},{name:'玻璃箱',speed:145,tip:'最后一件，轻放入库',color:'#9edbc9'}];
-var active=null,view=null,dispose=null,seq=0,held=false,role='A';
+var active=null,view=null,dispose=null,seq=0,held=false,role='A',resultConnection=null;var retiredRuns=new Set();
 function fishRoom(s){return !!s&&s.roomId==='room-15';}
 function roomId(){return window._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON?DUNGEON.roomId:null;}
 function cargoName(spec,s){return fishRoom(s)?({'标准箱':'鲜鱼箱','重箱':'加冰鱼箱','玻璃箱':'活鱼水箱','圆筒':'圆鱼桶'}[spec.name]||spec.name):spec.name;}
@@ -11,15 +11,15 @@ function fish(c,x,y,size){c.save();c.translate(x,y);c.scale(size,size);c.fillSty
 function fishBackdrop(c){c.fillStyle='#d8eeeb';c.fillRect(0,0,340,400);c.strokeStyle='#bad8d4';c.lineWidth=1;for(var y=75;y<350;y+=32){c.beginPath();c.moveTo(0,y);c.lineTo(340,y);c.stroke();}for(var x=0;x<340;x+=34){c.beginPath();c.moveTo(x,75);c.lineTo(x,350);c.stroke();}c.fillStyle='#518b8c';c.fillRect(0,0,340,59);c.fillStyle='#f0c889';for(var x=0;x<340;x+=48)c.fillRect(x,0,24,10);c.fillStyle='#b7d4d0';c.fillRect(0,350,340,50);}
 function send(d){netSend(d);}
 function clean(){if(dispose){dispose();dispose=null;}active=null;view=null;held=false;}
-function make(){var variation=RoomVariation.start('beam');return {tier:variation.tier,cargo:variation.cargo,roomId:roomId(),id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),time:window._dungeon?coopTime(65):65,ready:{A:false,B:false},cd:3,inputs:{A:false,B:false},seen:{A:0,B:0},seq:{A:-1,B:-1},yL:285,yR:285,bricks:[],spawn:1.2,got:0,goal:6,spills:0,limit:3,rescue:null,rescueUsed:false,done:false,win:false,msg:'六件不同货物：倾斜运到中央，放平保持半秒入库。'};}
-function snapshot(s){return {tier:s.tier,cargo:s.cargo,roomId:s.roomId,id:s.id,time:s.time,ready:s.ready,cd:s.cd,inputs:s.inputs,yL:s.yL,yR:s.yR,bricks:s.bricks,got:s.got,goal:s.goal,spills:s.spills,limit:s.limit,rescue:s.rescue,rescueUsed:s.rescueUsed,done:s.done,win:s.win,msg:s.msg};}
+function make(){var variation=RoomVariation.start('beam');return {tier:variation.tier,cargo:variation.cargo,roomId:roomId(),id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),time:window._dungeon?coopTime(65):65,elapsed:0,ready:{A:false,B:false},cd:3,inputs:{A:false,B:false},seen:{A:0,B:0},seq:{A:-1,B:-1},yL:285,yR:285,bricks:[],spawn:1.2,got:0,goal:6,spills:0,limit:3,rescue:null,rescueUsed:false,done:false,win:false,msg:'六件不同货物：倾斜运到中央，放平保持半秒入库。'};}
+function snapshot(s){return {tier:s.tier,cargo:s.cargo,roomId:s.roomId,id:s.id,time:s.time,elapsed:s.elapsed,reasonCode:s.reasonCode,ready:s.ready,cd:s.cd,inputs:s.inputs,yL:s.yL,yR:s.yR,bricks:s.bricks,got:s.got,goal:s.goal,spills:s.spills,limit:s.limit,rescue:s.rescue,rescueUsed:s.rescueUsed,done:s.done,win:s.win,msg:s.msg};}
 function input(d,who){var s=active;if(!s||d.id!==s.id||s.done)return;if(d.t==='bmReady'){s.ready[who]=true;return;}if(!Number.isInteger(d.seq)||d.seq<=s.seq[who])return;s.seq[who]=d.seq;s.inputs[who]=!!d.v;s.seen[who]=performance.now();}
 function act(v){held=!!v;var s=role==='A'?active:view;if(!s)return;var d={t:'bmInput',id:s.id,seq:++seq,v:held};if(role==='A')input(d,'A');else send(d);}
-function end(s,win,message){s.done=true;s.win=win;s.msg=message;s.inputs={A:false,B:false};}
+function end(s,win,message,reasonCode){if(s.done)return;s.done=true;s.win=win;s.reasonCode=reasonCode||(win?'objective_complete':'attempts_exhausted');s.msg=message;s.inputs={A:false,B:false};}
 function step(s,dt){
  if(s.done||!s.ready.A||!s.ready.B)return;
  if(s.cd>0){s.cd=Math.max(0,s.cd-dt);return;}
- s.time=Math.max(0,s.time-dt);if(s.time===0){end(s,false,'时间到，和同伴再配合一次。');return;}
+ s.elapsed+=dt;s.time=Math.max(0,s.time-dt);if(s.time===0){end(s,false,'时间到，和同伴再配合一次。','time_expired');return;}
  if(s.rescue){s.rescue.left-=dt;s.rescue.held=s.inputs.A&&s.inputs.B?s.rescue.held+dt:0;if(s.rescue.held>=.5){var b=s.bricks.find(function(b){return b.id===s.rescue.brick;});if(b)b.x=b.x<170?65:275;s.yL=s.yR=285;s.rescue=null;s.msg='扶稳了！继续把砖块送到中央。';}else if(s.rescue.left<=0){s.bricks=s.bricks.filter(function(b){return b.id!==s.rescue.brick;});s.rescue=null;s.spills++;s.msg='没有扶住，失误 '+s.spills+' / '+s.limit;}return;}
  s.yL=Math.max(205,Math.min(325,s.yL+(s.inputs.A?-65:32)*dt));s.yR=Math.max(205,Math.min(325,s.yR+(s.inputs.B?-65:32)*dt));
  s.spawn-=dt;if(s.spawn<=0&&s.bricks.length===0){var item=s.cargo[s.got],spec=cargoTypes[item.type];s.bricks.push({id:Math.random().toString(36),type:item.type,x:item.x,y:65,on:false,vy:100,vx:0,charge:0,stress:0});s.spawn=.7;s.msg=spec.name+'：'+spec.tip;}
@@ -65,21 +65,24 @@ function draw(s,who){if(!$('bm-canvas'))return;view=s;var themed=fishRoom(s),she
  c.strokeStyle='#30253a';c.lineWidth=12;c.lineCap='round';c.beginPath();c.moveTo(40,s.yL);c.lineTo(300,s.yR);c.stroke();c.strokeStyle='#e9a342';c.lineWidth=7;c.stroke();
  [['A',40,s.yL,'#63b5d2'],['B',300,s.yR,'#f49c59']].forEach(function(a){c.fillStyle=a[3];c.strokeStyle='#30253a';c.lineWidth=2;c.beginPath();c.arc(a[1],a[2],14,0,Math.PI*2);c.fill();c.stroke();c.fillStyle='#30253a';c.font='bold 15px sans-serif';c.fillText(a[0],a[1],a[2]+5);});
  s.bricks.forEach(function(b){var spec=cargoTypes[b.type];c.fillStyle=themed?(spec.name==='玻璃箱'?'#b9e6dc':spec.name==='重箱'?'#b2c5ce':'#f1cc87'):spec.color;c.strokeStyle='#30253a';c.lineWidth=2;if(spec.name==='圆筒'){c.beginPath();c.arc(b.x,b.y-12,13,0,Math.PI*2);c.fill();c.stroke();}else{c.fillRect(b.x-15,b.y-24,30,24);c.strokeRect(b.x-15,b.y-24,30,24);}if(themed){fish(c,b.x+2,b.y-12,.8);if(spec.name==='重箱'){c.fillStyle='#fff';c.fillRect(b.x-11,b.y-21,5,4);c.fillRect(b.x+5,b.y-8,5,4);}if(spec.name==='玻璃箱'){c.strokeStyle='#fff';c.beginPath();c.moveTo(b.x-10,b.y-20);c.lineTo(b.x-10,b.y-5);c.stroke();}}else{c.fillStyle='#30253a';c.font='bold 11px sans-serif';c.textAlign='center';c.fillText(spec.name==='重箱'?'重':spec.name==='玻璃箱'?'◇':'↓',b.x,b.y-7);}c.fillStyle=themed?'#fff5d7':'#30253a';c.textAlign='center';c.font='bold 14px sans-serif';c.fillText('第 '+(s.got+1)+' 件 · '+cargoName(spec,s),170,29);c.font='12px sans-serif';c.fillText(spec.tip,170,48);if(b.charge>0){c.fillStyle='#408967';c.fillRect(145,375,50*b.charge/.5,5);}});
- if(s.done&&!$('bm-result')){var r=document.createElement('div');r.id='bm-result';r.className='bm-result';r.innerHTML='<strong>'+(s.win?'合作成功':'再试一次')+'</strong>'+(window._dungeon?'':'<button id="bm-again">再来一局</button>');document.querySelector('.bm-controls').appendChild(r);if($('bm-again'))$('bm-again').onclick=function(){send({t:'bmRestart',id:s.id});if(who==='A'&&active)active.againA=true;else $('bm-again').disabled=true;};}
+ if(s.done&&!window.RoomResults&&!$('bm-result')){var r=document.createElement('div');r.id='bm-result';r.className='bm-result';r.innerHTML='<strong>'+(s.win?'合作成功':'再试一次')+'</strong>'+(window._dungeon?'':'<button id="bm-again">再来一局</button>');document.querySelector('.bm-controls').appendChild(r);if($('bm-again'))$('bm-again').onclick=function(){send({t:'bmRestart',id:s.id});if(who==='A'&&active)active.againA=true;else $('bm-again').disabled=true;};}
 }
-function host(){clearTimers();clean();S.mod='beam';window._dead=false;shell('A');var s=make();active=s;var last=performance.now(),next=0,endAt=0;draw(snapshot(s),'A');
+function beginResult(s,who){if(!window.RoomResults)return;if(!window._dungeon)RoomResults.begin({runId:s.id,role:who,connection:PEER.conn,gameId:'beam',title:'破障搬运',dungeon:null,onContinue:function(){if(who==='A')host();},onExit:function(){send({t:'bye'});clearTimers();closePeer();renderHall();}});s.resultRunId=RoomResults.status()?.runId;s.resultContext=window._dungeon?window._roomGameContext:null;}
+function reportResult(s){if(!window.RoomResults||s.resultReported||!s.resultRunId||RoomResults.status()?.runId!==s.resultRunId)return;s.resultReported=(s.resultContext?s.resultContext.finish:RoomResults.report)({win:s.win,reasonCode:s.win?'completed':s.reasonCode==='time_expired'?'timeout':'cargo_lost',reason:s.win?'货物已安全入库。':s.reasonCode==='time_expired'?'搬运时间用尽。':'货物损坏次数已用尽。',metrics:{durationMs:Math.round(s.elapsed*1000),timeLeftMs:Math.max(0,Math.round(s.time*1000)),completed:s.got,goal:s.goal,mistakesRemaining:Math.max(0,s.limit-s.spills),maxMistakes:s.limit}});}
+function host(){clearTimers();clean();S.mod='beam';window._dead=false;shell('A');var s=make();active=s;beginResult(s,'A');var last=performance.now(),next=0,endAt=0;draw(snapshot(s),'A');
  var iv=setInterval(function(){if(active!==s){clearInterval(iv);return;}var now=performance.now(),dt=Math.min(.06,(now-last)/1000);last=now;['A','B'].forEach(function(w){if(now-s.seen[w]>650)s.inputs[w]=false;});step(s,dt);S.time=Math.ceil(s.time);
  if(now>=next){draw(snapshot(s),'A');send({t:'bmState',state:snapshot(s)});next=now+66;}
+ if(s.done&&window.RoomResults){draw(snapshot(s),'A');send({t:'bmState',state:snapshot(s)});window._dead=true;reportResult(s);if(s.resultReported)clearInterval(iv);return;}
  if(s.done){if(!endAt)endAt=now+1100;if(window._dungeon&&now>=endAt){var win=s.win;clearTimers();dungeonEnd(win);}else if(!window._dungeon&&s.againA&&s.againB)host();}
  },16);timers.push(iv);
 }
 function guest(){var inDungeon=window._dungeon;clearTimers();clean();S.mod='beam';window._dead=false;shell('B');
- if(!inDungeon&&PEER.conn&&!PEER.conn._beamListener){PEER.conn._beamListener=function(d){dgGuestOnData(d);};PEER.conn.on('data',PEER.conn._beamListener);}
+ if(!inDungeon&&PEER.conn&&!PEER.conn._beamListener){var conn=PEER.conn;PEER.conn._beamListener=function(d){if(window.RoomResults&&RoomResults.consume(d,conn))return;if(PEER.conn===conn)dgGuestOnData(d);};PEER.conn.on('data',PEER.conn._beamListener);}
 }
 var oldClear=clearTimers;clearTimers=function(){clean();return oldClear();};
 var oldHost=startHostGame;startHostGame=function(){if(S.mod==='beam')return host();return oldHost();};renderBeamHost=host;runBeamHost=host;
 var oldGuest=renderGuestTwin;renderGuestTwin=function(code,mode){if(mode==='beam')return guest();return oldGuest(code,mode);};
-var oldHD=dgHostOnData;dgHostOnData=function(d){if(d.t==='bmReady'||d.t==='bmInput'){input(d,'B');return;}if(d.t==='bmRestart'){if(active&&active.id===d.id&&active.done)active.againB=true;return;}return oldHD(d);};
-var oldGD=dgGuestOnData;dgGuestOnData=function(d){if(d.t==='bmState'){if(S.mod!=='beam'||!$('bm-canvas'))return;if(view&&view.id!==d.state.id){guest();}draw(d.state,'B');return;}return oldGD(d);};
+var oldHD=dgHostOnData;dgHostOnData=function(d){if(window.RoomResults&&RoomResults.consume(d,PEER.conn))return;if(d.t==='bmReady'||d.t==='bmInput'){input(d,'B');return;}if(d.t==='bmRestart'){if(window.RoomResults)return;if(active&&active.id===d.id&&active.done)active.againB=true;return;}return oldHD(d);};
+var oldGD=dgGuestOnData;dgGuestOnData=function(d){if(window.RoomResults&&RoomResults.consume(d,PEER.conn))return;if(d.t==='bmState'){if(S.mod!=='beam'||!$('bm-canvas'))return;if(resultConnection!==PEER.conn){resultConnection=PEER.conn;retiredRuns.clear();}if(retiredRuns.has(d.state.id))return;if(view&&view.id!==d.state.id){retiredRuns.add(view.id);guest();}beginResult(d.state,'B');draw(d.state,'B');return;}return oldGD(d);};
 window.BeamMobile={create:make,step:step,state:function(){return active||view;}};
 })();

@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RoomLab · 开发者验收台</title><link rel="stylesheet" href="dev-console.css?v=13.4"><script defer src="dev-console-bot.js?v=13.4"></script><script defer src="dev-console.js?v=13.4"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RoomLab · 开发者验收台</title><link rel="stylesheet" href="dev-console.css?v=13.5"><script defer src="dev-console-bot-adapters.js?v=13.5"></script><script defer src="dev-console-bot.js?v=13.5"></script><script defer src="dev-console.js?v=13.5"></script></head>
 <body data-phase="catalog">
-<header class="app-head"><div class="brand"><b>RoomLab</b><span class="divider"></span><h1>开发者验收台</h1></div><span class="header-note">本地验收 · 不记录正式通关进度</span></header>
+<header class="app-head"><div class="brand"><b>RoomLab</b><span class="divider"></span><h1>开发者验收台</h1></div><div class="build-strip" aria-label="当前版本身份"><b id="dc-game-version">游戏 —</b><span id="dc-console-version">验收台 dc-2026.09.12.1</span><span id="dc-progression-version">进度规则 —</span><span id="dc-route-version">路线规则 —</span><em id="dc-origin">来源 —</em></div></header>
 <main class="workspace">
  <section class="toolbar" aria-label="开局配置">
+  <div class="field scope"><label for="dc-scope">验收范围</label><select id="dc-scope"><option value="single">单玩法</option><option value="tower">完整爬塔</option></select></div>
   <div class="field room"><label for="dc-room">密室</label><select id="dc-room" disabled><option>正在读取游戏目录…</option></select></div>
   <div class="field mode"><label for="dc-mode">玩法</label><select id="dc-mode" disabled><option>加载中</option></select></div>
   <div class="field level"><label for="dc-level">难度</label><select id="dc-level" disabled><option>加载中</option></select></div>
@@ -13,8 +14,9 @@
   <div class="field"><label for="dc-retry-mode">重试方式</label><div class="retry"><select id="dc-retry-mode" aria-describedby="dc-capability"><option value="new">换题</option><option value="same" disabled>同题（尚不支持）</option></select><button id="dc-retry" class="toolbutton" disabled>重试本关</button></div></div>
   <button id="dc-back" class="toolbutton return" disabled>返回选择</button>
  </section>
- <section class="toolbar bot-toolbar" aria-label="同伴托管"><div class="field"><label for="dc-control">操作方式</label><select id="dc-control"><option value="manual">双端手动</option><option value="A">托管 A · 手动 B</option><option value="B">托管 B · 手动 A</option></select></div><button id="dc-bot-pause" class="toolbutton" disabled>暂停托管</button><span id="dc-bot-status" role="status" aria-live="polite">双端手动</span><p id="dc-bot-capability"></p></section>
+ <section class="toolbar bot-toolbar" aria-label="同伴托管"><div class="field"><label for="dc-control">操作方式</label><select id="dc-control"><option value="manual">双端手动</option><option value="A">托管 A · 手动 B</option><option value="B">托管 B · 手动 A</option></select></div><button id="dc-bot-pause" class="toolbutton" disabled>暂停托管</button><span id="dc-bot-kind"></span><span id="dc-bot-status" role="status" aria-live="polite">双端手动</span><p id="dc-bot-capability"></p><div id="dc-bot-commands" aria-label="告诉托管同伴" hidden></div></section>
  <div class="session" role="status" aria-live="polite"><div class="session-left"><strong id="dc-status">读取游戏目录</strong><span id="dc-room-code">房间 —</span><span id="dc-ready">等待开局</span></div><span>自动建房、加入并准备 · 可选择单端同伴托管</span></div>
+ <section id="dc-run-meta" class="run-meta" aria-label="本轮身份" hidden><b id="dc-run-title">本轮 —</b><span id="dc-run-id">局 ID —</span><span id="dc-fingerprint">题面指纹 —</span><span id="dc-map-meta">地图 —</span></section>
  <p id="dc-error" class="error" role="alert" hidden></p>
  <div class="screens">
   <section class="endpoint"><header class="endpoint-head"><div><b class="role-symbol A">A</b><strong>创建端</strong></div><span id="dc-state-a" class="endpoint-state">未连接</span></header><div class="viewport" id="dc-slot-a"><p class="placeholder">选择配置，然后一键开局</p><iframe id="dc-frame-a" title="角色 A 游戏画面" width="390" height="844" allow="autoplay" hidden></iframe></div></section>

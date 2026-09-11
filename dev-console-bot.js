@@ -11,20 +11,21 @@ function resultOutcome(status){
  return '本关已结束，托管已停止';
 }
 function capability(mode,role,state){
- if(role==='manual')return {supported:true,detail:'双端手动：两端均由你操作。'};
+ if(role==='manual')return {supported:true,kind:'manual',detail:'双端手动：两端均由你操作。'};
  if(mode==='pwslide'&&state!==undefined&&!sliceState(state))return {supported:false,detail:'当前密码版本不是受支持的 A/B 同图切片结构，托管已禁用；请双端手动。'};
- if(mode==='pwslide')return {supported:true,detail:'托管仅推动自己的奇/偶行，跟随人工端第一条的可见位置；全部切口接齐后确认。人工端仍需调整并确认。'};
- if(mode==='lightsearch'&&role==='A')return {supported:true,detail:'A 真实等待 10.5 秒开灯；B 由你收齐道具并回出口。暂停立即取消待按动作。'};
- return {supported:false,detail:mode==='lightsearch'?'B 的可见地图探索尚未可靠适配，请手动搜索。':'此玩法尚未完成可靠托管适配，请使用双端手动。'};
+ if(mode==='pwslide')return {supported:true,kind:'automatic',detail:'托管仅推动自己的奇/偶行，跟随人工端第一条的可见位置；全部切口接齐后确认。人工端仍需调整并确认。'};
+ if(mode==='lightsearch'&&role==='A')return {supported:true,kind:'automatic',detail:'A 真实等待 10.5 秒开灯；B 由你收齐道具并回出口。暂停立即取消待按动作。'};
+ return window.DevConsoleBotAdapters?.capability(mode,role)||{supported:false,detail:'此玩法尚未完成可靠托管适配，请使用双端手动。'};
 }
 function create({windows,mode,signal,onChange=()=>{}}){
- let role='manual',paused=false,stopped=false,timer=null,resultTimer=null,anchor=null,nextPull=0,resultWaitUntil=0,actions=0,message='双端手动',gameId=null;
+ let role='manual',paused=false,stopped=false,timer=null,resultTimer=null,anchor=null,nextPull=0,resultWaitUntil=0,actions=0,message='双端手动',gameId=null,commands=[],adapter=null,held=null;
  const clean=[];
  const initialResults=['A','B'].map(r=>windows[r]?.RoomResults?.status?.()).filter(Boolean);
  const resultRunId=initialResults.find(s=>s.stage==='playing')?.runId||initialResults[0]?.runId||null;
- function snapshot(){return {role,paused,stopped,actions,message,gameId};}
- function report(text){message=text;onChange(snapshot());}
- function clear(){clearTimeout(timer);timer=null;anchor=null;resultWaitUntil=0;}
+ function snapshot(){const cap=capability(mode,role);return {role,paused,stopped,actions,message,gameId,kind:cap.kind||((role==='manual')?'manual':'automatic'),commands:commands.map(x=>({...x}))};}
+ function report(text){if(message===text)return;message=text;onChange(snapshot());}
+ function release(){if(!held)return;try{held.el.dispatchEvent(new held.win.PointerEvent('pointerup',{bubbles:true,pointerId:held.id,pointerType:'mouse',buttons:0}));}catch(_){}held=null;}
+ function clear(){clearTimeout(timer);timer=null;anchor=null;resultWaitUntil=0;release();adapter?.dispose?.();adapter=null;commands=[];}
  function pause(reason='已暂停，可直接操作托管端'){if(stopped||role==='manual')return;paused=true;clear();report(reason);}
  function stop(reason='本轮托管已停止'){if(stopped)return;stopped=true;clear();clearInterval(resultTimer);resultTimer=null;clean.splice(0).forEach(fn=>fn());report(reason);}
  function syncResult(){
@@ -37,12 +38,19 @@ function create({windows,mode,signal,onChange=()=>{}}){
   return false;
  }
  function click(selector){const b=windows[role].document.querySelector(selector);if(!b||b.disabled||b.hidden||!b.getClientRects().length)return false;b.click();actions++;return true;}
+ function clickElement(b){if(!b||b.disabled||b.hidden||!b.getClientRects().length)return false;b.click();actions++;return true;}
+ function key(code){const w=windows[role],key=code==='Space'?' ':code;w.dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,key,code}));w.dispatchEvent(new w.KeyboardEvent('keyup',{bubbles:true,key,code}));actions++;}
+ function hold(selector,ms){const w=windows[role],el=w.document.querySelector(selector);if(!el||el.disabled||el.hidden||!el.getClientRects().length)return Promise.resolve(false);release();const id=19,original=el.setPointerCapture;try{el.setPointerCapture=()=>{};el.dispatchEvent(new w.PointerEvent('pointerdown',{bubbles:true,pointerId:id,pointerType:'mouse',buttons:1}));}catch(_){return Promise.resolve(false);}finally{el.setPointerCapture=original;}held={el,win:w,id};actions++;return new Promise(resolve=>setTimeout(()=>{release();resolve(true);},ms));}
+ function setCommands(list){const next=Array.isArray(list)?list.slice(0,40).map(x=>({id:String(x.id),label:String(x.label)})):[];if(JSON.stringify(next)===JSON.stringify(commands))return;commands=next;onChange(snapshot());}
+ function external(){const registry=window.DevConsoleBotAdapters;if(!registry||!registry.capability(mode,role).supported)return null;return registry.create(mode,role,{window:windows[role],state:()=>readLocal(),click,clickElement,key,hold,release,commands:setCommands,report,stop});}
+ function readLocal(){const w=windows[role];if(mode==='dial')return w.RadioMobile?.state();if(mode==='wires')return w.WiresMobile?.state();if(mode==='vault')return w.VaultMobile?.state();if(mode==='beam')return w.BeamMobile?.state();if(mode==='boss')return w.BossMobile?.state();if(['lockbox','silhouette','evidence','mirrors'].includes(mode))return w.PuzzlePack?.state();if(['lookback','caller','shadow'].includes(mode))return w.RoomLabExpansion?.view||w.RoomLabExpansion?.state;if(mode==='pressure')return w.RT||w.RT_VIEW;if(mode==='pwslide')return w.PasswordStrip?.state();if(mode==='lightsearch')return w.RhythmLight?.state();if(mode==='maze')return w.MazeMobile?.state();return null;}
  function step(){
   timer=null;if(stopped||syncResult()||paused||role==='manual'||signal.aborted)return;
   try{
    if(['A','B'].some(r=>!windows[r]?.PEER?.conn?.open||windows[r].S?.mod!==mode)){stop('连接中断或已离开本关，托管已停止');return;}
    if(['A','B'].some(r=>['failed','recovering'].includes(windows[r].DungeonConnection?.status()?.state))){pause('连接不稳定，托管已暂停');return;}
-   const w=windows[role],s=mode==='pwslide'?w.PasswordStrip?.state():w.RhythmLight?.state();
+   const w=windows[role],s=readLocal();
+   if(!s&&adapter){adapter.tick();if(!stopped&&!paused)timer=setTimeout(step,140);return;}
    if(!s){stop('当前玩法状态不可读，托管已停止');return;}
    if(gameId&&gameId!==s.id){stop('游戏轮次已变化，请重新选择托管');return;}gameId=s.id;
    if(s.done||s.phase==='done'){stop(outcome(s));return;}
@@ -63,7 +71,7 @@ function create({windows,mode,signal,onChange=()=>{}}){
      }else if(s.rows.every(r=>r.offset===target)&&!s.confirmed[role]){click('#ps-confirm');report('自己的条片已接齐并确认，等待人工端确认');}
      else report('自己的条片已接齐，等待人工端调整并确认');
     }
-   }else if(mode==='lightsearch'&&s.started){
+   }else if(mode==='lightsearch'&&role==='A'&&s.started){
     const now=performance.now();
     if(s.challenge==='running'&&now<resultWaitUntil){report('已停止挑战，等待游戏同步结果');}
     else if(s.challenge==='running'){
@@ -73,11 +81,11 @@ function create({windows,mode,signal,onChange=()=>{}}){
      if(elapsed>=10500){if(click('#ls-pull')){anchor=null;resultWaitUntil=now+1000;nextPull=now+9500;report('已按真实计时停止挑战，等待下一次开灯');}}
      else report('A 正在真实默数；暂停或人工输入会取消待按动作');
     }else if(now>=nextPull){anchor=null;if(click('#ls-pull')){anchor=performance.now();nextPull=now+1000;report('A 已开始挑战，真实等待 10.5 秒');}}
-   }
+   }else if(adapter){adapter.tick();}
   }catch(e){stop('托管异常已停止：'+e.message);return;}
   if(!stopped&&!paused&&role!=='manual')timer=setTimeout(step,mode==='lightsearch'?40:140);
  }
- function setRole(value){if(stopped)return false;if(!['manual','A','B'].includes(value)||!capability(mode,value).supported)return false;clear();role=value;paused=false;nextPull=0;report(value==='manual'?'双端手动':value+' 托管已启用');if(value!=='manual')step();return true;}
+ function setRole(value){if(stopped)return false;if(!['manual','A','B'].includes(value)||!capability(mode,value).supported)return false;clear();role=value;paused=false;nextPull=0;if(value!=='manual'&&!(mode==='pwslide'||(mode==='lightsearch'&&value==='A')))adapter=external();report(value==='manual'?'双端手动':value+' 托管已启用');if(value!=='manual')step();return true;}
  function resume(){if(stopped||role==='manual')return;paused=false;clear();report('恢复托管');step();}
  for(const r of ['A','B']){
   const d=windows[r].document,handler=e=>{if(e.isTrusted&&r===role&&!paused)pause('检测到 '+r+' 人工输入，已暂停托管；可直接接管');};
@@ -86,7 +94,8 @@ function create({windows,mode,signal,onChange=()=>{}}){
  const abort=()=>stop('本轮已取消，旧托管动作已清除');signal.addEventListener('abort',abort,{once:true});clean.push(()=>signal.removeEventListener('abort',abort));
  resultTimer=setInterval(syncResult,100);
  if(signal.aborted)stop();
- return Object.freeze({setRole,pause,resume,stop,syncResult,snapshot});
+ function command(id){if(stopped||paused||role==='manual'||!adapter)return false;const valid=commands.some(x=>x.id===id);if(!valid)return false;const before=actions,ok=adapter.command(id);if(ok){if(actions===before)actions++;report('已执行口令：'+(commands.find(x=>x.id===id)?.label||id));}return !!ok;}
+ return Object.freeze({setRole,pause,resume,stop,syncResult,snapshot,command});
 }
 window.DevConsoleBot=Object.freeze({capability,create,resultOutcome});
 })();

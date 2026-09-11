@@ -1,5 +1,21 @@
 (function(){
 'use strict';
+// Shared HTML owns the run token and final snapshot. This hook only binds UI actions.
+var resultConn=null,resultRun=null,oldResultRuns=new Set();
+var priorResultPanel=showFB;showFB=function(data){if(S.mod==='catch'&&window.RoomResults&&RoomResults.status())return;return priorResultPanel.apply(this,arguments);};
+window.catchResultBegin=function(runId,who,conn){
+ if(window._dungeon)return true;
+ if(!window.RoomResults||typeof runId!=='string'||!runId||runId.length>240||conn!==PEER.conn||S.mod!=='catch')return false;
+ if(resultConn!==conn){resultConn=conn;resultRun=null;oldResultRuns.clear();}
+ if(oldResultRuns.has(runId))return false;
+ if(resultRun&&resultRun!==runId)oldResultRuns.add(resultRun);
+ resultRun=runId;
+ RoomResults.begin({runId:runId,role:who,connection:conn,gameId:'catch',title:'情报空投',dungeon:null,
+ onContinue:function(){if(who==='A'&&window._host&&window._host.mode==='catch')window._host.reset();},
+ onExit:function(){netSend({t:'bye'});clearTimers();closePeer();renderHall();}});
+ return true;
+};
+
 window.CatchVariation={create:function(){
  var plan=RoomVariation.start('catch'),index=0,seed=plan.seed||1;
  function random(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return(seed>>>0)/4294967296;}

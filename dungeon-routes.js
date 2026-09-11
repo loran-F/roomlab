@@ -1,7 +1,7 @@
 /* Host-generated, constrained route graphs. Loaded after game registration. */
 (function(g){
 'use strict';
-const VERSION=2, TYPES=['fork','parallel','crossroads'];
+const VERSION=3, TYPES=['fork','parallel','crossroads'];
 const NAMES={fork:'分叉汇合',parallel:'双线并行',crossroads:'中段交汇'};
 const ADAPTER_ONLY=['lockbox','silhouette','evidence','mirrors','pwslide','lightsearch'];
 function policyOptions(policy,nativePool){
@@ -13,10 +13,14 @@ function policyOptions(policy,nativePool){
   const adapter=adapters[mode],ready=adapter&&typeof adapter.host==='function'&&typeof adapter.guest==='function';
   return ADAPTER_ONLY.includes(mode)?!!ready:!!ready||native.includes(mode);
  }
- const modes=Array.from(new Set([policy.primary,...policy.pool]));
- modes.forEach(mode=>{if(typeof mode!=='string'||mode==='boss'||!supported(mode))throw new Error('Room mode has no dungeon adapter: '+mode);});
+ const ordered=Number.isInteger(policy.order)&&policy.order>0;
+ if(ordered&&policy.available===false)throw new Error('Room is not yet unlocked');
+ const modes=Array.from(new Set(ordered?policy.pool:[policy.primary,...policy.pool]));
+ [policy.primary,...modes].forEach(mode=>{if(typeof mode!=='string'||mode==='boss'||!supported(mode))throw new Error('Room mode has no dungeon adapter: '+mode);});
  if(policy.boss&&(!Array.isArray(registry)||!registry.some(p=>p.id==='boss')))throw new Error('Boss is not registered');
- return {roomId:policy.roomId,primary:policy.primary,pool:modes,firstVisit:!!policy.firstVisit,boss:policy.boss,title:String(policy.title||'')};
+ const tutorialMode=policy.tutorialMode||policy.primary,advancedMode=policy.advancedMode||policy.primary,finaleMode=policy.finaleMode||(policy.boss?'boss':policy.primary);
+ if(ordered&&(!supported(tutorialMode)||!supported(advancedMode)||(!policy.boss&&!supported(finaleMode))))throw new Error('Room stage mode has no dungeon adapter');
+ return {roomId:policy.roomId,primary:policy.primary,pool:modes,firstVisit:!!policy.firstVisit,boss:policy.boss,title:String(policy.title||''),...(ordered?{order:policy.order,stage:policy.stage,tutorial:policy.tutorial!==false&&policy.tutorialMode!==null,tutorialMode,advancedMode,finaleMode,advanced:policy.advancedPrimary??policy.advanced!==false}: {})};
 }
 function rng(seed){let n=seed>>>0;return function(){n+=0x6D2B79F5;let t=n;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return ((t^t>>>14)>>>0)/4294967296;};}
 function profile(room){
@@ -25,8 +29,59 @@ function profile(room){
  const bounds=minutes<=6?[4,4]:minutes<=9?[4,5]:[5,6];
  return {minutes,level,min:bounds[0],max:bounds[1],supply:level===1?'必经安全屋':level===2?'可选安全屋':'稀少补给',baseScale:level===1?1.08:level===2?1:.92};
 }
+function growthProfile(room,policy){
+ const base=profile(room),stage=Number.isInteger(policy.stage)?policy.stage:policy.order<=4?1:policy.order<=8?2:policy.order<=13?3:4;
+ if(stage<1||stage>4)throw new Error('Invalid route growth stage');
+ const config=[null,{min:3,max:4,maxBranches:1,nodeMin:5,nodeMax:7},{min:5,max:6,maxBranches:2,nodeMin:9,nodeMax:13},{min:7,max:8,maxBranches:3,nodeMin:16,nodeMax:23},{min:10,max:12,maxBranches:3,nodeMin:26,nodeMax:36}][stage];
+ return {...base,...config,stage,order:policy.order};
+}
+function generateGrowth(room,seed,requested,families,policy){
+ if(requested&&!TYPES.includes(requested))throw new Error('Unknown route layout');
+ const p=growthProfile(room,policy),random=rng(seed),pick=a=>a[Math.floor(random()*a.length)],integer=(min,max)=>min+Math.floor(random()*(max-min+1));
+ const pool=policy.pool.length?policy.pool:policy.order===1?[policy.primary]:[];
+ if(!pool.length)throw new Error('No previously unlocked room games');
+ const type=requested||pick(TYPES),floors=integer(p.min,p.max),guaranteed=p.level===1,restRow=Math.max(1,Math.floor(floors*.6));
+ const counts=Array(floors).fill(1),limits=Array(floors).fill(p.maxBranches);
+ if(policy.tutorial)limits[0]=1;
+ if(policy.boss&&policy.advanced)limits[floors-1]=1;
+ // Each template has a random narrow floor, rather than a repeated column grid.
+ if(type==='fork'&&floors>3)limits[integer(1,floors-2)]=1;
+ if(type==='crossroads'&&floors>3)limits[integer(1,floors-2)]=Math.max(1,p.maxBranches-1);
+ const extra=guaranteed?1:0,capacity=limits.reduce((sum,n)=>sum+n,0),low=Math.max(floors,p.nodeMin-2-extra),high=Math.min(capacity,p.nodeMax-2-extra);
+ if(high<low)throw new Error('Growth node budget cannot fit route floors');
+ const target=integer(low,high);
+ if(p.maxBranches>1){const wide=pick(limits.map((n,i)=>n===p.maxBranches?i:-1).filter(i=>i>=0));counts[wide]=p.maxBranches;}
+ let sum=counts.reduce((a,b)=>a+b,0);
+ while(sum<target){const candidates=counts.map((n,i)=>n<limits[i]?i:-1).filter(i=>i>=0);counts[pick(candidates)]++;sum++;}
+ if(guaranteed)counts.splice(restRow,0,1);
+ const rows=[],nodes=[];
+ function row(count,type){const layer=rows.length,xs=count===1?[50]:count===2?[24,76]:[16,50,84];const group=xs.map(x=>{const n={id:'n'+nodes.length,layer,type,x:Math.round((x+(count===1?0:(random()-.5)*6))*10)/10,y:0,done:type==='start',next:[],prev:[],mode:null};nodes.push(n);return n;});rows.push(group);}
+ row(1,'start');counts.forEach((count,i)=>row(count,guaranteed&&i===restRow?'rest':'event'));row(1,'boss');
+ function link(a,b){a.next.push(b.id);b.prev.push(a.id);}
+ for(let l=0;l<rows.length-1;l++){const a=rows[l],b=rows[l+1];let i=0,j=0;link(a[0],b[0]);while(i<a.length-1||j<b.length-1){if(i===a.length-1)j++;else if(j===b.length-1)i++;else if(random()<(type==='parallel'?.8:.45)){i++;j++;}else if(random()<.5)i++;else j++;link(a[i],b[j]);}}
+ if(!guaranteed&&(p.level===2||random()<.45)){const options=rows.filter((r,i)=>i>1&&i<rows.length-1&&r.length>1);if(options.length)pick(pick(options)).type='rest';}
+ if(policy.tutorial)rows[1].forEach(n=>{n.mode=policy.tutorialMode;n.roomTutorial=true;});
+ if(policy.boss&&policy.advanced)rows[rows.length-2].forEach(n=>{n.mode=policy.advancedMode;n.roomAdvanced=true;});
+ const end=nodes[nodes.length-1];end.roomFinale=true;end.roomAdvanced=policy.advanced;
+ if(!policy.boss){end.type='event';end.mode=policy.finaleMode;}
+ const byId=Object.fromEntries(nodes.map(n=>[n.id,n])),uses={};
+ nodes.forEach(n=>{
+  n.y=90-n.layer/(rows.length-1)*80;n.routeTier=Math.min(4,1+Math.floor((p.stage-1)/2)+Math.floor(n.layer/5));
+  if(n.type!=='event')return;
+  if(!n.mode){const parents=n.prev.map(id=>byId[id]).filter(n=>n.type==='event'),siblings=rows[n.layer].filter(s=>s!==n&&s.mode).map(s=>s.mode);
+   const ranked=pool.map(mode=>({mode,repeats:parents.filter(parent=>parent.mode===mode).length,chains:parents.filter(parent=>parent.mode===mode&&parent.prev.some(id=>byId[id].mode===mode)).length}));
+   const best=Math.min(...ranked.map(x=>x.chains*100+x.repeats));const choices=ranked.filter(x=>x.chains*100+x.repeats===best).map(x=>({...x,weight:(siblings.includes(x.mode)?.12:1)/(1+(uses[x.mode]||0))*(families&&parents.some(parent=>families[parent.mode]&&families[parent.mode]===families[x.mode])?.6:1)}));
+   let value=random()*choices.reduce((sum,x)=>sum+x.weight,0);n.mode=choices[choices.length-1].mode;choices.some(x=>{value-=x.weight;if(value<=0){n.mode=x.mode;return true;}return false;});
+  }uses[n.mode]=(uses[n.mode]||0)+1;
+ });
+ const d={roomId:room.id,hp:5,maxHp:5,nodes,start:nodes[0].id,boss:end.id,posA:nodes[0].id,posB:nodes[0].id,cur:'A',locked:{},over:false,win:false,_t:null,coopHistory:[],coopAlarm:0,
+  route:{version:VERSION,seed:seed>>>0,type,name:p.stage===1?'入门路线':type==='parallel'?'分路并行':NAMES[type],floors,layers:counts.length,minutes:p.minutes,level:p.level,supply:p.supply,baseScale:p.baseScale,ending:policy.boss?'boss':'primary',id:(seed>>>0).toString(36)+'-'+room.id,stage:p.stage,order:p.order,maxBranches:p.maxBranches,nodeCount:nodes.length},
+  progression:{roomId:room.id,primary:policy.primary,pool:policy.pool.slice(),firstVisit:policy.firstVisit,boss:policy.boss,title:policy.title,order:p.order,stage:p.stage,tutorial:policy.tutorial,tutorialMode:policy.tutorialMode,advancedMode:policy.advancedMode,finaleMode:policy.finaleMode,advanced:policy.advanced}};
+ const check=validate(d);if(!check.ok)throw new Error(check.errors.join('; '));return d;
+}
 function generate(room,pool,seed,requested,families,options){
  const policy=policyOptions(options,pool);
+ if(policy&&policy.order)return generateGrowth(room,seed,requested,families,policy);
  if(policy)pool=policy.pool;
  if(!pool.length)throw new Error('No registered dungeon games');
  if(requested&&!TYPES.includes(requested))throw new Error('Unknown route layout');
@@ -90,7 +145,7 @@ function generate(room,pool,seed,requested,families,options){
   ranked.some(x=>{value-=x.weight;if(value<=0){n.mode=x.mode;return true;}return false;});
  });
  const d={roomId:room.id,hp:5,maxHp:5,nodes,start:nodes[0].id,boss:nodes[nodes.length-1].id,posA:nodes[0].id,posB:nodes[0].id,cur:'A',locked:{},over:false,win:false,_t:null,coopHistory:[],coopAlarm:0,
-  route:{version:VERSION,seed:seed>>>0,type,name:NAMES[type],floors,layers:counts.length,minutes:p.minutes,level:p.level,supply:p.supply,baseScale:p.baseScale,ending:policy&&!policy.boss?'primary':'boss',id:(seed>>>0).toString(36)+'-'+room.id}};
+  route:{version:2,seed:seed>>>0,type,name:NAMES[type],floors,layers:counts.length,minutes:p.minutes,level:p.level,supply:p.supply,baseScale:p.baseScale,ending:policy&&!policy.boss?'primary':'boss',id:(seed>>>0).toString(36)+'-'+room.id}};
  if(policy)d.progression={roomId:room.id,primary:policy.primary,pool:policy.pool.slice(),firstVisit:policy.firstVisit,boss:policy.boss,title:policy.title};
  const check=validate(d);if(!check.ok)throw new Error(check.errors.join('; '));return d;
 }
@@ -107,7 +162,16 @@ function validate(d){
  });
  const edges=d.nodes.flatMap(n=>n.next.map(id=>[n,byId.get(id)]));
  edges.forEach(([a,b],i)=>edges.slice(i+1).forEach(([c,e])=>{if(b&&e&&a.layer===c.layer&&a.id!==c.id&&b.id!==e.id&&(a.x-c.x)*(b.x-e.x)<0)errors.push('Crossing edges');}));
- if(d.progression){
+ if(d.progression&&d.route&&d.route.version>=3){
+  const plan=d.progression,end=byId.get(d.boss),first=d.nodes.filter(n=>n.layer===1),pool=plan.pool.length?plan.pool:plan.order===1?[plan.primary]:[];
+  if(plan.tutorial&&(first.length!==1||first.some(n=>n.mode!==plan.tutorialMode||!n.roomTutorial)))errors.push('Missing primary tutorial');
+  if(!end||!end.roomFinale||!!end.roomAdvanced!==!!plan.advanced||(plan.boss?end.type!=='boss':end.type!=='event'||end.mode!==plan.finaleMode))errors.push('Invalid room finale');
+  if(plan.boss&&plan.advanced&&d.nodes.filter(n=>n.layer===end.layer-1).some(n=>!n.roomAdvanced||n.mode!==plan.advancedMode||n.type!=='event'))errors.push('Missing primary advanced encounter');
+  if(d.nodes.some(n=>n.roomAdvanced&&!n.roomFinale&&(!plan.boss||n.layer!==end.layer-1||n.mode!==plan.advancedMode)))errors.push('Unexpected advanced encounter');
+  if(d.nodes.some(n=>n.type==='event'&&!(n.roomTutorial||n.roomAdvanced||n.roomFinale)&&!pool.includes(n.mode)))errors.push('Mode outside unlocked pool');
+  if(d.nodes.some(n=>n.roomTutorial&&(n.layer!==1||!plan.tutorial)))errors.push('Unexpected tutorial');
+  const counts=new Map();d.nodes.forEach(n=>counts.set(n.layer,(counts.get(n.layer)||0)+1));if([...counts.values()].some(n=>n>d.route.maxBranches))errors.push('Excess route width');
+ }else if(d.progression){
   const plan=d.progression,first=d.nodes.filter(n=>n.layer===1),end=byId.get(d.boss),last=end&&d.nodes.filter(n=>n.layer===end.layer-1);
   if(!first.length||first.some(n=>n.type!=='event'||n.mode!==plan.primary||!n.roomTutorial))errors.push('Missing primary tutorial');
   if(!last||!last.length||last.some(n=>n.type!=='event'||n.mode!==plan.primary||!n.roomAdvanced))errors.push('Missing advanced primary');
@@ -116,7 +180,7 @@ function validate(d){
  }
  return {ok:!errors.length,errors};
 }
-const api=g.DungeonRoutes={profile,generate,validate,types:TYPES,policyOptions};
+const api=g.DungeonRoutes={profile,growthProfile,generate,validate,types:TYPES,policyOptions};
 if(typeof newDungeon!=='function')return;
 const originalNew=newDungeon,originalSnapshot=dgSnapshot,originalApply=applyDungeon;
 // Calling the previous constructor first preserves other modules' session resets.
@@ -135,7 +199,7 @@ dgSnapshot=function(){
  return snapshot;
 };
 applyDungeon=function(data){
- if(data.route&&[1,VERSION].includes(data.route.version)){
+ if(data.route&&[1,2,VERSION].includes(data.route.version)){
   // Build B's board from A's graph, never from a local random constructor.
   if(!DUNGEON||!DUNGEON.route||DUNGEON.route.id!==data.route.id){
    const candidate={...data,nodes:data.nodes.map(n=>({...n,next:n.next.slice(),prev:n.prev.slice()}))};

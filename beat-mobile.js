@@ -1,5 +1,21 @@
 (function(){
 'use strict';
+// Shared HTML owns the run token and final snapshot. This hook only binds UI actions.
+var resultConn=null,resultRun=null,oldResultRuns=new Set();
+var priorResultPanel=showFB;showFB=function(data){if(S.mod==='beat'&&window.RoomResults&&RoomResults.status())return;return priorResultPanel.apply(this,arguments);};
+window.beatResultBegin=function(runId,who,conn){
+ if(window._dungeon)return true;
+ if(!window.RoomResults||typeof runId!=='string'||!runId||runId.length>240||conn!==PEER.conn||S.mod!=='beat')return false;
+ if(resultConn!==conn){resultConn=conn;resultRun=null;oldResultRuns.clear();}
+ if(oldResultRuns.has(runId))return false;
+ if(resultRun&&resultRun!==runId)oldResultRuns.add(resultRun);
+ resultRun=runId;
+ RoomResults.begin({runId:runId,role:who,connection:conn,gameId:'beat',title:'信号节拍',dungeon:null,
+ onContinue:function(){if(who==='A'&&window._host&&window._host.mode==='beat')window._host.reset();},
+ onExit:function(){netSend({t:'bye'});clearTimers();closePeer();renderHall();}});
+ return true;
+};
+
 window.BeatVariation={create:function(){var plan=RoomVariation.start('beat'),index=0;return {tier:plan.tier,plan:plan,next:function(){if(plan.tier===1)return null;var phrase=plan.phrases[Math.floor(index/3)%plan.phrases.length],at=index++%3;return {type:phrase.types[at],beats:phrase.beats[at]};}};} };
 window.beatMobileDraw=function(c,notes,lives,bpm){
  c.clearRect(0,0,340,400);c.fillStyle='#ffe8ac';c.fillRect(0,0,340,400);
