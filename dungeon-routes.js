@@ -33,14 +33,14 @@ function growthProfile(room,policy){
  const base=profile(room),stage=Number.isInteger(policy.stage)?policy.stage:policy.order<=4?1:policy.order<=8?2:policy.order<=13?3:4;
  if(stage<1||stage>4)throw new Error('Invalid route growth stage');
  const config=[null,{min:3,max:4,maxBranches:1,nodeMin:5,nodeMax:7},{min:5,max:6,maxBranches:2,nodeMin:9,nodeMax:13},{min:7,max:8,maxBranches:3,nodeMin:16,nodeMax:23},{min:10,max:12,maxBranches:3,nodeMin:26,nodeMax:36}][stage];
- return {...base,...config,stage,order:policy.order};
+ return {...base,...config,stage,order:policy.order,supply:stage===1?'必经安全屋':'可选安全屋'};
 }
 function generateGrowth(room,seed,requested,families,policy){
  if(requested&&!TYPES.includes(requested))throw new Error('Unknown route layout');
  const p=growthProfile(room,policy),random=rng(seed),pick=a=>a[Math.floor(random()*a.length)],integer=(min,max)=>min+Math.floor(random()*(max-min+1));
  const pool=policy.pool.length?policy.pool:policy.order===1?[policy.primary]:[];
  if(!pool.length)throw new Error('No previously unlocked room games');
- const type=requested||pick(TYPES),floors=integer(p.min,p.max),guaranteed=p.level===1,restRow=Math.max(1,Math.floor(floors*.6));
+ const type=requested||pick(TYPES),floors=integer(p.min,p.max),guaranteed=p.stage===1,restRow=Math.max(1,Math.floor(floors*.6));
  const counts=Array(floors).fill(1),limits=Array(floors).fill(p.maxBranches);
  if(policy.tutorial)limits[0]=1;
  if(policy.boss&&policy.advanced)limits[floors-1]=1;
@@ -50,7 +50,9 @@ function generateGrowth(room,seed,requested,families,policy){
  const extra=guaranteed?1:0,capacity=limits.reduce((sum,n)=>sum+n,0),low=Math.max(floors,p.nodeMin-2-extra),high=Math.min(capacity,p.nodeMax-2-extra);
  if(high<low)throw new Error('Growth node budget cannot fit route floors');
  const target=integer(low,high);
- if(p.maxBranches>1){const wide=pick(limits.map((n,i)=>n===p.maxBranches?i:-1).filter(i=>i>=0));counts[wide]=p.maxBranches;}
+ // Reserve a genuine middle branch before allocating the remaining node budget.
+ // Its sibling stays playable, so the safe room can always be bypassed.
+ if(p.maxBranches>1){const wide=pick(limits.map((n,i)=>n===p.maxBranches&&i>0&&i<floors-1?i:-1).filter(i=>i>=0));counts[wide]=p.maxBranches;}
  let sum=counts.reduce((a,b)=>a+b,0);
  while(sum<target){const candidates=counts.map((n,i)=>n<limits[i]?i:-1).filter(i=>i>=0);counts[pick(candidates)]++;sum++;}
  if(guaranteed)counts.splice(restRow,0,1);
@@ -59,7 +61,7 @@ function generateGrowth(room,seed,requested,families,policy){
  row(1,'start');counts.forEach((count,i)=>row(count,guaranteed&&i===restRow?'rest':'event'));row(1,'boss');
  function link(a,b){a.next.push(b.id);b.prev.push(a.id);}
  for(let l=0;l<rows.length-1;l++){const a=rows[l],b=rows[l+1];let i=0,j=0;link(a[0],b[0]);while(i<a.length-1||j<b.length-1){if(i===a.length-1)j++;else if(j===b.length-1)i++;else if(random()<(type==='parallel'?.8:.45)){i++;j++;}else if(random()<.5)i++;else j++;link(a[i],b[j]);}}
- if(!guaranteed&&(p.level===2||random()<.45)){const options=rows.filter((r,i)=>i>1&&i<rows.length-1&&r.length>1);if(options.length)pick(pick(options)).type='rest';}
+ if(!guaranteed){const options=rows.filter((r,i)=>i>1&&i<rows.length-2&&r.length>1);if(!options.length)throw new Error('Missing optional safe-room branch');pick(pick(options)).type='rest';}
  if(policy.tutorial)rows[1].forEach(n=>{n.mode=policy.tutorialMode;n.roomTutorial=true;});
  if(policy.boss&&policy.advanced)rows[rows.length-2].forEach(n=>{n.mode=policy.advancedMode;n.roomAdvanced=true;});
  const end=nodes[nodes.length-1];end.roomFinale=true;end.roomAdvanced=policy.advanced;
@@ -152,7 +154,7 @@ function generate(room,pool,seed,requested,families,options){
 function validate(d){
  const errors=[],byId=new Map(d.nodes.map(n=>[n.id,n]));
  if(byId.size!==d.nodes.length)errors.push('Duplicate node ID');
- function reach(id,dir){const seen=new Set(),stack=[id];while(stack.length){const id=stack.pop();if(seen.has(id))continue;seen.add(id);const n=byId.get(id);if(n)stack.push(...n[dir]);}return seen;}
+ function reach(id,dir,blocked=new Set()){const seen=new Set(),stack=[id];while(stack.length){const id=stack.pop();if(seen.has(id)||blocked.has(id))continue;seen.add(id);const n=byId.get(id);if(n)stack.push(...n[dir]);}return seen;}
  const from=reach(d.start,'next'),to=reach(d.boss,'prev');
  d.nodes.forEach(n=>{
   if(!from.has(n.id)||!to.has(n.id))errors.push('Unreachable '+n.id);
@@ -171,6 +173,12 @@ function validate(d){
   if(d.nodes.some(n=>n.type==='event'&&!(n.roomTutorial||n.roomAdvanced||n.roomFinale)&&!pool.includes(n.mode)))errors.push('Mode outside unlocked pool');
   if(d.nodes.some(n=>n.roomTutorial&&(n.layer!==1||!plan.tutorial)))errors.push('Unexpected tutorial');
   const counts=new Map();d.nodes.forEach(n=>counts.set(n.layer,(counts.get(n.layer)||0)+1));if([...counts.values()].some(n=>n>d.route.maxBranches))errors.push('Excess route width');
+  const rests=d.nodes.filter(n=>n.type==='rest'),bypass=reach(d.start,'next',new Set(rests.map(n=>n.id))).has(d.boss);
+  if(rests.length!==1)errors.push('Expected exactly one safe room');
+  if(rests.some(n=>n.roomTutorial||n.roomAdvanced||n.roomFinale||n.id===d.start||n.id===d.boss))errors.push('Safe room replaces protected encounter');
+  if(rests.some(n=>!from.has(n.id)||!to.has(n.id)))errors.push('Safe room has no complete route');
+  if(plan.stage===1?bypass:!bypass)errors.push('Invalid safe-room bypass');
+  if(d.route.supply!==(plan.stage===1?'必经安全屋':'可选安全屋'))errors.push('Invalid supply description');
  }else if(d.progression){
   const plan=d.progression,first=d.nodes.filter(n=>n.layer===1),end=byId.get(d.boss),last=end&&d.nodes.filter(n=>n.layer===end.layer-1);
   if(!first.length||first.some(n=>n.type!=='event'||n.mode!==plan.primary||!n.roomTutorial))errors.push('Missing primary tutorial');

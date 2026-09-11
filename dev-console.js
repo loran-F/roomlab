@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id), native=new Set(['lockbox','silhouette','evidence','mirrors','pwslide','lightsearch']);
-const CONSOLE_BUILD='dc-2026.09.12.1';
+const CONSOLE_BUILD='dc-2026.09.12.2';
 let catalog=null,current=null,serial=0,lastConfig=null,desiredRole="manual";
 function towerScope(){return $('dc-scope').value==='tower';}
 function hashText(value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0');}
@@ -28,7 +28,9 @@ function option(value,label){const el=document.createElement('option');el.value=
 function levels(mode){
  if(mode==='boss')return [[1,'标准 · 双人拆机']];
  if(mode==='pwslide')return [[1,'入门 · 6 条'],[2,'进阶 · 8 条']];
- if(['lockbox','silhouette','evidence','mirrors'].includes(mode))return [[1,'入门'],[2,'进阶'],[3,'挑战']];
+ if(mode==='silhouette')return [[1,'入门'],[2,'进阶'],[3,'挑战'],[4,'极限 · 近似轮廓']];
+ if(mode==='lockbox')return [[1,'入门'],[2,'进阶'],[3,'挑战'],[4,'极限 · 四道校准']];
+ if(['evidence','mirrors'].includes(mode))return [[1,'入门'],[2,'进阶'],[3,'挑战']];
  if(mode==='vault')return [[1,'4 位数字'],[2,'7 位数字'],[3,'数字与字母'],[4,'限时算术']];
  if(mode==='lightsearch')return [[1,'入门 · 宽容节奏'],[2,'进阶'],[3,'挑战'],[4,'极限 · 更窄窗口']];
  if(['wires','pressure'].includes(mode))return [[1,'入门'],[2,'进阶'],[3,'挑战'],[4,'极限']];

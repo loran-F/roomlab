@@ -3,6 +3,8 @@
 'use strict';
 var MODE='pwslide',PROTO='password-slices/2',session=null,view=null,selected=0,drawKey='',swipe=null;
 function other(w){return w==='A'?'B':'A';}
+function feedback(type,source){var q=session;if(!q||q.failed||q.stopped||(q.ctx&&!q.ctx.isActive())||!window.GameFeedback)return;if(type==='tap'){var now=Date.now();if(now-(q.feedbackTapAt||0)<100)return;q.feedbackTapAt=now;}try{GameFeedback.emit(type,{source:'pwslide:'+source});}catch(_){} }
+function feedbackState(q,s){var previous=q.feedbackState;q.feedbackState={id:s.id,round:s.round,phase:s.phase,remaining:s.remaining,confirmed:copy(s.confirmed)};if(!previous||previous.id!==s.id||previous.round!==s.round||s.phase==='done')return;if(s.remaining<previous.remaining){feedback('error','authority');return;}if(previous.phase==='play'&&(s.phase==='between'||['A','B'].some(function(w){return s.confirmed[w]&&!previous.confirmed[w];})))feedback('correct','authority');}
 function copy(x){return JSON.parse(JSON.stringify(x));}
 function uid(){return Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);}
 var LIMIT=64,STEP=4;
@@ -52,19 +54,19 @@ function board(s){var count=s.rows.length;
  return defs+'<div class="ps-board" aria-label="同一幅密码横切成 '+count+' 条，左右拖动自己的条片">'+s.rows.map(function(r,i){return '<div class="ps-slice" style="aspect-ratio:360/'+(96/count)+'" data-ps-row="'+i+'" data-owner="'+r.owner+'"><span class="ps-row-label" aria-hidden="true">'+(i+1)+'</span><svg viewBox="0 '+(36+i*96/count)+' 360 '+(96/count)+'" preserveAspectRatio="none" aria-hidden="true"><g class="ps-band" data-ps-band="'+i+'" transform="translate('+r.offset+' 0)"><use href="#ps-glyphs"/></g></svg></div>';}).join('')+'</div>';
 }
 function renderOffset(i,value){var g=document.querySelector('[data-ps-band="'+i+'"]');if(g)g.setAttribute('transform','translate('+value+' 0)');}
-function draw(){var q=session;if(!q||q.failed||!view)return;var s=view,w=q.role,body=document.getElementById('ps-body');if(!body)return;if(s.phase==='done'&&window.RoomResults){swipe=null;document.querySelectorAll('.ps-shell button:not(#ps-back)').forEach(function(b){b.disabled=true;});return;}var structure=s.id+':'+s.round+':'+s.phase;
+function draw(){var q=session;if(!q||q.failed||!view)return;var s=view,w=q.role,body=document.getElementById('ps-body');if(!body)return;feedbackState(q,s);if(s.phase==='done'&&window.RoomResults){swipe=null;document.querySelectorAll('.ps-shell button:not(#ps-back)').forEach(function(b){b.disabled=true;});return;}var structure=s.id+':'+s.round+':'+s.phase;
  if(!s.rows[selected]||s.rows[selected].owner!==w)selected=mine(s,w)[0];
  if(drawKey!==structure){drawKey=structure;swipe=null;q.preview=null;
   if(s.phase!=='play'){
    var title=s.phase==='ready'?'把切开的密码拼回来':s.phase==='between'?'接下来，八条一起拼':!s.win?'本局机会用尽':q.ctx?'出口锁已解除':'密码拼好了';
    body.innerHTML='<section class="ps-paper ps-intro">'+icon()+'<p class="ps-eyebrow">'+(s.phase==='done'?(s.win?'合作完成':'本局结束'):'第 '+roundLabel(s)+' 轮 · '+s.remaining+' 次机会')+'</p><h2>'+title+'</h2><p>'+(s.phase==='done'?(s.win?'每一道切口都接上了。':'先观察数字切口，再正式确认。'):s.phase==='between'?'新的四位数字，切成八条。仍然只动自己的条片。':'两个人看同一幅图。你推奇偶条中的一半，同伴推另一半。')+'</p>'+(s.phase==='done'?'':'<ol><li>A 负责奇数条，B 负责偶数条。</li><li>左右拖动条片，让数字的切口接起来。</li><li>拼成完整数字后，各点一次确认。</li></ol>')+btn(s.phase==='done'?'ps-again':'ps-ready',s.phase==='done'?'再来一局':'读懂了 · 准备')+'<small>双方准备后开始 · 错误确认扣 1 次机会</small></section>';
    if(q.ctx&&s.phase==='done'){document.getElementById('ps-again').remove();body.querySelector('small').textContent=(s.win?'机关已解除':'本局机会用尽')+'，正在返回地图…';}
-   var b=document.getElementById(s.phase==='done'?'ps-again':'ps-ready');if(b)b.onclick=function(){emit(s.phase==='done'?'again':'ready');};
+   var b=document.getElementById(s.phase==='done'?'ps-again':'ps-ready');if(b)b.onclick=function(){feedback('tap','ready');emit(s.phase==='done'?'again':'ready');};
   }else{
    body.innerHTML='<div class="ps-meta"><span>第 '+roundLabel(s)+' 轮 · '+s.rows.length+' 条</span><span id="ps-budget"></span></div><section class="ps-paper ps-puzzle"><h2>拼回完整的四位数字</h2><p class="ps-hint">你是 '+w+' · 负责'+(w==='A'?'奇数':'偶数')+'条，同伴负责另一半</p>'+board(s)+'<p class="ps-legend">A 奇数条 · B 偶数条 · 两端画面同步</p></section><section class="ps-controls" aria-label="条片操作"><div class="ps-select">'+mine(s,w).map(function(i){return '<button data-ps-select="'+i+'" aria-pressed="false">第 '+(i+1)+' 条</button>';}).join('')+'</div><div class="ps-touch" aria-label="拖动此处左右移动选中条片"><span id="ps-selected"></span><small>也可在这里左右拖动</small></div><div class="ps-directions">'+btn('ps-minus','← 向左微调')+btn('ps-plus','向右微调 →')+'</div>'+btn('ps-confirm','拼好了 · 确认')+'</section>';
-   document.getElementById('ps-confirm').onclick=function(){emit('confirm');};
+   document.getElementById('ps-confirm').onclick=function(){feedback('tap','confirm-request');emit('confirm');};
    document.getElementById('ps-minus').onclick=function(){nudge(-1);};document.getElementById('ps-plus').onclick=function(){nudge(1);};
-   body.querySelectorAll('[data-ps-select]').forEach(function(b){b.onclick=function(){if(swipe)return;selected=Number(b.dataset.psSelect);draw();};});
+   body.querySelectorAll('[data-ps-select]').forEach(function(b){b.onclick=function(){if(swipe)return;if(selected!==Number(b.dataset.psSelect))feedback('tap','select');selected=Number(b.dataset.psSelect);draw();};});
   }
  }
  if(s.phase==='play'){
@@ -80,9 +82,9 @@ function draw(){var q=session;if(!q||q.failed||!view)return;var s=view,w=q.role,
  document.getElementById('ps-status').textContent=s.notice||(s.phase==='play'?'沿数字轮廓接好切口；细条不好点时，用下方条号选择。':s.phase==='done'?(s.win?'合作完成。':'本局机会用尽。'):'读完规则后，和同伴一起准备。');
 }
 function position(i,value){var q=session;if(!q||!view)return;value=Math.max(-LIMIT,Math.min(LIMIT,Math.round(value)));q.preview={index:i,value:value,seq:q.seq+1};renderOffset(i,value);emit('move',{index:i,offset:value});}
-function nudge(delta){if(!view||view.phase!=='play'||swipe)return;var q=session,value=q.preview&&q.preview.index===selected?q.preview.value:view.rows[selected].offset;position(selected,Math.round(value/STEP)*STEP+delta*STEP);draw();}
+function nudge(delta){if(!view||view.phase!=='play'||swipe)return;var q=session,value=q.preview&&q.preview.index===selected?q.preview.value:view.rows[selected].offset;var next=Math.max(-LIMIT,Math.min(LIMIT,Math.round(value/STEP)*STEP+delta*STEP));if(next!==value)feedback('tap','nudge');position(selected,next);draw();}
 function controls(q){var root=document.querySelector('.ps-shell');
- function down(e){if(e.button!==0||swipe||!view||view.phase!=='play'||q.failed)return;var row=e.target.closest('[data-ps-row]'),pad=e.target.closest('.ps-touch');if(!row&&!pad)return;var index=row?Number(row.dataset.psRow):selected;if(view.rows[index].owner!==q.role)return;e.preventDefault();selected=index;var board=root.querySelector('.ps-board'),start=q.preview&&q.preview.index===index?q.preview.value:view.rows[index].offset;swipe={x:e.clientX,index:index,id:view.id,round:view.round,pointer:e.pointerId,start:start,value:start,scale:360/board.clientWidth,sentAt:0};root.setPointerCapture(e.pointerId);draw();}
+ function down(e){if(e.button!==0||swipe||!view||view.phase!=='play'||q.failed)return;var row=e.target.closest('[data-ps-row]'),pad=e.target.closest('.ps-touch');if(!row&&!pad)return;var index=row?Number(row.dataset.psRow):selected;if(view.rows[index].owner!==q.role)return;e.preventDefault();feedback('tap','drag-start');selected=index;var board=root.querySelector('.ps-board'),start=q.preview&&q.preview.index===index?q.preview.value:view.rows[index].offset;swipe={x:e.clientX,index:index,id:view.id,round:view.round,pointer:e.pointerId,start:start,value:start,scale:360/board.clientWidth,sentAt:0};root.setPointerCapture(e.pointerId);draw();}
  function move(e){var a=swipe;if(!a||a.pointer!==e.pointerId||q.failed)return;e.preventDefault();a.value=Math.max(-LIMIT,Math.min(LIMIT,Math.round(a.start+(e.clientX-a.x)*a.scale)));renderOffset(a.index,a.value);if(Date.now()-a.sentAt>=40){a.sentAt=Date.now();position(a.index,a.value);}}
  function up(e){var a=swipe;if(!a||a.pointer!==e.pointerId)return;move(e);swipe=null;if(root.hasPointerCapture(e.pointerId))root.releasePointerCapture(e.pointerId);if(!view||a.id!==view.id||a.round!==view.round||q.failed)return;position(a.index,Math.round(a.value/STEP)*STEP);draw();}
  function cancel(){var a=swipe;swipe=null;if(a&&root.hasPointerCapture(a.pointer))root.releasePointerCapture(a.pointer);if(a&&!q.failed&&view&&a.id===view.id&&a.round===view.round){position(a.index,Math.round(a.value/STEP)*STEP);draw();}}

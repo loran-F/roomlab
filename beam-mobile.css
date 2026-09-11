@@ -17,3 +17,7 @@ body:has(.bm-fish){background:#2f555b;color:#fff1d4}
 .bm-fish .bm-top strong{color:#ffe3a6}
 
 .beam-mobile #bm-lift{touch-action:none}.beam-mobile #bm-ready,.beam-mobile #bm-again{touch-action:manipulation}
+
+/* Shared counters stay outside the arena; cargo feedback is drawn at its own position. */
+.bm-status{gap:8px;flex-wrap:wrap;font-variant-numeric:tabular-nums}.bm-status span{white-space:nowrap}.bm-message{min-height:48px}.bm-arena canvas{touch-action:none}
+@media(max-width:350px){.bm-status{font-size:12px;gap:4px}.bm-top strong{font-size:18px}}

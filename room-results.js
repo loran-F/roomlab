@@ -1,6 +1,6 @@
 (function(g){
 'use strict';
-let session=null;
+let session=null;const feedbackResults=new Set();
 const metricKeys=['durationMs','timeLeftMs','completed','goal','mistakesRemaining','maxMistakes','hp','rescueUsed','rescueSucceeded'];
 const reasonCodes=['completed','timeout','attempts_exhausted','objective_failed','health_exhausted','pressure_overflow','cargo_lost','incorrect_answer','disconnected'];
 const reasonText={timeout:'时间用尽，重新商量一下配合节奏。',attempts_exhausted:'本局尝试机会已用尽。',health_exhausted:'设备耐久已耗尽。',pressure_overflow:'压力超出设备承受范围。',cargo_lost:'货物损坏或滑落次数已用尽。',incorrect_answer:'提交结果未通过核对。',objective_failed:'本次目标未完成，和同伴再试一次。'};
@@ -11,10 +11,11 @@ function close(){const s=session;session=null;if(s){clearInterval(s.retry);if(s.
 function begin(options){
  if(!options||!options.runId||!['A','B'].includes(options.role))throw Error('RoomResults requires runId and role');
  if(session&&session.runId===options.runId&&session.connection===options.connection)return;
- close();const s=session=Object.assign({},options,{result:null,acked:!options.connection,advanced:false,disconnected:false});
+ close();const s=session=Object.assign({},options,{ratingExcluded:!!options.practice||!!options.tutorial||!!(options.dungeon&&g.DUNGEON?.nodes?.find(n=>n.id===options.dungeon.nodeId)?.roomTutorial)||g.RoomProgression?.progress().accessMode==='developer',result:null,acked:!options.connection,advanced:false,disconnected:false});
  s.disconnect=()=>{if(session!==s)return;s.disconnected=true;clearInterval(s.retry);if(s.result)draw(s);};
  if(s.connection){s.connection.on('close',s.disconnect);s.connection.on('error',s.disconnect);}
 }
+function feedback(s){if(s.feedbackSent||feedbackResults.has(s.result?.resultId)||s.disconnected||!s.result||typeof s.result.win!=='boolean')return;s.feedbackSent=true;feedbackResults.add(s.result.resultId);try{g.GameFeedback?.emit(s.result.win?'success':'fail',{source:'result:'+s.result.resultId});}catch(_){}}
 function metrics(input){const out={};for(const k of metricKeys)if(input&&Number.isFinite(input[k])&&input[k]>=0)out[k]=input[k];return out;}
 function report(data){
  const s=session;if(!s||s.role!=='A'||s.result||s.advanced||s.disconnected)return false;
@@ -26,8 +27,10 @@ function report(data){
  if(session!==s)return false;
  const stage=d&&data.win&&d.final?'room-complete':d&&d.over&&!data.win?'room-fail':data.win?'game-success':'game-fail';
  const reasonCode=reasonCodes.includes(data.reasonCode)?data.reasonCode:data.win?'completed':'objective_failed';
- s.result=Object.freeze({resultId:s.runId+':result',gameId:s.gameId,win:data.win,stage,reasonCode,reason:typeof data.reason==='string'?data.reason.slice(0,160):reasonText[reasonCode]||'',metrics:Object.freeze(metrics(data.metrics)),dungeon:d&&Object.freeze(d)});
- draw(s);send(s,packet(s,'roomResult',{result:s.result}));
+ const rating=g.CooperationRating?.score({gameId:s.gameId,win:data.win,stage,reasonCode,metrics:metrics(data.metrics)},s.ratingConfig||{});
+ s.result=Object.freeze({rating:rating||null,resultId:s.runId+':result',gameId:s.gameId,win:data.win,stage,reasonCode,reason:typeof data.reason==='string'?data.reason.slice(0,160):reasonText[reasonCode]||'',metrics:Object.freeze(metrics(data.metrics)),dungeon:d&&Object.freeze(d)});
+ try{g.CooperationRating?.record(s.result,s.result.rating,{role:s.role,excluded:s.ratingExcluded});}catch(_){}
+ feedback(s);draw(s);send(s,packet(s,'roomResult',{result:s.result}));
  if(s.connection)s.retry=setInterval(()=>{if(session!==s||s.acked||s.disconnected){clearInterval(s.retry);return;}send(s,packet(s,'roomResult',{result:s.result}));},500);
  return true;
 }
@@ -37,7 +40,7 @@ function consume(p,connection){
  if(p.t==='roomResult'&&s.role==='B'){
   const r=p.result;if(!r||r.resultId!==s.runId+':result'||r.gameId!==s.gameId||typeof r.win!=='boolean'||!['game-success','game-fail','room-complete','room-fail'].includes(r.stage))return true;
   if(s.advanced)return true;
-  if(!s.result){s.result=Object.freeze(Object.assign({},r,{metrics:Object.freeze(metrics(r.metrics))}));s.acked=true;if(s.onResult)s.onResult(s.result);draw(s);}
+  if(!s.result){s.result=Object.freeze(Object.assign({},r,{metrics:Object.freeze(metrics(r.metrics))}));s.acked=true;if(s.onResult)s.onResult(s.result);feedback(s);draw(s);}
   send(s,packet(s,'roomResultAck',{resultId:s.result.resultId}));
  }else if(p.t==='roomResultAck'&&s.role==='A'&&s.result&&p.resultId===s.result.resultId){const fresh=!s.acked;s.acked=true;clearInterval(s.retry);if(fresh){const root=document.getElementById('room-result');if(root){root.querySelector('.rr-note').textContent='两端已同步本次结果。';root.querySelector('.rr-primary').disabled=false;}}}
  else if(p.t==='roomResultAdvance'&&s.role==='B'&&s.result&&p.resultId===s.result.resultId&&!s.advanced){s.advanced=true;remove();if(s.onContinue)s.onContinue(s.result);}
@@ -58,6 +61,7 @@ function draw(s){
  if(m.durationMs!=null)stat('本局用时',Math.floor(m.durationMs/60000)+':'+String(Math.floor(m.durationMs/1000)%60).padStart(2,'0'));
  if(m.completed!=null&&m.goal!=null)stat('完成进度',m.completed+' / '+m.goal);
  if(r.dungeon&&r.dungeon.hpAfter!=null&&!r.win)stat('队伍剩余机会',String(r.dungeon.hpAfter));if(stats.childNodes.length)root.append(stats);
+ if(!s.disconnected)g.CooperationRating?.decorate(root,r,r.rating);
  const footer=node('div','rr-bottom');footer.append(node('p','rr-note',s.disconnected?'请返回重新连接。':!s.acked?'等待同伴确认结果…':s.role==='B'?'等待同伴继续':'两端已同步本次结果。'));
  const actions=node('div','rr-actions'),exit=node('button','','返回'+(s.dungeon?'密室选择':'玩法选择')),next=node('button','rr-primary',s.role==='B'?'等待同伴继续':s.dungeon?r.stage==='room-fail'?'重新挑战':r.stage==='room-complete'?'再来一局':'返回地图':'再来一局');
  exit.onclick=()=>{close();if(s.onExit)s.onExit();};next.disabled=s.role==='B'||!s.acked||s.disconnected;next.onclick=advance;actions.append(exit,next);footer.append(actions);root.append(footer);document.body.append(root);(next.disabled?exit:next).focus({preventScroll:true});

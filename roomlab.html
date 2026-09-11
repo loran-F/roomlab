@@ -1437,7 +1437,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v13.5·主题密室';
+var APP_VER='v13.6·主题密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -2591,6 +2591,7 @@ function runModule(set){
 
 /* ---- 玩法 1：迷宫盲走 ---- */
 function runMaze(set){
+  var rules=window.mazeRuntimeRules(),text=rules.text;
   var stage=$('stage');
   var cell=Math.min(46, Math.floor(420/MAZE.cols));
   var cv=document.createElement('canvas');
@@ -2599,10 +2600,10 @@ function runMaze(set){
   var ctx=cv.getContext('2d');
   var pos=[MAZE.start[0], MAZE.start[1]];
   var done=false;
-  var path=MAZE.path[0],gates=[.25,.5,.75].map(function(f,i){var at=path[Math.floor((path.length-1)*f)].split(',').map(Number);return {r:at[0],c:at[1],index:i,symbol:Math.floor(Math.random()*6),open:false};}),pending=null;
-  var symbols=['○','△','□','⊕','◇','☆'],valves=['蓝阀','橙阀','绿阀'],answers=[0,1,2,2,0,1];
-  var panel=document.createElement('div');panel.id='maze-valve';panel.className='maze-valve';panel.hidden=true;panel.innerHTML='<b id="maze-valve-clue"></b><p>报符号给 B，听指挥选择阀门。</p>'+valves.map(function(v,i){return '<button data-valve="'+i+'">'+v+'</button>';}).join('');stage.parentNode.appendChild(panel);
-  panel.querySelectorAll('button').forEach(function(button){button.onclick=function(){if(!pending||done||window._dead)return;if(+button.dataset.valve===answers[pending.symbol]){pending.open=true;pending=null;panel.hidden=true;var m=$('msg');if(m){m.className='msg ok';m.textContent='阀门打开！继续前进。';}render();}else{cut(4);var m=$('msg');if(m){m.className='msg err';m.textContent='阀门不对，−4秒。重新向 B 核对符号。';}}};});
+  var path=MAZE.path[0],gates=rules.gateFractions.map(function(f,i){var at=path[Math.floor((path.length-1)*f)].split(',').map(Number);return {r:at[0],c:at[1],index:i,symbol:Math.floor(Math.random()*6),open:false};}),pending=null;
+  var symbols=['○','△','□','⊕','◇','☆'],valves=text.options,answers=[0,1,2,2,0,1];
+  var panel=document.createElement('div');panel.id='maze-valve';panel.className='maze-valve';panel.hidden=true;panel.innerHTML='<b id="maze-valve-clue"></b><p>'+text.encounter+'</p>'+valves.map(function(v,i){return '<button data-valve="'+i+'">'+v+'</button>';}).join('');stage.parentNode.appendChild(panel);
+  panel.querySelectorAll('button').forEach(function(button){button.onclick=function(){if(!pending||done||window._dead)return;if(+button.dataset.valve===answers[pending.symbol]){pending.open=true;pending=null;panel.hidden=true;var m=$('msg');if(m){m.className='msg ok';m.textContent=text.opened;}render();}else{cut(rules.penalties.wrongGate);var m=$('msg');if(m){m.className='msg err';m.textContent=text.wrongGate;}}};});
   window._mazeGates=gates;
 
 
@@ -2613,7 +2614,7 @@ function runMaze(set){
     for(var r=0;r<R;r++) for(var c=0;c<C;c++){
       var wall=MAZE.walls[r][c]==='1';
       // A 视野：十字 5 格（上下左右+自己），看不到斜向——更依赖 B 的方向
-      var near=Math.abs(r-pos[0])+Math.abs(c-pos[1])<=1;
+      var near=Math.abs(r-pos[0])+Math.abs(c-pos[1])<=rules.visionRadius;
       if(near){
         ctx.fillStyle=wall?'#786b86':'#fff0cc';
         ctx.fillRect(c*cell,r*cell,cell,cell);
@@ -2623,7 +2624,7 @@ function runMaze(set){
         ctx.fillRect(c*cell,r*cell,cell,cell);
       }
     }
-    gates.forEach(function(g){if(Math.abs(g.r-pos[0])+Math.abs(g.c-pos[1])<=1){ctx.fillStyle=g.open?'#81bd86':'#e6a750';ctx.fillRect(g.c*cell+2,g.r*cell+2,cell-4,cell-4);ctx.fillStyle='#30253a';ctx.font='bold '+Math.floor(cell*.65)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.open?'✓':symbols[g.symbol],g.c*cell+cell/2,g.r*cell+cell/2);}});
+    gates.forEach(function(g){if(Math.abs(g.r-pos[0])+Math.abs(g.c-pos[1])<=rules.visionRadius){ctx.fillStyle=g.open?'#81bd86':'#e6a750';ctx.fillRect(g.c*cell+2,g.r*cell+2,cell-4,cell-4);ctx.fillStyle='#30253a';ctx.font='bold '+Math.floor(cell*.65)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(g.open?'✓':symbols[g.symbol],g.c*cell+cell/2,g.r*cell+cell/2);}});
     // 探针
     ctx.fillStyle='#269873';
     ctx.shadowColor='#269873'; ctx.shadowBlur=0;
@@ -2640,19 +2641,19 @@ function runMaze(set){
     var nr=pos[0]+dr, nc=pos[1]+dc;
     if(nr<0||nc<0||nr>=MAZE.rows||nc>=MAZE.cols||MAZE.walls[nr][nc]==='1'){
       beep(160,0.18,'sawtooth',0.14); buzz();
-      cut(5);
-      var m=$('msg'); if(m){ m.className='msg err'; m.textContent='✘ 碰墙！时间 -5s。让 B 重新确认方向。'; }
+      cut(rules.penalties.wall);
+      var m=$('msg'); if(m){ m.className='msg err'; m.textContent=text.wall; }
       return;
     }
     var gate=gates.find(function(g){return g.r===nr&&g.c===nc&&!g.open;});
-    if(gate){pending=gate;panel.hidden=false;$('maze-valve-clue').textContent='阀门 '+(gate.index+1)+' · 现场符号「'+symbols[gate.symbol]+'」';return;}
+    if(gate){pending=gate;panel.hidden=false;$('maze-valve-clue').textContent=text.gate+' '+(gate.index+1)+' · '+text.clue+'「'+symbols[gate.symbol]+'」';return;}
     pending=null;panel.hidden=true;
-    if(nr===MAZE.end[0]&&nc===MAZE.end[1]&&gates.some(function(g){return !g.open;})){var m=$('msg');if(m){m.className='msg warn';m.textContent='出口未供电：先打开地图上的三个阀门。';}return;}
+    if(nr===MAZE.end[0]&&nc===MAZE.end[1]&&gates.some(function(g){return !g.open;})){var m=$('msg');if(m){m.className='msg warn';m.textContent=text.lockedExit;}return;}
     pos=[nr,nc];
     var ti=isTrap(nr,nc);
     if(ti>=0 && !sprung[ti]){
-      sprung[ti]=true; cut(8); beep(200,0.2,'sawtooth',0.16); buzz();
-      var mt=$('msg'); if(mt){ mt.className='msg err'; mt.textContent='💥 踩到陷阱！时间 -8s。问 B 要安全路线，这条路别再走了。'; }
+      sprung[ti]=true; cut(rules.penalties.trap); beep(200,0.2,'sawtooth',0.16); buzz();
+      var mt=$('msg'); if(mt){ mt.className='msg err'; mt.textContent=text.trap; }
     }else{
       var dirName = dr===1?'下':(dr===-1?'上':(dc===1?'右':'左'));
       var m=$('msg'); if(m){ m.className='msg ok'; m.textContent='✔ 走了 1 步（'+dirName+'）。报给 B 你现在的方位。'; }
@@ -2661,7 +2662,7 @@ function runMaze(set){
     if(pos[0]===MAZE.end[0] && pos[1]===MAZE.end[1]){
       done=true;
       beep(660,0.15,'square',0.1); setTimeout(function(){beep(880,0.2,'square',0.1);},150); setTimeout(function(){beep(1100,0.25,'square',0.1);},300);
-      var m2=$('msg'); if(m2){ m2.className='msg ok'; m2.textContent='✔ 到达终点！探针就位，玩法完成！'; }
+      var m2=$('msg'); if(m2){ m2.className='msg ok'; m2.textContent=text.success; }
       finish(true);
     }
   }
@@ -3411,105 +3412,123 @@ function realtimeGuestData(d){
   if(s.done&&!window._dungeon&&(!previous||!previous.done)){window._dead=true;if(s.mode!=='pressure'||!window.RoomResults)showFB({ok:s.win,duration:Math.round((s.mode==='pressure'?90:100)-s.time),timeLeft:Math.ceil(s.time),role:'B'});}
 }
 
+function pressureConfig(tier){return {tier:tier,accel:[9,11,13,15][tier-1],maxSpeed:[5,6,7,8][tier-1],brake:[22,25,28,32][tier-1],damping:[6,5.5,5,4.5][tier-1],jitter:[.18,.3,.45,.6][tier-1],stable:[16,14,12,11][tier-1],warning:2.5,moving:1.2,grace:.3,hold:4};}
 function pressureCreate(){
-  var tier=typeof coopDifficulty==='function'?Math.max(1,Math.min(4,coopDifficulty().tier||1)):1;
-  return {safeHalf:6-tier,jitter:2.5+tier,phase:1,round:0,hp:3,seals:0,charge:0,val:50,velocity:0,center:50,nextCenter:35+Math.random()*30,shift:6,heatB:0,cooldown:0,unsafe:0,adjust:{up:false,down:false},transition:0};
+  var tier=typeof coopDifficulty==='function'?Math.max(1,Math.min(4,coopDifficulty().tier||1)):1,cfg=pressureConfig(tier);
+  return {cfg:cfg,safeHalf:6-tier,jitter:cfg.jitter,phase:'stable',phaseLeft:cfg.stable,round:0,hp:3,seals:0,charge:0,val:50,velocity:0,center:50,nextCenter:35+Math.floor(Math.random()*31),shift:cfg.stable,heatB:0,cooldown:0,unsafe:0,requireRelease:false,feedback:'waiting',adjust:{up:false,down:false},transition:0};
+}
+function pressureMotion(s,dt){
+  var c=s.cfg,force=Number(s.adjust.up)-Number(s.adjust.down),v=s.velocity,drift=Math.sin(s.elapsed*1.1)*c.jitter;
+  if(force&&v*force<-.08){s.velocity=Math.sign(v)*Math.max(0,Math.abs(v)-c.brake*dt);s.motion='braking';}
+  else if(force){s.velocity=rtClamp(v+(force*c.accel+drift)*dt,-c.maxSpeed,c.maxSpeed);s.motion=force>0?'rising':'falling';}
+  else{s.velocity=v*Math.exp(-c.damping*dt)+drift*dt;if(Math.abs(s.velocity)<.015)s.velocity=0;s.motion=Math.abs(s.velocity)<.25?'settling':'coasting';}
+  s.val+=s.velocity*dt;
 }
 function pressureStep(s,dt){
-  s.shift-=dt;if(s.shift<=0){s.shift=6;s.centerTarget=s.nextCenter;s.nextCenter=32+Math.random()*36;rtMessage(s,'安全区间开始移动，B 报新区间！');}
-  if(s.centerTarget!=null)s.center+=rtClamp(s.centerTarget-s.center,-4*dt,4*dt);
-  var force=(s.adjust.up?1:0)-(s.adjust.down?1:0);
-  var targetVelocity=force*19+Math.sin(s.elapsed*1.6)*s.jitter;
-  s.velocity+=(targetVelocity-s.velocity)*Math.min(1,dt*4);s.val+=s.velocity*dt;
-  s.cooldown=Math.max(0,s.cooldown-dt);
-  var open=s.inputs.B&&s.cooldown===0,inside=s.val>=s.center-s.safeHalf&&s.val<=s.center+s.safeHalf;
-  s.heatB=rtClamp(s.heatB+(open?18:-32)*dt,0,100);
-  if(open&&inside){s.charge+=dt;s.unsafe=0;}
-  else{s.charge=Math.max(0,s.charge-dt*.35);s.unsafe=open?s.unsafe+dt:0;}
-  if(s.unsafe>=1.25||s.heatB>=100){
-    s.hp--;s.charge=Math.max(0,s.charge-1);s.cooldown=1.5;s.unsafe=0;
-    rtMessage(s,s.heatB>=100?'✘ 校准阀过热，耐久 -1，松手散热！':'✘ 区间外硬开阀，耐久 -1！重新报数。','err');
+  if(s.done)return;dt=Math.max(0,Math.min(.1,dt));var c=s.cfg;
+  if(s.time<=0){s.done=true;s.win=false;rtMessage(s,'时间用尽，本次稳压结束。','err');return;}
+  if(!s.inputs.B)s.requireRelease=false;
+  s.phaseLeft-=dt;s.cooldown=Math.max(0,s.cooldown-dt);
+  if(s.phase==='settle'){
+    s.velocity*=Math.exp(-9*dt);s.motion='settling';
+    if(s.phaseLeft<=0&&!s.requireRelease){s.phase='warning';s.phaseLeft=c.warning;rtMessage(s,'下一轮区间即将迁移，B 报预告，暂不开阀。');}
+  }else{
+    pressureMotion(s,dt);
+    if(s.phase==='stable'&&s.phaseLeft<=0){s.phase='warning';s.phaseLeft=c.warning;s.requireRelease=true;rtMessage(s,'区间保持不动，B 预告下一位置；松阀等待迁移。');}
+    else if(s.phase==='warning'&&s.phaseLeft<=0){s.phase='moving';s.phaseLeft=c.moving;s.moveFrom=s.center;s.requireRelease=true;s.charge=0;s.unsafe=0;}
+    else if(s.phase==='moving'){
+      var x=rtClamp(1-s.phaseLeft/c.moving,0,1);s.center=s.moveFrom+(s.nextCenter-s.moveFrom)*(x*x*(3-2*x));
+      if(s.phaseLeft<=0){s.center=s.nextCenter;var next=35+Math.floor(Math.random()*31);if(Math.abs(next-s.center)<10)next=s.center>=50?s.center-14:s.center+14;s.nextCenter=rtClamp(next,28,72);s.phase='stable';s.phaseLeft=c.stable;rtMessage(s,'新区间已稳定，先调压力，再开阀。');}
+    }
   }
-  if(s.charge>=4){s.seals++;s.charge=0;s.cooldown=1;s.unsafe=0;rtMessage(s,'✔ 第 '+s.seals+'/3 轮校准完成，松手冷却。','ok');}
-  if(s.val<=0||s.val>=100||s.hp<=0){s.val=rtClamp(s.val,0,100);s.done=true;s.win=false;rtMessage(s,s.hp<=0?'✘ 校准设备损坏，行动失败。':'✘ 压力爆表，动力舱失控！','err');}
-  else if(s.seals>=3){s.done=true;s.win=true;rtMessage(s,'✔ 三轮稳压完成，警报电源已切断！','ok');}
+  s.shift=Math.max(0,s.phaseLeft);
+  var open=s.inputs.B&&!s.requireRelease&&s.phase==='stable'&&s.cooldown===0,inside=Math.abs(s.val-s.center)<=s.safeHalf;
+  s.heatB=rtClamp(s.heatB+(open?18:-32)*dt,0,100);
+  if(open&&inside){s.charge+=dt;s.unsafe=0;s.feedback='valid';}
+  else if(open){s.unsafe+=dt;if(s.unsafe>c.grace)s.charge=Math.max(0,s.charge-dt*.65);s.feedback=s.unsafe<=c.grace?'grace':'outside';}
+  else{s.unsafe=0;s.feedback=s.phase==='settle'?'round-complete':s.requireRelease?'release':s.phase==='moving'?'moving':s.phase==='warning'?'warning':s.cooldown>0?'cooling':'waiting';if(s.phase==='stable')s.charge=Math.max(0,s.charge-dt*.25);}
+  if(s.unsafe>=1.25||s.heatB>=100){s.hp--;s.cooldown=1.5;s.requireRelease=true;s.unsafe=0;s.charge=Math.max(0,s.charge-1);s.feedback='damage';rtMessage(s,'持续偏离或阀门过热：耐久 -1。松阀后重新调整。','err');}
+  if(s.val<=0||s.val>=100||s.hp<=0){s.val=rtClamp(s.val,0,100);s.done=true;s.win=false;rtMessage(s,s.hp<=0?'设备耐久耗尽。':'压力触及极限，稳压失败。','err');return;}
+  if(s.charge>=c.hold){s.seals++;s.round=s.seals;s.charge=0;s.unsafe=0;s.velocity=0;s.adjust={up:false,down:false};s.requireRelease=true;s.phase='settle';s.phaseLeft=1;s.feedback='round-complete';if(s.seals>=3){s.done=true;s.win=true;rtMessage(s,'三轮稳压完成！','ok');}else rtMessage(s,'第 '+s.seals+' / 3 轮完成。稳定停顿 1 秒，B 松阀后进入下一轮。','ok');}
 }
 function pressureSnapshot(s,role){
-  var common={id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,hp:s.hp,seals:s.seals,round:s.round,heatB:s.heatB,cooldown:s.cooldown,inputs:s.inputs};
-  // A 不下发安全区间；B 不下发压力读数，保留口头沟通的必要性。
-  if(role==='A'){common.val=s.val;common.velocity=s.velocity;}
-  else{common.lo=s.center-s.safeHalf;common.hi=s.center+s.safeHalf;common.nextLo=s.nextCenter-s.safeHalf;common.nextHi=s.nextCenter+s.safeHalf;common.shift=s.shift;common.charge=s.charge;}
+  var common={id:s.id,mode:s.mode,ready:s.ready,cd:s.cd,time:s.time,done:s.done,win:s.win,msg:s.msg,hp:s.hp,seals:s.seals,round:s.round,heatB:s.heatB,cooldown:s.cooldown,inputs:{A:s.inputs.A,B:s.inputs.B},phase:s.phase,requireRelease:s.requireRelease,feedback:s.feedback,charge:s.charge,holdGoal:s.cfg.hold};
+  // Never send B's target bounds to A, or A's value/velocity to B.
+  if(role==='A'){common.val=s.val;common.velocity=s.velocity;common.motion=s.motion||'settling';common.speedRatio=Math.abs(s.velocity)/s.cfg.maxSpeed;}
+  else{common.lo=s.phase==='moving'?null:s.center-s.safeHalf;common.hi=s.phase==='moving'?null:s.center+s.safeHalf;common.nextLo=s.phase==='warning'||s.phase==='moving'?s.nextCenter-s.safeHalf:null;common.nextHi=common.nextLo==null?null:s.nextCenter+s.safeHalf;common.shift=s.shift;}
   return common;
 }
 function pressureUI(role){
-  $('rt-title').textContent='动力稳压';$('rt-steps').innerHTML='<span class="rt-step on">01 报读数</span><span class="rt-step on">02 调压力</span><span class="rt-step on">03 开阀校准</span>';
-  $('rt-help').textContent=role==='A'?'你只看到压力，持续报数给 B。按住加 / 减压，松手后仍有短暂惯性。听 B 指挥跟随安全区间，别撞到 0 / 100。':'你只看到区间，听 A 报读数再指挥加 / 减。确认在区间内才按住校准阀，每轮保持 4 秒；注意散热和下一次区间移动。';
-  if(role==='A'){
-    $('rt-action').style.display='none';
-    var controls=document.querySelector('.rt-controls');
-    controls.insertAdjacentHTML('beforeend','<button class="rt-control" id="rt-down">− 减压</button><button class="rt-control" id="rt-up">＋ 加压</button>');
-  }else $('rt-action').textContent='按住校准阀';
+  $('rt-title').textContent='动力稳压';$('rt-steps').innerHTML='<span class="rt-step on">01 报读数</span><span class="rt-step on">02 按住调节</span><span class="rt-step on">03 稳定开阀</span>';
+  $('rt-help').textContent=role==='A'?'持续按住加 / 减即可调节；松手逐渐停稳，反向会先刹车。只向 B 报压力和趋势，听区间指挥。':'向 A 报稳定区间。区间内按住阀门 4 秒；擦边有 0.3 秒缓冲。每轮完成先松阀，预告和迁移期间不开阀。';
+  if(role==='A'){$('rt-action').style.display='none';document.querySelector('.rt-controls').insertAdjacentHTML('beforeend','<button class="rt-control" id="rt-down">− 按住减压</button><button class="rt-control" id="rt-up">＋ 按住加压</button>');}
+  else $('rt-action').textContent='按住校准阀';
 }
 function pressureDraw(s,role){
   var waiting=!s.ready||s.cd>0;
   $('rt-health').textContent='设备耐久 '+s.hp+' / 3';$('rt-progress').textContent='校准 '+s.seals+' / 3';
-  $('rt-signal').textContent=waiting?'行动倒计时':role==='A'?'实时压力 / 0—100':'当前安全区间';
-  $('rt-cue').textContent=!s.ready?'···':s.cd>0?Math.ceil(s.cd):s.done?(s.win?'成功':'失败'):role==='A'?s.val.toFixed(1):Math.round(s.lo)+'—'+Math.round(s.hi);
-  $('rt-cue').style.fontSize=role==='B'?'43px':'54px';
-  $('rt-detail').textContent=role==='A'?'读数报给 B · 提前松手抵消惯性':'下次 '+Math.round(s.nextLo)+'—'+Math.round(s.nextHi)+' · '+Math.ceil(s.shift)+' 秒后移动';
-  $('rt-bar').style.width=(role==='A'?rtClamp(s.val,0,100):s.charge/4*100)+'%';
-  $('rt-bar').style.background=role==='A'&&(s.val<15||s.val>85)?'#f87171':'#5eead4';
-  $('rt-self').textContent=role==='A'?'B 阀门 '+(s.inputs.B?'开启':'关闭'):'本轮稳定 '+s.charge.toFixed(1)+' / 4 秒';
-  $('rt-other').textContent='阀温 '+Math.round(s.heatB)+'%'+(s.cooldown>0?' · 冷却':'');
-  document.querySelectorAll('.rt-control').forEach(function(b){b.disabled=waiting||s.done;});
+  $('rt-signal').textContent=waiting?'行动倒计时':role==='A'?'当前压力 / 0—100':s.phase==='moving'?'安全区间迁移中':'当前安全区间';
+  $('rt-cue').textContent=!s.ready?'···':s.cd>0?Math.ceil(s.cd):s.done?(s.win?'成功':'失败'):role==='A'?s.val.toFixed(1):s.lo==null?'迁移中':Math.round(s.lo)+'—'+Math.round(s.hi);
+  $('rt-cue').style.fontSize=role==='B'?'40px':'54px';
+  if(role==='A'){var motion=s.motion==='braking'?'反向制动':Math.abs(s.velocity)<.25?'趋稳':s.velocity>0?'上升':'下降';var strength=s.speedRatio<.3?'缓慢':s.speedRatio<.7?'中速':'较快';$('rt-detail').textContent=motion+' · '+strength+' '+Math.abs(s.velocity).toFixed(1)+' / 秒'+(s.val<15||s.val>85?' · 接近压力极限，请制动':'');}
+  else $('rt-detail').textContent=s.phase==='settle'?'本轮完成，停顿 1 秒；请松开阀门':s.phase==='warning'?'预告 '+Math.round(s.nextLo)+'—'+Math.round(s.nextHi)+' · '+Math.ceil(s.shift)+' 秒后迁移':s.phase==='moving'?'正在迁移，请等待区间稳定':'区间保持稳定 · '+Math.ceil(s.shift)+' 秒';
+  $('rt-bar').style.width=(role==='A'?rtClamp(s.val,0,100):s.charge/s.holdGoal*100)+'%';$('rt-bar').style.background=role==='A'&&(s.val<15||s.val>85)?'#f87171':'#5eead4';
+  $('rt-self').textContent='本轮稳定 '+s.charge.toFixed(1)+' / '+s.holdGoal+' 秒'+(s.feedback==='grace'?' · 擦边缓冲':s.feedback==='outside'?' · 持续偏离':s.requireRelease?' · 等 B 松阀':'');
+  $('rt-other').textContent='B 阀门 '+(s.inputs.B?'按住':'松开')+' · 阀温 '+Math.round(s.heatB)+'%'+(s.cooldown>0?' · 冷却':'');
+  document.querySelectorAll('.rt-control').forEach(function(b){b.disabled=waiting||s.done||(role==='A'&&s.phase==='settle');});
+  if(role==='B')$('rt-action').textContent=s.requireRelease?'先松开 · 再开阀':s.phase==='stable'?'按住校准阀':'等待区间稳定';
   rtDrawMessage(s);
 }
 
 </script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.5">
-<script defer src="room-assets.js?v=13.5"></script>
-<script defer src="room-loading.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="expansion-games.css?v=13.5">
-<script defer src="expansion-games.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.5">
-<script defer src="coop-upgrade.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="fullscreen-map.css?v=13.5">
-<script defer src="fullscreen-map.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beam-mobile.css?v=13.5">
-<script defer src="beam-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beat-mobile.css?v=13.5">
-<script defer src="beat-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="catch-mobile.css?v=13.5">
-<script defer src="catch-mobile.js?v=13.5"></script>
-<script defer src="code-symbols.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="maze-mobile.css?v=13.5">
-<script defer src="maze-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="vault-mobile.css?v=13.5">
-<script defer src="vault-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="radio-mobile.css?v=13.5">
-<script defer src="radio-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="wires-mobile.css?v=13.5">
-<script defer src="wires-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="boss-mobile.css?v=13.5">
-<script defer src="boss-mobile.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="puzzle-pack.css?v=13.5">
-<script defer src="puzzle-pack.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-routes.css?v=13.5">
-<script defer src="dungeon-routes.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="password-strip.css?v=13.5">
-<script defer src="password-strip.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="rhythm-light.css?v=13.5">
-<script defer src="rhythm-light.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-puzzle-themes.css?v=13.5">
-<script defer src="room-puzzle-themes.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-progression.css?v=13.5">
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-results.css?v=13.5">
-<script defer src="room-results.js?v=13.5"></script>
-<script defer src="room-progression.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-connection.css?v=13.5">
-<script defer src="dungeon-connection.js?v=13.5"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.5">
-<script defer src="room-cover-loader.js?v=13.5"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.6">
+<script defer src="room-assets.js?v=13.6"></script>
+<script defer src="room-loading.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="expansion-games.css?v=13.6">
+<script defer src="expansion-games.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.6">
+<script defer src="coop-upgrade.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="fullscreen-map.css?v=13.6">
+<script defer src="fullscreen-map.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beam-mobile.css?v=13.6">
+<script defer src="beam-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="beat-mobile.css?v=13.6">
+<script defer src="beat-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="catch-mobile.css?v=13.6">
+<script defer src="catch-mobile.js?v=13.6"></script>
+<script defer src="code-symbols.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="maze-mobile.css?v=13.6">
+<script defer src="maze-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="vault-mobile.css?v=13.6">
+<script defer src="vault-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="radio-mobile.css?v=13.6">
+<script defer src="radio-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="wires-mobile.css?v=13.6">
+<script defer src="wires-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="boss-mobile.css?v=13.6">
+<script defer src="boss-mobile.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="puzzle-pack.css?v=13.6">
+<script defer src="puzzle-pack.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-routes.css?v=13.6">
+<script defer src="dungeon-routes.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="password-strip.css?v=13.6">
+<script defer src="password-strip.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="rhythm-light.css?v=13.6">
+<script defer src="rhythm-light.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-puzzle-themes.css?v=13.6">
+<script defer src="room-puzzle-themes.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-progression.css?v=13.6">
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-results.css?v=13.6">
+<link data-room-style rel="stylesheet" href="game-feedback.css?v=13.6">
+<script defer src="game-feedback.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" href="cooperation-rating.css?v=13.6">
+<script defer src="cooperation-rating.js?v=13.6"></script>
+<script defer src="room-results.js?v=13.6"></script>
+<script defer src="room-progression.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="dungeon-connection.css?v=13.6">
+<script defer src="dungeon-connection.js?v=13.6"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.6">
+<script defer src="room-cover-loader.js?v=13.6"></script>
 <script>
 window.__roomStylesReady=Promise.all(Array.from(document.querySelectorAll('link[data-room-style]')).map(function(link){return new Promise(function(resolve){if(link.sheet||window.__roomLoadFailures.includes(link.href)){resolve();return;}var timer=setTimeout(function(){window.__roomLoadFailures.push(link.href);resolve();},30000);function done(){clearTimeout(timer);resolve();}link.addEventListener('load',done,{once:true});link.addEventListener('error',done,{once:true});});}));
 document.addEventListener('DOMContentLoaded',function(){if(window.RoomLoading){RoomLoading.boot();}else{document.getElementById('room-boot-detail').textContent='界面没有加载完成，请重新加载。';}},{once:true});

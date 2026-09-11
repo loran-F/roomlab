@@ -22,7 +22,7 @@ function create({windows,mode,signal,onChange=()=>{}}){
  const clean=[];
  const initialResults=['A','B'].map(r=>windows[r]?.RoomResults?.status?.()).filter(Boolean);
  const resultRunId=initialResults.find(s=>s.stage==='playing')?.runId||initialResults[0]?.runId||null;
- function snapshot(){const cap=capability(mode,role);return {role,paused,stopped,actions,message,gameId,kind:cap.kind||((role==='manual')?'manual':'automatic'),commands:commands.map(x=>({...x}))};}
+ function snapshot(){const cap=capability(mode,role);return {role,paused,stopped,actions,message,gameId,kind:cap.kind||((role==='manual')?'manual':'automatic'),commands:commands.map(x=>({...x})),holding:held?{role,selector:held.selector}:null};}
  function report(text){if(message===text)return;message=text;onChange(snapshot());}
  function release(){if(!held)return;try{held.el.dispatchEvent(new held.win.PointerEvent('pointerup',{bubbles:true,pointerId:held.id,pointerType:'mouse',buttons:0}));}catch(_){}held=null;}
  function clear(){clearTimeout(timer);timer=null;anchor=null;resultWaitUntil=0;release();adapter?.dispose?.();adapter=null;commands=[];}
@@ -40,9 +40,12 @@ function create({windows,mode,signal,onChange=()=>{}}){
  function click(selector){const b=windows[role].document.querySelector(selector);if(!b||b.disabled||b.hidden||!b.getClientRects().length)return false;b.click();actions++;return true;}
  function clickElement(b){if(!b||b.disabled||b.hidden||!b.getClientRects().length)return false;b.click();actions++;return true;}
  function key(code){const w=windows[role],key=code==='Space'?' ':code;w.dispatchEvent(new w.KeyboardEvent('keydown',{bubbles:true,key,code}));w.dispatchEvent(new w.KeyboardEvent('keyup',{bubbles:true,key,code}));actions++;}
- function hold(selector,ms){const w=windows[role],el=w.document.querySelector(selector);if(!el||el.disabled||el.hidden||!el.getClientRects().length)return Promise.resolve(false);release();const id=19,original=el.setPointerCapture;try{el.setPointerCapture=()=>{};el.dispatchEvent(new w.PointerEvent('pointerdown',{bubbles:true,pointerId:id,pointerType:'mouse',buttons:1}));}catch(_){return Promise.resolve(false);}finally{el.setPointerCapture=original;}held={el,win:w,id};actions++;return new Promise(resolve=>setTimeout(()=>{release();resolve(true);},ms));}
+ function down(w,el,id){const original=el.setPointerCapture;try{el.setPointerCapture=()=>{};el.dispatchEvent(new w.PointerEvent('pointerdown',{bubbles:true,pointerId:id,pointerType:'mouse',buttons:1}));return true;}catch(_){return false;}finally{el.setPointerCapture=original;}}
+ function press(selector){const w=windows[role],el=w.document.querySelector(selector);if(!el||el.disabled||el.hidden||!el.getClientRects().length)return false;if(held?.el===el&&held.win===w)return true;release();const id=19;if(!down(w,el,id))return false;held={el,win:w,id,selector};actions++;return true;}
+ function maintain(selector){const w=windows[role],el=w.document.querySelector(selector);if(!el||el.disabled||el.hidden||!el.getClientRects().length){release();return false;}if(held?.el!==el||held.win!==w)return press(selector);if(!down(w,el,held.id)){release();return false;}actions++;return true;}
+ function hold(selector,ms){if(!press(selector))return Promise.resolve(false);return new Promise(resolve=>setTimeout(()=>{release();resolve(true);},ms));}
  function setCommands(list){const next=Array.isArray(list)?list.slice(0,40).map(x=>({id:String(x.id),label:String(x.label)})):[];if(JSON.stringify(next)===JSON.stringify(commands))return;commands=next;onChange(snapshot());}
- function external(){const registry=window.DevConsoleBotAdapters;if(!registry||!registry.capability(mode,role).supported)return null;return registry.create(mode,role,{window:windows[role],state:()=>readLocal(),click,clickElement,key,hold,release,commands:setCommands,report,stop});}
+ function external(){const registry=window.DevConsoleBotAdapters;if(!registry||!registry.capability(mode,role).supported)return null;return registry.create(mode,role,{window:windows[role],state:()=>readLocal(),click,clickElement,key,press,maintain,hold,release,commands:setCommands,report,stop});}
  function readLocal(){const w=windows[role];if(mode==='dial')return w.RadioMobile?.state();if(mode==='wires')return w.WiresMobile?.state();if(mode==='vault')return w.VaultMobile?.state();if(mode==='beam')return w.BeamMobile?.state();if(mode==='boss')return w.BossMobile?.state();if(['lockbox','silhouette','evidence','mirrors'].includes(mode))return w.PuzzlePack?.state();if(['lookback','caller','shadow'].includes(mode))return w.RoomLabExpansion?.view||w.RoomLabExpansion?.state;if(mode==='pressure')return w.RT||w.RT_VIEW;if(mode==='pwslide')return w.PasswordStrip?.state();if(mode==='lightsearch')return w.RhythmLight?.state();if(mode==='maze')return w.MazeMobile?.state();return null;}
  function step(){
   timer=null;if(stopped||syncResult()||paused||role==='manual'||signal.aborted)return;
@@ -86,7 +89,7 @@ function create({windows,mode,signal,onChange=()=>{}}){
   if(!stopped&&!paused&&role!=='manual')timer=setTimeout(step,mode==='lightsearch'?40:140);
  }
  function setRole(value){if(stopped)return false;if(!['manual','A','B'].includes(value)||!capability(mode,value).supported)return false;clear();role=value;paused=false;nextPull=0;if(value!=='manual'&&!(mode==='pwslide'||(mode==='lightsearch'&&value==='A')))adapter=external();report(value==='manual'?'双端手动':value+' 托管已启用');if(value!=='manual')step();return true;}
- function resume(){if(stopped||role==='manual')return;paused=false;clear();report('恢复托管');step();}
+ function resume(){if(stopped||role==='manual')return;paused=false;clear();if(!(mode==='pwslide'||(mode==='lightsearch'&&role==='A')))adapter=external();report('恢复托管');step();}
  for(const r of ['A','B']){
   const d=windows[r].document,handler=e=>{if(e.isTrusted&&r===role&&!paused)pause('检测到 '+r+' 人工输入，已暂停托管；可直接接管');};
   for(const type of ['pointerdown','keydown','wheel','touchstart']){d.addEventListener(type,handler,true);clean.push(()=>d.removeEventListener(type,handler,true));}

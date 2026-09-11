@@ -3,6 +3,25 @@
 'use strict';
 var active=null,view=null,dispose=null,role='A',seq=0,held=0,terminal=null,retired=new Set(),radioConnection=null;
 var clamp=function(x,a,b){return Math.max(a,Math.min(b,x));};
+var feedback=null;
+function feedbackEmit(type,tag){try{if(window.GameFeedback&&typeof GameFeedback.emit==='function')GameFeedback.emit(type,{source:'dial:'+tag});}catch(_){/* Feedback must never interrupt gameplay. */}}
+function feedbackState(s){
+ if(!feedback||feedback.id!==s.id)feedback={id:s.id,prev:null,lastCue:-Infinity,lastLock:-Infinity,seconds:new Set(),warned:false,ended:false};
+ var f=feedback,p=f.prev;if(f.ended||p&&s.elapsed<p.elapsed)return;
+ var v={elapsed:s.elapsed,got:s.got,near:s.quality>.5,aligned:s.quality>.86,pair:s.quality>.86&&s.partnerGood&&!s.noise,noise:s.noise,charge:s.charge,playing:s.ready.A&&s.ready.B&&s.cd===0&&!s.done};f.prev=v;
+ if(s.done){f.ended=true;return;} // RoomResults owns terminal success/fail once per resultId.
+ if(!v.playing||!p||!p.playing)return;
+ var now=performance.now(),type=null,tag='';
+ if(s.got>p.got){type='correct';tag='fragment';}
+ else if(v.noise&&!p.noise){type='warning';tag='interference';}
+ else if(v.pair&&!p.pair&&now-f.lastLock>=1200){type='correct';tag='pair-aligned';f.lastLock=now;}
+ else if(p.pair&&!v.pair&&!v.noise&&s.got===p.got&&s.charge<p.charge&&now-f.lastLock>=1200){type='error';tag='lock-lost';f.lastLock=now;}
+ else if(now-f.lastCue>=1200&&(v.aligned&&!p.aligned||v.near&&!p.near)){type='reveal';tag='local-signal';f.lastCue=now;}
+ if(type)feedbackEmit(type,tag);
+ var sec=Math.ceil(s.time);
+ if(sec<=10&&sec>0&&!f.warned){f.warned=true;if(!type)feedbackEmit('warning','time-low');}
+ if(sec<=5&&sec>0&&!f.seconds.has(sec)){f.seconds.add(sec);if(!type)feedbackEmit('tick','time-public');}
+}
 function roomId(){return window._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON?DUNGEON.roomId:'';}
 var mic='<svg viewBox="0 0 48 64" aria-hidden="true"><rect x="14" y="3" width="20" height="35" rx="10" fill="currentColor"/><path d="M9 27v4a15 15 0 0 0 30 0v-4M24 46v12M13 59h22" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M19 12h10M19 19h10M19 26h10" stroke="#33404a" stroke-width="2"/></svg>';
 function studio(){return roomId()==='room-21';}
@@ -12,14 +31,14 @@ function metrics(s){var target=s.tf+(s.got===1?Math.sin(s.phase*.5)*7:0),noise=s
 function snap(s,who){var m=metrics(s);return {id:s.id,elapsed:s.elapsed,time:s.time,ready:s.ready,practice:s.practice,cd:s.cd,got:s.got,charge:s.charge,done:s.done,win:s.win,noise:m.noise,value:who==='A'?s.f:s.g,quality:who==='A'?m.f:m.g,partnerGood:who==='A'?m.g>.86:m.f>.86,inputs:s.inputs};}
 function step(s,dt){if(s.done)return;var started=s.ready.A&&s.ready.B;s.f=clamp(s.f+s.inputs.A*15*dt,0,100);s.g=clamp(s.g+s.inputs.B*15*dt,0,100);if(!started)return;if(s.cd>0){s.cd=Math.max(0,s.cd-dt);return;}s.elapsed+=Math.min(dt,s.time);s.time=Math.max(0,s.time-dt);s.phase+=dt;var m=metrics(s);if(!m.noise)s.charge=clamp(s.charge+(m.f>.86&&m.g>.86?dt:-dt*.55),0,2);if(s.charge>=2){s.got++;s.charge=0;s.phase=0;s.tf=20+Math.random()*60;s.tg=20+Math.random()*60;}if(s.got===3||s.time===0){s.done=true;s.win=s.got===3;s.inputs={A:0,B:0};}}
 function input(d,w){var s=active;if(!s||d.id!==s.id||s.done)return;if(d.t==='radioReady'){if(s.practice[w])s.ready[w]=true;return;}if(!Number.isInteger(d.seq)||d.seq<=s.seq[w]||![-1,0,1].includes(d.v))return;s.seq[w]=d.seq;s.inputs[w]=d.v;s.seen[w]=performance.now();if(d.v)s.practice[w]=true;}
-function act(v){held=v;var s=role==='A'?active:view;if(!s)return;var d={t:'radioInput',id:s.id,seq:++seq,v:v};if(role==='A')input(d,'A');else netSend(d);}
-function clean(){terminal=active&&active.done?active:view&&view.done?view:terminal;if(dispose)dispose();dispose=null;active=view=null;held=0;}
+function act(v){var before=held;held=v;var s=role==='A'?active:view;if(!s)return;if(v&&v!==before&&!s.done)feedbackEmit('tap','adjust');var d={t:'radioInput',id:s.id,seq:++seq,v:v};if(role==='A')input(d,'A');else netSend(d);}
+function clean(){feedback=null;terminal=active&&active.done?active:view&&view.done?view:terminal;if(dispose)dispose();dispose=null;active=view=null;held=0;}
 function shell(w){role=w;seq=0;clearNetZones();var scene=window.RadioScenes&&window.RadioScenes[roomId()]||{};
  $('app').innerHTML='<section class="radio-scene"><div class="radio-background" aria-hidden="true"></div><div class="radio-decor radio-decor-left" aria-hidden="true"></div><div class="radio-decor radio-decor-right" aria-hidden="true"></div><main class="radio-console"><header><button id="radio-back" aria-label="返回">‹</button><strong>双人搜台</strong><b id="count">--s</b></header><div class="radio-track"><span id="goal">情报 0 / 3</span><span id="radio-round">固定频道</span></div><section class="radio-display"><div class="radio-display-label"><span>'+(w==='A'?'频率示波器':'增益接收器')+'</span><b id="radio-value">—</b></div><canvas id="radio-wave" width="600" height="300"></canvas><div class="radio-meter"><i id="radio-quality"></i></div><span id="radio-reading">等待信号</span><div class="radio-capture"><i id="radio-charge"></i><span id="radio-lock">稳定 2 秒，自动收录</span></div></section><p id="msg" class="radio-message" role="status">先试按一次调节按钮，再准备。</p><footer class="radio-controls" data-role="'+w+'"><div class="radio-duty"><b>'+w+'</b><span>'+(w==='A'?'你调频率 · 波形越平顺越接近':'你调增益 · 信号条越满越接近')+'</span></div><div class="radio-buttons"><button id="radio-minus">−<small>按住降低</small></button><div class="radio-knob" aria-hidden="true"><i></i></div><button id="radio-plus">+<small>按住升高</small></button></div><button id="radio-ready" disabled>先试按 ＋ 或 −</button><span id="radio-partner">另一位负责'+(w==='A'?'增益':'频率')+'，保持沟通</span><button id="radio-again" hidden>再来一局</button></footer></main></section>';
  if(studio()){document.querySelector('.radio-scene').classList.add('radio-studio');document.querySelector('.radio-console header strong').textContent='好男人就是我';document.querySelector('.radio-display-label span').innerHTML=mic+'<span>'+(w==='A'?'调频台':'混音台')+' · <b id="radio-studio-lamp">试音中</b></span>';document.querySelector('.radio-decor-left').innerHTML='<div class="radio-studio-mic">'+mic+'</div>';document.querySelector('.radio-decor-right').innerHTML='<div class="radio-studio-sign">ON AIR<small>深夜电台 · 录音室</small></div>';document.querySelector('.radio-duty span').textContent=w==='A'?'调频师 · 调清波形，接入来电':'混音师 · 调好增益，清晰收音';}
  ['background','left','right'].forEach(function(k){if(!scene[k])return;var img=document.createElement('img');img.src=scene[k];img.alt='';document.querySelector(k==='background'?'.radio-background':'.radio-decor-'+k).appendChild(img);});
  $('radio-back').onclick=function(){if(window._dungeon)dungeonAbort();else{clearTimers();closePeer();location.search='';}};
- $('radio-ready').onclick=function(){act(0);var s=role==='A'?active:view;if(!s)return;var d={t:'radioReady',id:s.id};if(w==='A')input(d,'A');else netSend(d);};
+ $('radio-ready').onclick=function(){act(0);var s=role==='A'?active:view;if(!s)return;feedbackEmit('tap','ready');var d={t:'radioReady',id:s.id};if(w==='A')input(d,'A');else netSend(d);};
 
  [-1,1].forEach(function(v){var b=$(v<0?'radio-minus':'radio-plus');b.onpointerdown=function(e){if(b.disabled)return;e.preventDefault();b.setPointerCapture(e.pointerId);act(v);};b.onpointerup=b.onpointercancel=b.onlostpointercapture=function(){act(0);};});
  function down(e){if(!['ArrowLeft','ArrowRight'].includes(e.key)||e.repeat||$('radio-plus').disabled)return;e.preventDefault();act(e.key==='ArrowLeft'?-1:1);}function up(e){if(['ArrowLeft','ArrowRight'].includes(e.key))act(0);}function blur(){act(0);}
@@ -27,7 +46,7 @@ function shell(w){role=w;seq=0;clearNetZones();var scene=window.RadioScenes&&win
  function closed(){clean();if($('msg')){$('msg').textContent='连接断开，请返回重新建房。';document.querySelectorAll('.radio-controls button').forEach(function(b){b.disabled=true;});}}
  if(conn)conn.on('close',closed);dispose=function(){clearInterval(heart);window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',blur);if(conn&&conn.off)conn.off('close',closed);};
 }
-function draw(s,w){if(!$('radio-wave'))return;view=s;var started=s.ready.A&&s.ready.B,waiting=started&&s.cd>0;
+function draw(s,w){if(!$('radio-wave'))return;view=s;feedbackState(s);var started=s.ready.A&&s.ready.B,waiting=started&&s.cd>0;
  $('count').textContent=Math.ceil(s.time)+'s';$('goal').textContent='情报 '+s.got+' / 3';$('radio-round').textContent=['固定频道','追踪漂移','干扰频道','收录完成'][s.got];$('radio-value').textContent=w==='A'?(88+s.value*.2).toFixed(1)+' MHz':Math.round(s.value)+' dB';
  $('radio-quality').style.width=s.quality*100+'%';$('radio-charge').style.width=s.charge/2*100+'%';$('radio-reading').textContent=s.noise?'短暂干扰 · 保持旋钮':s.quality>.86?'你的信号已对准':s.quality>.5?'正在接近 · 小幅调整':'信号微弱 · 继续搜索';$('radio-lock').textContent=s.done?(s.win?'三段情报已收录':'本轮结束'):s.noise?'干扰中 · 收录进度保留':'收录 '+s.charge.toFixed(1)+' / 2.0 秒';
  $('radio-ready').hidden=started||s.done;$('radio-ready').disabled=!s.practice[w]||s.ready[w];$('radio-ready').textContent=s.ready[w]?'已准备，等待同伴':s.practice[w]?'练习完成 · 准备搜台':'先试按 ＋ 或 −';

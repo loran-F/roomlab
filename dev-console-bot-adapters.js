@@ -2,10 +2,10 @@
 (function(g){
 'use strict';
 const guided={
- maze:{A:'听手动 B 指路后执行方向或阀门口令。',B:'读取自己的完整地图，向手动 A 给出路线；B 无正式操作。'},
+ maze:{A:'听手动 B 指路后执行方向或关卡口令。',B:'读取自己的完整地图，向手动 A 给出路线；B 无正式操作。'},
  code:{A:'听手动 B 报数字后按本端数字键。',B:'查本端密码本，并把数字口述给手动 A。'},
  wires:{A:'听手动 B 报线号后在本端选线并确认。',B:'按本端规则给手动 A 报线号；救场时听符号选旁路。'},
- vault:{A:'本端自动开始扫描并把逐位内容口述给手动 B。',B:'听手动 A 报位序与内容后，在本端记录并提交。'},
+ vault:{A:'准备好后由验收者发出口令开始扫描，再把逐位内容口述给手动 B。',B:'听手动 A 报位序与内容后，在本端记录并提交。'},
  pressure:{A:'听手动 B 报安全区间后执行加压、减压或松手。',B:'根据本端区间指挥手动 A；确认稳定后开阀。'},
  lookback:{A:'听手动 B 报怪物应对后选择前进、停步或躲藏。',B:'听手动 A 报门向后开门；怪物出现时自动显示应对口令。'},
  caller:{A:'听手动 B 指定核验项并操作提问、放行或拒绝。',B:'查本端档案，把核验项和结论口述给手动 A。'},
@@ -39,8 +39,8 @@ function create(mode,role,h){
  const buttons=list=>list.map(x=>({id:x[0],label:x[1]}));
  function visibleCommands(){
   const d=w.document,s=h.state();
-  if(mode==='maze'&&role==='A')return d.querySelector('#maze-valve:not([hidden])')?buttons([['valve:0','选择蓝阀'],['valve:1','选择橙阀'],['valve:2','选择绿阀']]):buttons([['key:ArrowUp','向上移动'],['key:ArrowDown','向下移动'],['key:ArrowLeft','向左移动'],['key:ArrowRight','向右移动']]);
-  if(mode==='maze'&&role==='B')return buttons([['say-valve:0','A 看到 ○ 或 ◇'],['say-valve:1','A 看到 △ 或 ☆'],['say-valve:2','A 看到 □ 或 ⊕']]);
+  if(mode==='maze'&&role==='A')return d.querySelector('#maze-valve:not([hidden])')?buttons(Array.from(d.querySelectorAll('#maze-valve [data-valve]')).map((button,i)=>['valve:'+i,'选择'+button.textContent.trim()])):buttons([['key:ArrowUp','向上移动'],['key:ArrowDown','向下移动'],['key:ArrowLeft','向左移动'],['key:ArrowRight','向右移动']]);
+  if(mode==='maze'&&role==='B')return buttons(Array.from(d.querySelectorAll('.mz-valve-grid span')).map((span,i)=>['say-valve:'+i,'告诉 A：'+span.textContent.trim()]));
   if(mode==='code'&&role==='A')return buttons(Array.from({length:10},(_,i)=>['code:'+i,'输入 '+i]));
   if(mode==='code'&&role==='B')return buttons(codeSymbolDescriptions.map((x,i)=>['say-code:'+i,x]));
   if(mode==='wires'){if(s?.rescue&&role==='B')return buttons(['△','○','□'].map(x=>['symbol:'+x,'选择旁路 '+x]));if(role==='A')return buttons(Array.from({length:8},(_,i)=>['wire:'+(i+1),'剪第 '+(i+1)+' 根']));return buttons(Array.from({length:8},(_,i)=>['say-wire:'+(i+1),'告诉同伴：剪第 '+(i+1)+' 根']));}
@@ -54,7 +54,8 @@ function create(mode,role,h){
    if(d.querySelector('#vm-next'))out.push(['next','下一格']);
    if(!d.querySelector('#vm-submit')?.disabled)out.push(['submit','提交记录']);return buttons(out);
   }
-  if(mode==='pressure')return role==='A'?buttons([['key:ArrowUp','加压'],['key:ArrowDown','减压'],['release','松手']]):buttons([['key:Space','开阀'],['release','关阀']]);
+  if(mode==='vault'&&role==='A'&&s?.phase==='read'&&!local.vaultStarted)return buttons([['vault:start','让托管A开始扫描']]);
+  if(mode==='pressure')return role==='A'?buttons([['pressure:up','持续加压'],['pressure:down','持续减压'],['release','松开调节']]):[];
   if(mode==='lookback')return role==='A'?buttons([['x:go','前进'],['x:stop','停步'],['x:hide','躲藏']]):buttons([['x:left','开左门'],['x:right','开右门'],['x:lure','放诱饵']]);
   if(mode==='caller')return role==='A'?buttons([['x:code','询问工号'],['x:task','询问任务'],['x:route','询问来路'],['x:admit','放行'],['x:reject','拒绝']]):buttons([['x:admit','放行'],['x:reject','拒绝']]);
   if(mode==='evidence')return buttons(Array.from(d.querySelectorAll('[data-note]')).filter(b=>!b.disabled).map(b=>['note:'+b.dataset.note,'选择：'+b.textContent.trim()]).concat(d.querySelector('#pp-submit:not(:disabled)')?[['click:#pp-submit','提交证物']]:[]));
@@ -68,7 +69,7 @@ function create(mode,role,h){
   if(id.startsWith('key:')){h.key(id.slice(4));return true;}
   if(id.startsWith('click:'))return h.click(id.slice(6));
   if(id.startsWith('valve:'))return h.click('[data-valve="'+id.slice(6)+'"]');
-  if(id.startsWith('say-valve:')){h.report('告诉手动 A：选择 '+['蓝阀','橙阀','绿阀'][+id.slice(10)]);return true;}
+  if(id.startsWith('say-valve:')){const span=w.document.querySelectorAll('.mz-valve-grid span')[+id.slice(10)];if(!span)return false;h.report('告诉手动 A：选择 '+span.textContent.trim());return true;}
   if(id.startsWith('code:')){const n=id.slice(5),b=Array.from(w.document.querySelectorAll('.code-keypad button')).find(x=>!x.disabled&&x.textContent.trim()===n);return b?h.clickElement(b):false;}
   if(id.startsWith('wire:')){const n=id.slice(5);return h.click('[data-wire="'+n+'"]')&&h.click('#wm-cut');}
   if(id.startsWith('say-code:')){h.report('告诉手动 A：输入数字 '+id.slice(9));return true;}
@@ -80,16 +81,33 @@ function create(mode,role,h){
   if(id==='delete')return h.click('#vm-delete');
   if(id==='next')return h.click('#vm-next');
   if(id==='submit')return h.click('#vm-submit');
+  if(id==='vault:start'){
+   const s=h.state();
+   if(mode!=='vault'||role!=='A'||s?.phase!=='read'||local.vaultStarted)return false;
+   local.vaultStarted=true;
+   return h.click('#vm-start');
+  }
   if(id.startsWith('x:'))return h.click('[data-x="'+id.slice(2)+'"]');
   if(id.startsWith('note:'))return h.click('[data-note="'+id.slice(5)+'"]');
   if(id.startsWith('mb:'))return h.click('[data-mb="'+id.slice(3)+'"]');
+  if(id==='pressure:up')return h.press?h.press('#rt-up'):false;
+  if(id==='pressure:down')return h.press?h.press('#rt-down'):false;
   return false;
  }
  function pulse(selector,ms=240){if(local.held)return;local.held=true;h.hold(selector,ms).finally(()=>local.held=false);}
+ const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+ function beamPick(state){
+  const bricks=Array.isArray(state.bricks)?state.bricks:[];
+  const on=bricks.filter(brick=>brick&&typeof brick.id==='string'&&brick.phase==='on');
+  const bankable=on.find(brick=>Math.abs((Number(brick.x)||170)-170)<=18);
+  const urgent=on.filter(brick=>{const x=Number(brick.x)||170,vx=Number(brick.vx)||0,velocity=x<170?-vx:vx,distance=x<170?x-30:310-x;return velocity>2&&distance/velocity<.2;}).sort((a,b)=>Math.min(Number(a.x)||170,340-(Number(a.x)||170))-Math.min(Number(b.x)||170,340-(Number(b.x)||170)))[0];
+  return bankable||urgent||on[0]||null;
+ }
+ function beamSetTarget(id,phase){if(local.target!==id||local.phase!==phase){h.release();local.target=id;local.phase=phase;}}
  function tick(){
   const now=performance.now(),s=h.state();h.commands(visibleCommands());
   if(mode==='maze'&&role==='B'){
-   const path=w.MazeMobile?.scenario?.()?.map?.path?.[0]||[];if(path.length){const directions=[];for(let i=1;i<path.length;i++){const a=path[i-1].split(',').map(Number),b=path[i].split(',').map(Number);directions.push(b[0]<a[0]?'↑':b[0]>a[0]?'↓':b[1]<a[1]?'←':'→');}h.report('安全路线：'+directions.join(' ')+'；遇阀门让 A 报符号，再选下方对照');}else h.report('等待本端完整地图');return;
+   const path=w.MazeMobile?.scenario?.()?.map?.path?.[0]||[];if(path.length){const directions=[];for(let i=1;i<path.length;i++){const a=path[i-1].split(',').map(Number),b=path[i].split(',').map(Number);directions.push(b[0]<a[0]?'↑':b[0]>a[0]?'↓':b[1]<a[1]?'←':'→');}h.report('安全路线：'+directions.join(' ')+'；遇关卡点让 A 报标记，再选下方对照');}else h.report('等待本端完整地图');return;
   }
   if(mode==='code'&&role==='B'){h.report('让手动 A 按外环缺口、分叉、实心点、内线、底钩描述符号，再选下方匹配项');return;}
   if(!s)return h.report('等待本端玩法状态');
@@ -104,8 +122,20 @@ function create(mode,role,h){
   }
   if(guided[mode]){
    if(mode==='wires'&&role==='B'){h.report((s.rules||[]).join(' '));return;}
-   if(mode==='vault'&&role==='A'){if(s.phase==='read')h.click('#vm-start');else if(s.phase==='show'&&s.clue!==undefined)h.report('告诉手动 B：第 '+(s.index+1)+' 位是 '+s.clue);return;}
-   if(mode==='pressure'&&role==='B'&&Number.isFinite(s.lo))h.report('告诉手动 A：安全区间 '+Math.round(s.lo)+'—'+Math.round(s.hi));
+   if(mode==='vault'&&role==='A'){
+    if(s.phase!=='read')local.vaultSawAway=true;
+    else if(local.vaultSawAway){local.vaultStarted=false;local.vaultSawAway=false;}
+    if(s.phase==='read')h.report(local.vaultStarted?'扫描启动中，请等待':'准备好后点击“让托管A开始扫描”');
+    else if(s.phase==='show'&&s.clue!==undefined)h.report('告诉手动 B：第 '+(s.index+1)+' 位是 '+s.clue);
+    return;
+   }
+   if(mode==='pressure'&&role==='B'){
+    const shouldRelease=s.requireRelease||s.phase!=='stable'||s.feedback==='outside'||s.feedback==='damage'||Number(s.heatB)>=82||Number(s.cooldown)>0;
+    if(shouldRelease)h.release();else(h.press?h.press('#rt-action'):pulse('#rt-action',650));
+    if(Number.isFinite(s.lo))h.report('告诉手动 A：安全区间 '+Math.round(s.lo)+'—'+Math.round(s.hi)+(shouldRelease?'；阀门已松开':'；正在校准'));
+    else h.report('区间迁移中，阀门已松开');
+    return;
+   }
    else if(mode==='lookback'&&role==='B'&&['warning','danger'].includes(s.phase)){const word={ears:'停步',eyes:'前进',nose:'躲藏'}[s.monster];if(word)h.report('告诉手动 A：'+word);}
    else if(mode==='caller'&&role==='B'&&s.checks)h.report('告诉手动 A：本轮核验 '+s.checks.map(x=>({code:'工号',task:'任务',route:'来路'})[x]).join('＋'));
    else if(mode==='evidence'&&s.clues)h.report('向手动端读出本端证据：'+s.clues.join('；'));
@@ -117,13 +147,16 @@ function create(mode,role,h){
    if(local.quality!==null&&s.quality<local.quality-.015)local.dir*=-1;local.quality=s.quality;pulse(local.dir>0?'#radio-plus':'#radio-minus',260);return h.report('按本端波形试探 '+(local.dir>0?'增加':'降低'));
   }
   if(mode==='lockbox'){
-   if(s.stage===0){if(role==='A')h.click('#pp-slide');else pulse('#pp-hold',500);}
-   else if(s.stage===1){if(role==='A'&&now-local.last>400){local.last=now;h.click('#pp-gear');}else if(role==='B'&&s.aligned)h.click('#pp-latch');}
-   else pulse('#pp-hold',500);return h.report('按本端机关反馈配合');
+   if(s.stage===0){if(role==='A'){h.release();if(s.holds?.B)h.click('#pp-slide');}else(h.maintain?h.maintain('#pp-hold'):h.press?h.press('#pp-hold'):pulse('#pp-hold',500));}
+   else if(s.stage===1){h.release();if(role==='A'&&now-local.last>400){local.last=now;h.click('#pp-gear');}else if(role==='B'&&s.aligned)h.click('#pp-latch');}
+   else(h.maintain?h.maintain('#pp-hold'):h.press?h.press('#pp-hold'):pulse('#pp-hold',Math.ceil((Number(s.pullGoal)||2)*1000)+800));return h.report(s.stage===2?'持续拉住本端把手，等待同伴共同保持 '+s.pullGoal+' 秒':'按本端公开机关反馈配合');
   }
   if(mode==='silhouette'&&role==='B'){
-   for(let i=0;i<3;i++)if(s.rot[i]!==s.targetRot[i]){h.click('#pp-rot-'+i);return h.report('旋转本端第 '+(i+1)+' 件物体');}
-   h.click('#pp-check');return h.report(s.lamp===s.targetLamp?'轮廓已对齐，核对':'物体已对齐，告诉手动 A 调灯');
+   for(let i=0;i<3;i++)if(s.rot[i]!==s.targetRot[i]){local.silCheckSig=null;h.click('#pp-rot-'+i);return h.report('旋转本端第 '+(i+1)+' 件物体');}
+   if(s.lamp!==s.targetLamp){local.silCheckSig=null;return h.report('物体已对齐，等待 A 调整灯光');}
+   const sig=[s.lamp,s.targetLamp,...s.rot,...s.targetRot].join(':');
+   if(local.silCheckSig!==sig){local.silCheckSig=sig;h.click('#pp-check');}
+   return h.report('轮廓已对齐，核对');
   }
   if(mode==='mirrors'){
    if(now-local.last<450)return;local.last=now;const own=s.mirrors.map((m,i)=>m.owner===role?i:-1).filter(i=>i>=0),other=s.mirrors.filter(m=>m.owner!==role).map(m=>m.rot).join('');if(!own.length)return;
@@ -142,7 +175,11 @@ function create(mode,role,h){
    }return h.report('按本端布局执行影子协作');
   }
   if(mode==='beam'){
-   const b=s.bricks?.find(x=>!x.resolved);if(s.rescue)return void pulse('#bm-lift',500);if(!b||!b.on)return void h.release();const dx=b.x-170,tilt=s.yR-s.yL,want=role==='A'?dx< -24&&tilt<80:dx>24&&tilt>-80;if(want)pulse('#bm-lift',260);else h.release();return h.report('根据本端货物位置调整本端高度');
+   const bricks=Array.isArray(s.bricks)?s.bricks:[],rescueId=typeof s.rescue==='string'?s.rescue:s.rescue&&typeof s.rescue.brick==='string'?s.rescue.brick:null,rescue=rescueId?bricks.find(brick=>brick&&brick.id===rescueId&&brick.phase==='rescue'):null;
+   if(rescue){beamSetTarget(rescue.id,'rescue');h.press?h.press('#bm-lift'):pulse('#bm-lift',680);return h.report('协助救援 '+rescue.id+'，等待另一端共同抬升');}
+   const b=beamPick(s);
+   if(!b){beamSetTarget(null,'level');const y=role==='A'?Number(s.yL):Number(s.yR),vy=role==='A'?Number(s.vyL):Number(s.vyR),want=y+vy*.24>250;if(want)(h.press?h.press('#bm-lift'):pulse('#bm-lift',220));else h.release();return h.report('暂无可操作货物，提前稳定落点');}
+   beamSetTarget(b.id,b.phase);const x=Number(b.x)||170,vx=Number(b.vx)||0,dx=x-170,outward=(x<80&&vx<0)||(x>260&&vx>0),bankable=Math.abs(dx)<=18,glass=bricks.some(item=>item&&item.phase==='on'&&item.type===2);let desired=bankable?0:clamp(-dx*3-vx*6,glass?-55:-100,glass?55:100);const targetY=role==='A'?250-desired/2:250+desired/2,y=role==='A'?Number(s.yL):Number(s.yR),vy=role==='A'?Number(s.vyL):Number(s.vyR),want=y+vy*.24>targetY;if(want)(h.press?h.press('#bm-lift'):pulse('#bm-lift',250));else h.release();return h.report('跟踪 '+b.id+'：'+(outward?'提前阻止外滑':bankable?'稳定入库':'持续搬运'));
   }
   if(mode==='catch'){
    const v=role==='A'?w._host:(w._guestState&&w._guestState()),items=v?.items||[],px=v?.px;if(!Number.isFinite(px))return;const good=items.filter(x=>x.type!=='bad').sort((a,b)=>b.y-a.y)[0],bad=items.filter(x=>x.type==='bad'&&x.y>300&&Math.abs(x.x-px)<45)[0];const want=bad?(role==='A'?bad.x>=px:bad.x<px):good?(role==='A'?good.x<px:good.x>px):false;if(want)pulse('#ct-tap',260);else h.release();return h.report('根据本端画面'+(want?'移动':'等待'));
