@@ -7,7 +7,7 @@ var feedback=null,radioCtx=null;
 function session(){return window.RoomSession&&typeof RoomSession.current==='function'?RoomSession.current():null;}
 function config(tier){tier=clamp(Math.round(Number(tier)||1),1,5);return {tier:tier,goal:[2,3,4,5,6][tier-1],width:[14,10,8,6,5][tier-1],hold:[1,1.4,1.8,2.2,2.6][tier-1],time:[90,110,150,180,210][tier-1],drift:[0,0,2,3,4][tier-1],gainDrift:[0,0,0,2,3][tier-1],speed:[0,0,.12,.14,.16][tier-1],noiseFor:[0,0,.7,1,1.3][tier-1]};}
 function nextChannel(s){if(s.tier===1){s.tf=[40,65][s.got%2];s.tg=[60,35][s.got%2];}else{s.tf=22+s.random()*56;s.tg=22+s.random()*56;}}
-function planLabel(s){return ['教学 · 固定频道','入门 · 随机频道','标准 · 频率慢漂','困难 · 双端慢漂','极限 · 双端追踪'][s.tier-1];}
+function planLabel(s){return ['入门 · 固定频道','入门 · 随机频道','普通 · 频率慢漂','困难 · 双端慢漂','困难 · 双端追踪'][s.tier-1];}
 function ownAligned(s){return s.quality>.86;}
 
 function feedbackEmit(type,tag){try{if(window.GameFeedback&&typeof GameFeedback.emit==='function')GameFeedback.emit(type,{source:'dial:'+tag});}catch(_){/* Feedback must never interrupt gameplay. */}}

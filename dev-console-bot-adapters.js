@@ -2,7 +2,7 @@
 (function(g){
 'use strict';
 const guided={
- maze:{A:'听手动 B 指路后执行方向或关卡口令。',B:'读取自己的完整地图，向手动 A 给出路线；B 无正式操作。'},
+ maze:{A:'向手动 B 描述当前位置，再按对方指路执行方向或关卡口令。',B:'等待手动 A 描述当前位置；只依据本端公开地形和门/工具对照指路，不读取出生点或默认路线。'},
  code:{A:'听手动 B 报数字后按本端数字键。',B:'查本端密码本，并把数字口述给手动 A。'},
  wires:{A:'听手动 B 报线号后在本端选线并确认。',B:'按本端规则给手动 A 报线号；救场时听符号选旁路。'},
  vault:{A:'准备好后由验收者发出口令开始扫描，再把逐位内容口述给手动 B。',B:'听手动 A 报位序与内容后，在本端记录并提交。'},
@@ -35,12 +35,14 @@ function capability(mode,role){
 }
 const byText=(w,text)=>Array.from(w.document.querySelectorAll('button')).find(b=>!b.disabled&&!b.hidden&&b.getClientRects().length&&b.textContent.trim().includes(text));
 function create(mode,role,h){
- const w=h.window,local={last:0,dir:1,quality:null,held:false,index:0,phase:null,seen:new Map(),path:[],target:null};
+ const w=h.window,local={last:0,dir:1,quality:null,held:false,index:0,phase:null,seen:new Map(),path:[],target:null,mazeRow:null,mazeCol:null,mazeProgress:0,mazeAdvice:null};
  const buttons=list=>list.map(x=>({id:x[0],label:x[1]}));
+ function mazePublic(){const s=w.MazeMobile?.scenario?.(),m=s?.map;if(s?.schema!==2||s.visibility!=='observer'||!m||!Array.isArray(m.walls)||!Array.isArray(m.end)||!Array.isArray(m.traps)||!Array.isArray(m.gatePoints))return null;return m;}
+ function mazeAdvise(){const m=mazePublic();if(!m||!Number.isInteger(local.mazeRow)||!Number.isInteger(local.mazeCol))return false;const start=[local.mazeRow,local.mazeCol],walk=p=>m.walls[p[0]]?.[p[1]]==='0',traps=new Set(m.traps.map(String)),progress=Math.max(0,Math.min(m.gatePoints.length,Number(local.mazeProgress)||0)),target=(m.gatePoints[progress]||m.end).slice();if(!walk(start))return void(local.mazeAdvice='A 报的位置不是本端公开地图的可通行格，请重新核对行列');if(String(start)===String(target)){local.mazeAdvice=progress<m.gatePoints.length?'A 已到第 '+(progress+1)+' 个关卡点，请先报现场标记并使用门/工具对照':'A 已到出口，请确认完成';return true;}const q=[start],prev=new Map([[String(start),null]]);for(let i=0;i<q.length&&!prev.has(String(target));i++){const p=q[i];for(const d of [[-1,0],[1,0],[0,-1],[0,1]]){const n=[p[0]+d[0],p[1]+d[1]],key=String(n);if(!walk(n)||traps.has(key)||prev.has(key)||(progress<m.gatePoints.length&&key===String(m.end)))continue;prev.set(key,p);q.push(n);}}if(!prev.has(String(target))){local.mazeAdvice='当前公开地形无法找到避开危险区的路线，请 A 重新核对位置';return true;}let at=target;while(prev.get(String(at))&&String(prev.get(String(at)))!==String(start))at=prev.get(String(at));const dr=at[0]-start[0],dc=at[1]-start[1],direction=dr<0?'向上':dr>0?'向下':dc<0?'向左':'向右';local.mazeAdvice='根据 A 明确报告的位置：下一格'+direction+'；移动后请重新报告行列';local.mazeRow=local.mazeCol=null;return true;}
  function visibleCommands(){
   const d=w.document,s=h.state();
   if(mode==='maze'&&role==='A')return d.querySelector('#maze-valve:not([hidden])')?buttons(Array.from(d.querySelectorAll('#maze-valve [data-valve]')).map((button,i)=>['valve:'+i,'选择'+button.textContent.trim()])):buttons([['key:ArrowUp','向上移动'],['key:ArrowDown','向下移动'],['key:ArrowLeft','向左移动'],['key:ArrowRight','向右移动']]);
-  if(mode==='maze'&&role==='B')return buttons(Array.from(d.querySelectorAll('.mz-valve-grid span')).map((span,i)=>['say-valve:'+i,'告诉 A：'+span.textContent.trim()]));
+  if(mode==='maze'&&role==='B'){const m=mazePublic(),out=Array.from(d.querySelectorAll('.mz-valve-grid span')).map((span,i)=>['say-valve:'+i,'告诉 A：'+span.textContent.trim()]);if(m){m.walls.forEach((_,i)=>out.push(['maze:row:'+i,'A 报位置：第 '+(i+1)+' 行']));for(let i=0;i<m.walls[0].length;i++)out.push(['maze:col:'+i,'A 报位置：第 '+(i+1)+' 列']);for(let i=0;i<=m.gatePoints.length;i++)out.push(['maze:progress:'+i,'A 报进度：已过 '+i+' 个关卡']);}return buttons(out);}
   if(mode==='code'&&role==='A')return buttons(Array.from({length:10},(_,i)=>['code:'+i,'输入 '+i]));
   if(mode==='code'&&role==='B'&&Array.isArray(s?.maps))return buttons(s.maps.flatMap((map,book)=>map.map((value,symbol)=>['say-code:'+book+':'+symbol+':'+value,String.fromCharCode(65+book)+' 册 · 符号 '+(symbol+1)+' → '+value])));
   if(mode==='code'&&role==='B')return buttons(codeSymbolDescriptions.map((x,i)=>['say-code:0:'+i+':'+i,x]));
@@ -72,6 +74,9 @@ function create(mode,role,h){
   if(id.startsWith('click:'))return h.click(id.slice(6));
   if(id.startsWith('valve:'))return h.click('[data-valve="'+id.slice(6)+'"]');
   if(id.startsWith('say-valve:')){const span=w.document.querySelectorAll('.mz-valve-grid span')[+id.slice(10)];if(!span)return false;h.report('告诉手动 A：选择 '+span.textContent.trim());return true;}
+  if(id.startsWith('maze:row:')){local.mazeRow=Number(id.slice(9));local.mazeAdvice=null;mazeAdvise();return Number.isInteger(local.mazeRow)||!!local.mazeAdvice;}
+  if(id.startsWith('maze:col:')){local.mazeCol=Number(id.slice(9));local.mazeAdvice=null;mazeAdvise();return Number.isInteger(local.mazeCol)||!!local.mazeAdvice;}
+  if(id.startsWith('maze:progress:')){local.mazeProgress=Number(id.slice(14));local.mazeAdvice=null;mazeAdvise();return Number.isInteger(local.mazeProgress);}
   if(id.startsWith('code:')){const n=id.slice(5),b=Array.from(w.document.querySelectorAll('.code-keypad button')).find(x=>!x.disabled&&x.textContent.trim()===n);return b?h.clickElement(b):false;}
   if(id.startsWith('wire:')){const n=id.slice(5);return h.click('[data-wire="'+n+'"]')&&h.click('#wm-cut');}
   if(id.startsWith('say-code:')){const p=id.split(':');h.report('告诉手动 A：'+String.fromCharCode(65+Number(p[1]))+' 册符号 '+(Number(p[2])+1)+' 对应数字 '+p[3]);return true;}
@@ -111,9 +116,7 @@ function create(mode,role,h){
  function beamSetTarget(id,phase){if(local.target!==id||local.phase!==phase){h.release();local.target=id;local.phase=phase;}}
  function tick(){
   const now=performance.now(),s=h.state();h.commands(visibleCommands());
-  if(mode==='maze'&&role==='B'){
-   const path=w.MazeMobile?.scenario?.()?.map?.path?.[0]||[];if(path.length){const directions=[];for(let i=1;i<path.length;i++){const a=path[i-1].split(',').map(Number),b=path[i].split(',').map(Number);directions.push(b[0]<a[0]?'↑':b[0]>a[0]?'↓':b[1]<a[1]?'←':'→');}h.report('安全路线：'+directions.join(' ')+'；遇关卡点让 A 报标记，再选下方对照');}else h.report('等待本端完整地图');return;
-  }
+  if(mode==='maze'&&role==='B'){h.report(local.mazeAdvice||'等待手动 A 明确报告当前行列和已通过关卡数；只用本端公开地形计算下一格');return;}
   if(mode==='code'&&role==='B'){h.report('听手动 A 报册号和符号编号，再从本端密码本选择对应口令');return;}
   if(!s)return h.report('等待本端玩法状态');
   if(s.done)return h.stop(s.win?'本关成功，托管已停止':'本关失败，托管已停止');

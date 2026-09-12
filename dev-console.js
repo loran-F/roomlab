@@ -2,14 +2,14 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id), native=new Set(['lockbox','silhouette','evidence','mirrors','pwslide','lightsearch']);
-const CONSOLE_BUILD='dc-2026.09.12.6';
+const CONSOLE_BUILD='dc-2026.09.12.9';
 let catalog=null,current=null,serial=0,lastConfig=null,desiredRole="manual";
 function towerScope(){return false;}
 function hashText(value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0');}
 function visibleFingerprint(w){if(!w)return '--------';const parts=[];for(const el of w.document.querySelectorAll('h1,h2,h3,p,span,b,strong,button,[role=status]')){if(el.getClientRects().length&&!el.hidden){const t=el.textContent.trim().replace(/\s+/g,' ');if(t)parts.push(t);}}for(const c of w.document.querySelectorAll('canvas'))if(c.getClientRects().length)parts.push('canvas:'+c.width+'x'+c.height);return hashText(parts.join('|'));}
 function fixedTeaching(config){return config.scope==='single'&&config.mode==='pwslide'&&config.level===1;}
 function updateRetryCopy(config=configuration()){const tower=config.scope==='tower',fixed=fixedTeaching(config),label=tower?'换一张塔图':fixed?'重开固定教学':'换题';$('dc-retry-mode').options[0].textContent=label;$('dc-retry').textContent=tower?'重新生成塔图':fixed?'重开固定教学':'换题重开';}
-function showRunMeta(r){const session=r.windows.A?.RoomSession?.current?.(),game=readGame(r.windows.A,r.config.mode),run=session?.runId||game?.id||('desk-'+r.id);$('dc-run-meta').hidden=false;$('dc-run-title').textContent='第 '+r.id+' 轮 · '+(r.config.level===1?'固定教学':'第 '+r.config.level+' 档');$('dc-run-id').textContent='局 ID '+run;$('dc-fingerprint').textContent='可见题面 '+visibleFingerprint(r.windows.A)+' / '+visibleFingerprint(r.windows.B);$('dc-map-meta').textContent='直达会话 · '+r.config.roomId+' · '+r.config.mode+' · tier '+r.config.level+' · protocol '+(session?.protocol||1);}
+function showRunMeta(r){const session=r.windows.A?.RoomSession?.current?.(),game=readGame(r.windows.A,r.config.mode),run=session?.runId||game?.id||('desk-'+r.id),label=levels().find(x=>x[0]===r.config.level)?.[1]||('难度 '+r.config.level);$('dc-run-meta').hidden=false;$('dc-run-title').textContent='第 '+r.id+' 轮 · '+label;$('dc-run-id').textContent='局 ID '+run;$('dc-fingerprint').textContent='可见题面 '+visibleFingerprint(r.windows.A)+' / '+visibleFingerprint(r.windows.B);$('dc-map-meta').textContent='直达会话 · '+r.config.roomId+' · '+r.config.mode+' · difficulty '+r.config.level+' / tier '+internalTier(r.config.level)+' · protocol '+(session?.protocol||3);}
 function botControls(){
  const r=current,mode=r?.started?r.config.mode:$("dc-mode").value,select=$("dc-control"),state=r?.bot?.snapshot(),gameState=r?.started?readGame(r.windows.A,mode):undefined;
  const supported=value=>DevConsoleBot.capability(mode,value,gameState);
@@ -25,7 +25,8 @@ function botControls(){
 function attachBot(r){r.bot=DevConsoleBot.create({windows:r.windows,mode:r.config.mode,signal:r.controller.signal,onChange:botControls});r.bot.setRole(desiredRole);botControls();}
 const captions={catalog:'读取游戏目录',idle:'待开局',loading:'加载游戏页面',hosting:'创建房间',joining:'加入房间',map:'准备密室素材',preparing:'自动准备',playing:'进行中',tower:'完整爬塔地图',ended:'本关已结束',error:'开局或连接失败'};
 function option(value,label){const el=document.createElement('option');el.value=value;el.textContent=label;return el;}
-function levels(){return [[1,'教学 · 固定样本'],[2,'入门'],[3,'标准'],[4,'困难'],[5,'极限']];}
+function levels(){return [[1,'入门'],[2,'普通'],[3,'困难']];}
+function internalTier(difficulty){return [1,3,5][difficulty-1]||1;}
 function fillLevels(){const keep=$('dc-level').value;$('dc-level').replaceChildren(...levels($('dc-mode').value).map(x=>option(...x)));if(levels($('dc-mode').value).some(x=>String(x[0])===keep))$('dc-level').value=keep;capability();botControls();}
 function capability(){const mode=$('dc-mode').value;if(towerScope())$('dc-capability').textContent='按所选密室的真实成长规则生成完整路线。每次重开使用新 seed；同题固定 seed 重试尚无统一 UI 接口。';else $('dc-capability').textContent=mode==='pwslide'&&Number($('dc-level').value)===1?'固定教学题：密码始终为 1234；“重开固定教学”只重置条片和本轮状态。':mode==='pwslide'?'换题会重置全部条片偏移并生成进阶密码；同题复测尚无可靠接口。':(['lockbox','silhouette','evidence','mirrors'].includes(mode)?'换题会重新创建关卡；部分基础结构或案件题库固定，不保证每次题面不同。':'换题会重新创建关卡；固定地图、规则或结构可能重复。')+' 同题重试尚无统一接口。';updateRetryCopy();}
 function controls(){const busy=!!current?.busy;$('dc-scope').disabled=true;$('dc-room').disabled=!catalog||busy;$('dc-mode').disabled=true;$('dc-level').disabled=!catalog||busy;$('dc-start').disabled=busy;$('dc-start').textContent=catalog?'直达开局':'重新读取目录';$('dc-retry').disabled=!lastConfig||busy;$('dc-back').disabled=!catalog&&!current;$('dc-retry-mode').disabled=busy;updateRetryCopy();botControls();}
@@ -44,6 +45,7 @@ function cancel(){const r=current;current=null;if(r)clearFrames(r);for(const rol
 function fail(r,error){if(current!==r||r.controller.signal.aborted)return;r.busy=false;r.error=error.message||String(error);clearFrames(r,false);$('dc-error').textContent=r.error+' 可点击“重试本关”重新建局，或返回选择。';$('dc-error').hidden=false;setPhase('error','本轮已停止');$('dc-retry').focus();}
 function gameURL(){const u=new URL('roomlab.html',location.href);u.search='';return u.href;}
 async function load(r,role,discovery=false){
+ r.loads=r.loads||{};r.loads[role]=(r.loads[role]||0)+1;
  const old=frame(role),f=makeFrame(role);old.replaceWith(f);r.frames[role]=f;f.hidden=discovery;
  $('dc-state-'+role.toLowerCase()).textContent='加载中';
  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>done(new Error(role+' 端页面加载超时')),45000);function abort(){done(abortError());}function done(error){clearTimeout(timer);f.removeEventListener('load',ready);r.controller.signal.removeEventListener('abort',abort);error?reject(error):resolve();}function ready(){done();}f.addEventListener('load',ready,{once:true});r.controller.signal.addEventListener('abort',abort,{once:true});f.src=gameURL();});
@@ -78,7 +80,7 @@ function endpoint(w,mode){
   else if(mode==='pressure'){ready=!!(s?.ready&&s.cd===0);stage=ready?'可操作':'等待准备';}
   else if(mode==='vault'){ready=!!s;stage=s?.phase==='read'?'可操作 · 待扫描':ready?'可操作':'等待准备';}
   else {ready=!!(d.querySelector('canvas')||d.querySelector('#playarea')?.childElementCount||d.querySelector('.manual'));stage=ready?'可操作':'等待界面';}
-  return {connected,ready,stage,mode:w.S?.mod||null,gameId:s?.id||null,tier:w.RoomSession?.current?.()?.tier||s?.tier||w._roomGameContext?.tier||w.coopDifficulty?.().tier||null,dataListeners:w.PEER?.conn?.listenerCount?.('data')||0,link:w.DungeonConnection?.status()?.state||null};
+  return {connected,ready,stage,mode:w.S?.mod||null,gameId:s?.id||null,difficulty:w.RoomSession?.current?.()?.difficulty||w.RoomSession?.state?.()?.difficulty||null,tier:w.RoomSession?.current?.()?.tier||s?.tier||w._roomGameContext?.tier||w.coopDifficulty?.().tier||null,dataListeners:w.PEER?.conn?.listenerCount?.('data')||0,link:w.DungeonConnection?.status()?.state||null};
  }catch(_){return{connected:false,ready:false,stage:'页面不可访问',mode:null};}
 }
 function paintEndpoints(r){const result={};for(const role of ['A','B']){const e=endpoint(r.windows[role],r.config?.mode);result[role]=e;const label=$('dc-state-'+role.toLowerCase());label.textContent=(e.connected?'已连接 · ':'')+e.stage;label.dataset.ready=String(e.ready);}return result;}
@@ -122,13 +124,26 @@ async function start(config){
  try{
   await Promise.all(['A','B'].map(role=>load(r,role)));check(r);const a=r.windows.A,b=r.windows.B;
   const plan=a.RoomDirectory.getPlan(config.roomId);if(!plan||plan.primary!==config.mode)throw new Error('密室与玩法目录不一致');
-  if(!a.RoomGameAdapters?.[config.mode]?.host||!a.RoomGameAdapters?.[config.mode]?.guest)throw new Error('当前玩法尚未注册完整 A/B 适配器');
-  setPhase('hosting','A 正在创建直达房间');a.RoomSession.levels(config.roomId);
-  const levelButtons=Array.from(a.document.querySelectorAll('.direct-room button')).slice(0,5);if(!levelButtons[config.level-1]||levelButtons[config.level-1].disabled)throw new Error('开发模式未开放第 '+config.level+' 档');levelButtons[config.level-1].click();
-  await wait(r,()=>a.PEER?.room&&a.PEER?.peer?.open,'A 建房失败，请确认本地 Peer 服务已启动。');r.roomCode=String(a.PEER.room);$('dc-room-code').textContent='房间 '+r.roomCode;
-  setPhase('joining','B 正在加入同一直达房间');b.RoomSession.levels(config.roomId);const joinButton=Array.from(b.document.querySelectorAll('.direct-room button')).find(x=>x.textContent.trim()==='加入同伴');if(!joinButton)throw new Error('B 端缺少加入入口');joinButton.click();const input=b.document.querySelector('.direct-room input');const submit=Array.from(b.document.querySelectorAll('.direct-room button')).find(x=>x.textContent.trim()==='加入');if(!input||!submit)throw new Error('B 端加入表单不完整');input.value=r.roomCode;input.dispatchEvent(new b.Event('input',{bubbles:true}));submit.click();
-  await wait(r,()=>a.PEER?.conn?.open&&b.PEER?.conn?.open,'B 加入失败，请检查房间服务或网络。');setPhase('preparing','等待直达会话握手与双端准备');
-  await wait(r,()=>{const x=a.RoomSession.current(),y=b.RoomSession.current();return x&&y&&x.runId===y.runId&&x.roomId===config.roomId&&x.mode===config.mode&&x.tier===config.level&&y.tier===config.level&&x.role==='A'&&y.role==='B';},'A/B 直达会话元数据未能同步。',30000);
+  r.loadCounts={A:r.loads.A,B:r.loads.B};
+  setPhase('hosting','A 进入选择页时自动创建房间');a.RoomSession.levels(config.roomId);
+  await wait(r,()=>a.RoomSession.state().screen==='selector'&&a.RoomSession.state().roomCode&&a.PEER?.peer?.open,'A 自动建房失败，请确认本地 Peer 服务已启动。');r.roomCode=String(a.RoomSession.state().roomCode);r.hostPeer=a.PEER.peer;$('dc-room-code').textContent='房间 '+r.roomCode;
+  setPhase('joining','B 正在加入同一房间');b.RoomSession.levels(config.roomId);b.RoomSession.join();const input=b.document.getElementById('direct-code-input'),submit=b.document.getElementById('direct-join');if(!input||!submit)throw new Error('B 端加入表单不完整');input.value=r.roomCode;input.dispatchEvent(new b.Event('input',{bubbles:true}));submit.click();
+  await wait(r,()=>{const x=a.RoomSession.state(),y=b.RoomSession.state();return x.screen==='selector'&&y.screen==='selector'&&x.connected&&y.connected&&x.roomCode===r.roomCode&&y.roomCode===r.roomCode&&x.roomId===config.roomId&&y.roomId===config.roomId;},'B 加入后双方未进入共享选择页。',30000);
+  if(a.PEER.peer!==r.hostPeer||String(a.RoomSession.state().roomCode)!==r.roomCode)throw new Error('共享难度页重复创建了 A 房间');
+  const guestTier=b.document.getElementById('direct-tier-'+config.level);if(!guestTier?.disabled)throw new Error('B 端难度按钮必须只读');
+  if(!a.RoomSession.selectTier(config.level))throw new Error('A 端无法选择第 '+config.level+' 档');
+  await wait(r,()=>a.RoomSession.state().difficulty===config.level&&b.RoomSession.state().difficulty===config.level&&a.RoomSession.state().tier===internalTier(config.level)&&b.RoomSession.state().tier===internalTier(config.level)&&b.document.getElementById('direct-tier-'+config.level)?.getAttribute('aria-pressed')==='true','B 端未同步 A 的权威档位。');
+  const resourcesBefore={A:a.RoomModeLoader.status().resources.slice(),B:b.RoomModeLoader.status().resources.slice()};
+  if(!a.RoomSession.start())throw new Error('A 端无法发起提案');
+  await wait(r,()=>a.RoomSession.state().screen==='proposal'&&b.RoomSession.state().screen==='proposal'&&b.document.getElementById('direct-reject'),'B 端未收到第一次提案。');const rejectedId=a.RoomSession.state().proposalId;
+  if(!b.RoomSession.rejectProposal())throw new Error('B 端无法拒绝提案');
+  await wait(r,()=>a.RoomSession.state().screen==='selector'&&b.RoomSession.state().screen==='selector'&&!a.RoomSession.state().proposalId&&!b.RoomSession.state().proposalId,'拒绝后未返回同一房间选择页。');
+  const resourcesAfterReject={A:a.RoomModeLoader.status().resources.slice(),B:b.RoomModeLoader.status().resources.slice()};if(JSON.stringify(resourcesAfterReject)!==JSON.stringify(resourcesBefore))throw new Error('未确认的提案不应加载玩法资源');
+  if(a.PEER.peer!==r.hostPeer||String(a.RoomSession.state().roomCode)!==r.roomCode||String(b.RoomSession.state().roomCode)!==r.roomCode)throw new Error('拒绝提案后重复创建了房间');
+  if(!a.RoomSession.start())throw new Error('A 端无法重新发起提案');await wait(r,()=>b.RoomSession.state().screen==='proposal'&&b.document.getElementById('direct-accept'),'B 端未收到重新提案。');const acceptedId=a.RoomSession.state().proposalId;if(!acceptedId||acceptedId===rejectedId)throw new Error('重新提案未生成独立 proposalId');
+  if(!b.RoomSession.acceptProposal())throw new Error('B 端无法确认提案');r.proposal={rejectedId,acceptedId,resourcesBefore,resourcesAfterReject};setPhase('preparing','B 已确认，双方正在按需加载并建立本轮会话');
+  await wait(r,()=>{const x=a.RoomSession.current(),y=b.RoomSession.current(),t=internalTier(config.level);return x&&y&&x.runId===y.runId&&x.roomId===config.roomId&&x.mode===config.mode&&x.difficulty===config.level&&y.difficulty===config.level&&x.tier===t&&y.tier===t&&x.role==='A'&&y.role==='B';},'A/B 三档难度与内部强度未能同步。',30000);
+  if(!a.RoomGameAdapters?.[config.mode]?.host||!a.RoomGameAdapters?.[config.mode]?.guest||!b.RoomGameAdapters?.[config.mode]?.guest)throw new Error('按需加载后玩法未注册完整 A/B 适配器');
   const end=Date.now()+45000;
   while(Date.now()<end){check(r);const e=paintEndpoints(r);if(e.A.link==='failed'||e.B.link==='failed'||!e.A.connected||!e.B.connected)throw new Error('准备期间双端连接中断');if(e.A.ready&&e.B.ready){r.busy=false;r.started=true;attachBot(r);showRunMeta(r);setPhase('playing',config.mode==='vault'?'A 可手动开始扫描':'双方已准备 · 手动操作');monitor(r);return;}await prepareUI(r);await pause(100,r);}
   throw new Error('准备超时：'+paintEndpoints(r).A.stage+' / '+paintEndpoints(r).B.stage+'，请重试或检查游戏界面。');
@@ -146,8 +161,8 @@ function monitor(r){if(current!==r||r.controller.signal.aborted)return;const e=p
 function configuration(){return {scope:$('dc-scope').value,roomId:$('dc-room').value,mode:$('dc-mode').value,level:Number($('dc-level').value)};}
 async function discover(){
  const r=current={id:++serial,controller:new AbortController(),frames:{},windows:{},off:[],busy:true};setPhase('catalog','首次读取当前游戏注册信息');
- try{if(location.protocol==='file:')throw new Error('请通过本地服务打开：http://127.0.0.1:8080/dev-console.html');const w=await load(r,'A',true),plans=w.RoomDirectory.plans;if(plans.length!==17)throw new Error('直达目录应为 17 房，当前为 '+plans.length);const rooms=plans.map(p=>{const room=w.ROOM_CATALOG.find(x=>x.id===p.roomId);return {id:p.roomId,name:room?.name||p.title,mode:p.primary,title:p.title};});catalog={rooms,modes:rooms.map(x=>({id:x.mode,name:x.title,roomId:x.id})),plans:plans.map(p=>({roomId:p.roomId,primary:p.primary,title:p.title})),accessMode:'developer',version:w.APP_VER,progressionVersion:w.RoomLevelProgress?.schemaVersion||1,protocol:1};
-  $('dc-game-version').textContent='游戏 '+catalog.version;$('dc-console-version').textContent='验收台 '+CONSOLE_BUILD;$('dc-progression-version').textContent='五档规则 v'+catalog.progressionVersion;$('dc-route-version').textContent='会话协议 v'+catalog.protocol;const local=/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);$('dc-origin').textContent=(local?'本地':'线上')+' · '+location.host;$('dc-origin').dataset.local=String(local);
+  try{if(location.protocol==='file:')throw new Error('请通过本地服务打开：http://127.0.0.1:8080/dev-console.html');const w=await load(r,'A',true),plans=w.RoomDirectory.plans;if(plans.length!==17)throw new Error('直达目录应为 17 房，当前为 '+plans.length);const rooms=plans.map(p=>{const room=w.ROOM_CATALOG.find(x=>x.id===p.roomId);return {id:p.roomId,name:room?.name||p.title,mode:p.primary,title:p.title};});catalog={rooms,modes:rooms.map(x=>({id:x.mode,name:x.title,roomId:x.id})),plans:plans.map(p=>({roomId:p.roomId,primary:p.primary,title:p.title})),accessMode:'developer',version:w.APP_VER,progressionVersion:2,protocol:3};
+  $('dc-game-version').textContent='游戏 '+catalog.version;$('dc-console-version').textContent='验收台 '+CONSOLE_BUILD;$('dc-progression-version').textContent='三档规则 v'+catalog.progressionVersion;$('dc-route-version').textContent='会话协议 v'+catalog.protocol;const local=/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$)/.test(location.hostname);$('dc-origin').textContent=(local?'本地':'线上')+' · '+location.host;$('dc-origin').dataset.local=String(local);
   $('dc-room').replaceChildren(...catalog.rooms.map((x,i)=>option(x.id,'#'+(i+1)+' · '+x.name)));$('dc-mode').replaceChildren(...catalog.rooms.map(x=>option(x.mode,x.title)));$('dc-room').value=catalog.rooms[0].id;$('dc-mode').value=catalog.rooms[0].mode;fillLevels();cancel();
  }catch(e){if(e.name!=='AbortError'){fail(r,e);$('dc-start').disabled=false;$('dc-start').textContent='重新读取目录';}}
 }
@@ -156,7 +171,7 @@ $('dc-start').onclick=()=>catalog?start(configuration()):discover();$('dc-retry'
 $('dc-control').onchange=()=>{desiredRole=$('dc-control').value;if(current?.bot&&!current.bot.snapshot().stopped)current.bot.setRole(desiredRole);botControls();};
 $('dc-bot-pause').onclick=()=>{const bot=current?.bot;if(!bot)return;bot.snapshot().paused?bot.resume():bot.pause();botControls();};
 window.addEventListener('pagehide',()=>{const r=current;current=null;clearFrames(r);});
-window.DevConsole=Object.freeze({snapshot(){const r=current,d=r?.windows?.A?.DUNGEON;return {phase:document.body.dataset.phase,sessionId:r?.id||null,config:r?.config?{...r.config}:null,roomCode:r?.roomCode||null,error:r?.error||null,busy:!!r?.busy,bot:r?.bot?.snapshot()||null,catalog:catalog?JSON.parse(JSON.stringify(catalog)):null,route:d?.route?JSON.parse(JSON.stringify(d.route)):null,progression:d?.progression?JSON.parse(JSON.stringify(d.progression)):null,runMeta:$('dc-run-meta').hidden?null:{title:$('dc-run-title').textContent,runId:$('dc-run-id').textContent,fingerprint:$('dc-fingerprint').textContent,map:$('dc-map-meta').textContent},A:endpoint(r?.windows.A,r?.config?.mode),B:endpoint(r?.windows.B,r?.config?.mode)};}});
+window.DevConsole=Object.freeze({snapshot(){const r=current,d=r?.windows?.A?.DUNGEON;return {phase:document.body.dataset.phase,sessionId:r?.id||null,config:r?.config?{...r.config}:null,roomCode:r?.roomCode||null,error:r?.error||null,busy:!!r?.busy,bot:r?.bot?.snapshot()||null,catalog:catalog?JSON.parse(JSON.stringify(catalog)):null,route:d?.route?JSON.parse(JSON.stringify(d.route)):null,progression:d?.progression?JSON.parse(JSON.stringify(d.progression)):null,diagnostics:r?{loads:{...(r.loads||{})},hostPeerStable:!!r.hostPeer&&r.windows?.A?.PEER?.peer===r.hostPeer,proposal:r.proposal?{...r.proposal}:null,A:r.windows?.A?.RoomSession?.state?.()||null,B:r.windows?.B?.RoomSession?.state?.()||null,resources:{A:r.windows?.A?.RoomModeLoader?.status?.().resources||[],B:r.windows?.B?.RoomModeLoader?.status?.().resources||[]}}:null,runMeta:$('dc-run-meta').hidden?null:{title:$('dc-run-title').textContent,runId:$('dc-run-id').textContent,fingerprint:$('dc-fingerprint').textContent,map:$('dc-map-meta').textContent},A:endpoint(r?.windows.A,r?.config?.mode),B:endpoint(r?.windows.B,r?.config?.mode)};}});
 discover();
 })();
 

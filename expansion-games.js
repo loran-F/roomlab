@@ -268,7 +268,7 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
       const recording=s.phase==='record',replay=s.phase==='replay',echo=replay||s.phase==='escape';
       const actor=echo?s.ghost:s.positions.A,layout=s.layout,dir=layout.mirror?'左':'右',back=layout.mirror?'右':'左';
       const aAt=echo&&actor===s.exit,bAt=s.positions.B===s.exit,won=s.done&&s.win;
-      el('shadow-tier').textContent=['','固定教学','入门','标准','困难','极限'][s.tier||1];
+      el('shadow-tier').textContent=['入门','普通','困难'][Math.min(2,Math.max(0,Math.floor(((s.tier||1)-1)/2)))];
       el('x-duty').textContent=s.layout.keyLatches?(role==='A'?'录下踩按钮，再走到集合出口等待。':'播放回声，拿钥匙后回集合出口。'):(role==='A'?'踩钮留足 B 往返时间，再到集合出口。':'趁回声踩住按钮，取钥匙并返回集合出口。');
       const title=s.done?(s.win?'共同撤离成功':'时间用尽 · 撤离失败'):{plan:'先让 A 录下动作',record:'● A 正在录影',waiting:'录好了，轮到 B',replay:'▶ 回声正在回放',escape:aAt?'A 在出口等你':'回声没有到出口',retry:'重新配合，再试一次'}[s.phase];
       const status=s.keyCollected?(s.layout.keyLatches?'钥匙已开门禁 · 可以回来':'钥匙到手 · 须趁回声踩钮返回'):s.doorOpen?'按钮被踩住 → 门禁打开':'按钮松开 → 门禁关闭';
