@@ -2,7 +2,7 @@
 (function(){
 'use strict';
 const $=id=>document.getElementById(id), native=new Set(['lockbox','silhouette','evidence','mirrors','pwslide','lightsearch']);
-const CONSOLE_BUILD='dc-2026.09.12.3';
+const CONSOLE_BUILD='dc-2026.09.12.4';
 let catalog=null,current=null,serial=0,lastConfig=null,desiredRole="manual";
 function towerScope(){return $('dc-scope').value==='tower';}
 function hashText(value){let h=2166136261;for(const c of String(value)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return (h>>>0).toString(16).padStart(8,'0');}
