@@ -38,8 +38,9 @@ function growthProfile(room,policy){
 function generateGrowth(room,seed,requested,families,policy){
  if(requested&&!TYPES.includes(requested))throw new Error('Unknown route layout');
  const p=growthProfile(room,policy),random=rng(seed),pick=a=>a[Math.floor(random()*a.length)],integer=(min,max)=>min+Math.floor(random()*(max-min+1));
- const pool=policy.pool.length?policy.pool:policy.order===1?[policy.primary]:[];
- if(!pool.length)throw new Error('No previously unlocked room games');
+ // An empty learned pool uses this room's own basic exercise only.
+ // Keep progression.pool unchanged: practicing here does not unlock any game.
+ const pool=policy.pool.length?policy.pool:[policy.primary];
  const type=requested||pick(TYPES),floors=integer(p.min,p.max),guaranteed=p.stage===1,restRow=Math.max(1,Math.floor(floors*.6));
  const counts=Array(floors).fill(1),limits=Array(floors).fill(p.maxBranches);
  if(policy.tutorial)limits[0]=1;
@@ -165,7 +166,7 @@ function validate(d){
  const edges=d.nodes.flatMap(n=>n.next.map(id=>[n,byId.get(id)]));
  edges.forEach(([a,b],i)=>edges.slice(i+1).forEach(([c,e])=>{if(b&&e&&a.layer===c.layer&&a.id!==c.id&&b.id!==e.id&&(a.x-c.x)*(b.x-e.x)<0)errors.push('Crossing edges');}));
  if(d.progression&&d.route&&d.route.version>=3){
-  const plan=d.progression,end=byId.get(d.boss),first=d.nodes.filter(n=>n.layer===1),pool=plan.pool.length?plan.pool:plan.order===1?[plan.primary]:[];
+  const plan=d.progression,end=byId.get(d.boss),first=d.nodes.filter(n=>n.layer===1),pool=plan.pool.length?plan.pool:[plan.primary];
   if(plan.tutorial&&(first.length!==1||first.some(n=>n.mode!==plan.tutorialMode||!n.roomTutorial)))errors.push('Missing primary tutorial');
   if(!end||!end.roomFinale||!!end.roomAdvanced!==!!plan.advanced||(plan.boss?end.type!=='boss':end.type!=='event'||end.mode!==plan.finaleMode))errors.push('Invalid room finale');
   if(plan.boss&&plan.advanced&&d.nodes.filter(n=>n.layer===end.layer-1).some(n=>!n.roomAdvanced||n.mode!==plan.advancedMode||n.type!=='event'))errors.push('Missing primary advanced encounter');
