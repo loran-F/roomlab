@@ -1,11 +1,12 @@
 (function(){
 'use strict';
 var observer=null, mazeTerminal=null, mazeStartedAt=null, mazeContext=null;
-var scenario=null, serial=0, acceptedEntries=new WeakMap();
+var scenario=null, serial=0, acceptedEntries=new WeakMap(),directContext=null,directRunning=false,directSeen=null;
+function sessionMeta(){return window.RoomSession&&RoomSession.current()||directContext||{};}
 function config(tier,theme){
- tier=Math.max(1,Math.min(4,Math.floor(Number(tier)||1)));theme=theme==='mountain'?'mountain':'vent';
- var n=[1,2,3,3][tier-1],pen={wall:[0,2,5,5][tier-1],trap:[0,4,8,8][tier-1],wrongGate:[2,3,4,4][tier-1]},mount=theme==='mountain';
- return {tier:tier,theme:theme,rows:[9,11,13,15][tier-1],cols:tier===1?9:11,gateCount:n,trapCount:[0,1,2,3][tier-1],visionRadius:tier===1?2:1,penalties:pen,gateFractions:Array.from({length:n},function(_,i){return(i+1)/(n+1);}),routeSteps:{min:[18,26,36,46][tier-1],max:[24,34,44,60][tier-1]},text:{
+ tier=Math.max(1,Math.min(5,Math.floor(Number(tier)||1)));theme=theme==='mountain'?'mountain':'vent';
+ var n=[1,2,3,4,5][tier-1],pen={wall:[0,1,3,4,5][tier-1],trap:[0,3,5,7,8][tier-1],wrongGate:[1,2,3,4,5][tier-1]},mount=theme==='mountain';
+ return {tier:tier,theme:theme,timeLimit:[180,180,210,240,300][tier-1],rows:[9,11,13,15,17][tier-1],cols:[9,11,11,13,13][tier-1],gateCount:n,trapCount:[0,1,2,3,4][tier-1],visionRadius:tier<=2?2:1,penalties:pen,gateFractions:Array.from({length:n},function(_,i){return(i+1)/(n+1);}),routeSteps:{min:[18,26,36,46,62][tier-1],max:[18,34,44,60,80][tier-1]},text:{
  gate:mount?'登山保护点':'阀门',options:mount?['岩钉','安全绳','冰镐']:['蓝阀','橙阀','绿阀'],
  encounter:mount?'报出岩壁标记，听 B 指挥选择登山工具。':'报符号给 B，听指挥选择阀门。',
  wrongGate:(mount?'工具不匹配':'阀门不对')+'，−'+pen.wrongGate+'秒。重新向 B 核对'+(mount?'岩壁标记。':'符号。'),
@@ -18,24 +19,24 @@ function config(tier,theme){
 }
 function runtimeRules(){return JSON.parse(JSON.stringify(scenario&&scenario.rules||config(3,'vent')));}
 window.mazeRuntimeRules=runtimeRules;
-function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),v=a[i];a[i]=a[j];a[j]=v;}return a;}
+function shuffle(a,random){random=random||Math.random;for(var i=a.length-1;i>0;i--){var j=Math.floor(random()*(i+1)),v=a[i];a[i]=a[j];a[j]=v;}return a;}
 function generate(input){
- var rules=typeof input==='object'?config(input.tier,input.theme):config(input||1),best=null;
- var target=rules.routeSteps.min+2*Math.floor(Math.random()*((rules.routeSteps.max-rules.routeSteps.min)/2+1));
+ var rules=typeof input==='object'?config(input.tier,input.theme):config(input||1),best=null,seed=271828;var random=rules.tier===1?function(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}:Math.random;
+ var target=rules.routeSteps.min+2*Math.floor(random()*((rules.routeSteps.max-rules.routeSteps.min)/2+1));
  for(var attempt=0;attempt<24;attempt++){
   var rows=rules.rows,cols=rules.cols,w=Array.from({length:rows},function(){return Array(cols).fill('1');}),stack=[[1,1]],parents={'1,1':null},farthest=[1,1],depth={'1,1':0};w[1][1]='0';
-  while(stack.length){var p=stack[stack.length-1],next=[[2,0],[-2,0],[0,2],[0,-2]].map(function(d){return[p[0]+d[0],p[1]+d[1]];}).filter(function(q){return q[0]>0&&q[0]<rows-1&&q[1]>0&&q[1]<cols-1&&w[q[0]][q[1]]==='1';});if(!next.length){stack.pop();continue;}var q=next[Math.floor(Math.random()*next.length)];w[(p[0]+q[0])/2][(p[1]+q[1])/2]='0';w[q[0]][q[1]]='0';parents[q]=p;depth[q]=depth[p]+1;if(depth[q]>depth[farthest])farthest=q;stack.push(q);}
+  while(stack.length){var p=stack[stack.length-1],next=[[2,0],[-2,0],[0,2],[0,-2]].map(function(d){return[p[0]+d[0],p[1]+d[1]];}).filter(function(q){return q[0]>0&&q[0]<rows-1&&q[1]>0&&q[1]<cols-1&&w[q[0]][q[1]]==='1';});if(!next.length){stack.pop();continue;}var q=next[Math.floor(random()*next.length)];w[(p[0]+q[0])/2][(p[1]+q[1])/2]='0';w[q[0]][q[1]]='0';parents[q]=p;depth[q]=depth[p]+1;if(depth[q]>depth[farthest])farthest=q;stack.push(q);}
   var chain=[],at=farthest;while(at){chain.unshift(at);at=parents[at];}var path=[];chain.forEach(function(p,i){if(i){var prev=chain[i-1];path.push([(prev[0]+p[0])/2,(prev[1]+p[1])/2].join(','));}path.push(p.join(','));});
   if(!best||path.length>best.path.length)best={w:w,path:path};if(path.length>target)break;
  }
  var path=best.path.slice(0,target+1),safe=new Set(path),branches=[];
- best.w.forEach(function(row,r){row.forEach(function(v,c){if(v==='0'&&!safe.has(r+','+c))branches.push([r,c]);});});shuffle(branches);
+ best.w.forEach(function(row,r){row.forEach(function(v,c){if(v==='0'&&!safe.has(r+','+c))branches.push([r,c]);});});shuffle(branches,random);
  return {walls:best.w.map(function(row){return row.join('');}),start:[1,1],end:path[path.length-1].split(',').map(Number),traps:branches.slice(0,rules.trapCount),path:[path]};
 }
 function valid(s){
  if(!s||s.schema!==1||typeof s.mapId!=='string'||typeof s.sessionId!=='string'||!s.map)return false;
  var rules=s.rules,m=s.map,legacy=!rules;
- if(rules){var expected=config(rules.tier,rules.theme);if(!Number.isInteger(rules.tier)||rules.tier<1||rules.tier>4||!['vent','mountain'].includes(rules.theme))return false;for(var key of Object.keys(expected)){if(JSON.stringify(rules[key])!==JSON.stringify(expected[key]))return false;}}
+ if(rules){var expected=config(rules.tier,rules.theme);if(!Number.isInteger(rules.tier)||rules.tier<1||rules.tier>5||!['vent','mountain'].includes(rules.theme))return false;for(var key of Object.keys(expected)){if(JSON.stringify(rules[key])!==JSON.stringify(expected[key]))return false;}}
  var rows=legacy?15:rules.rows,cols=legacy?11:rules.cols;
  if(!Array.isArray(m.walls)||m.walls.length!==rows||m.walls.some(function(r){return typeof r!=='string'||r.length!==cols||!/^[01]+$/.test(r);}))return false;
  var walk=function(p){return Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&m.walls[p[0]]&&m.walls[p[0]][p[1]]==='0';};
@@ -46,11 +47,11 @@ function valid(s){
 window.mazeApplyScenario=function(s){if(!valid(s))return false;scenario=JSON.parse(JSON.stringify(s));if(!scenario.rules)scenario.rules=config(3,'vent');MAZE=scenario.map;MAZE.rows=MAZE.walls.length;MAZE.cols=MAZE.walls[0].length;MAZES=[MAZE];window._mazeSeed=0;return true;};
 window.mazePrepareHost=function(){
  mazeTerminal=null;mazeStartedAt=null;window._mazeGates=null;window._mazeMove=null;
- var theme=window._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON&&DUNGEON.roomId==='room-16'?'mountain':'vent';
- var rules=config(typeof coopDifficulty==='function'?coopDifficulty().tier:1,theme),m=generate(rules),key='roomlab.maze.last.v2',previous='';try{previous=localStorage.getItem(key)||'';}catch(e){}
- if(m.walls.join('')===previous){var max=rules.cols-1;m.walls=m.walls.map(function(r){return r.split('').reverse().join('');});m.start[1]=max-m.start[1];m.end[1]=max-m.end[1];m.traps=m.traps.map(function(p){return[p[0],max-p[1]];});m.path=[m.path[0].map(function(p){var q=p.split(',').map(Number);return q[0]+','+(max-q[1]);})];}
+ var meta=sessionMeta(),theme=meta.roomId?(meta.roomId==='room-16'?'mountain':'vent'):window._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON&&DUNGEON.roomId==='room-16'?'mountain':'vent';
+ var rules=config(meta.tier||(typeof coopDifficulty==='function'?coopDifficulty().tier:1),theme),m=generate(rules),key='roomlab.maze.last.v2',previous='';try{previous=localStorage.getItem(key)||'';}catch(e){}
+ if(rules.tier>1&&m.walls.join('')===previous){var max=rules.cols-1;m.walls=m.walls.map(function(r){return r.split('').reverse().join('');});m.start[1]=max-m.start[1];m.end[1]=max-m.end[1];m.traps=m.traps.map(function(p){return[p[0],max-p[1]];});m.path=[m.path[0].map(function(p){var q=p.split(',').map(Number);return q[0]+','+(max-q[1]);})];}
  try{localStorage.setItem(key,m.walls.join(''));}catch(e){}
- var id=Date.now().toString(36)+'-'+(++serial)+'-'+Math.random().toString(36).slice(2,9),s={schema:1,mapId:id,sessionId:id,generation:serial,initialTime:typeof coopTime==='function'?coopTime(PG().time):PG().time,loadingAttempt:window.RoomLoading?(RoomLoading.status().attemptId||null):null,rules:rules,map:m};window.mazeApplyScenario(s);return s;
+ var id=meta.runId||meta.sessionId||Date.now().toString(36)+'-'+(++serial)+'-'+Math.random().toString(36).slice(2,9),s={schema:1,mapId:id,sessionId:id,generation:serial,initialTime:meta.runId||meta.sessionId?rules.timeLimit:typeof coopTime==='function'?coopTime(PG().time):PG().time,loadingAttempt:window.RoomLoading?(RoomLoading.status().attemptId||null):null,rules:rules,map:m};window.mazeApplyScenario(s);return s;
 };
 window.mazeAcceptEnter=function(d,conn){
  if(!d||d.t!=='enter'||d.mode!=='maze')return true;
@@ -60,7 +61,7 @@ window.mazeAcceptEnter=function(d,conn){
  var seen=acceptedEntries.get(conn);if(!seen){seen=new Set();acceptedEntries.set(conn,seen);}if(seen.has(s.sessionId))return false;
  seen.add(s.sessionId);return true;
 };
-window.MazeMobile={config:config,rules:runtimeRules,generate:generate,validate:valid,scenario:function(){return scenario;},state:function(){if(S.mod!=='maze')return null;var status=window.RoomResults&&RoomResults.status();return mazeTerminal||(S.mod==='maze'&&status&&status.outcome?{done:true,win:status.outcome==='success',runId:status.runId}:null);}};
+window.MazeMobile={config:config,rules:runtimeRules,generate:generate,validate:valid,scenario:function(){return scenario;},state:function(){if(S.mod!=='maze')return null;var status=window.RoomResults&&RoomResults.status();return mazeTerminal||(S.mod==='maze'&&status&&status.outcome?{done:true,win:status.outcome==='success',runId:status.runId}:directLive()&&document.querySelector('.mz-main')?{mode:'maze',id:scenario.sessionId,runId:scenario.sessionId,tier:scenario.rules.tier,role:S.role,done:false}:null);}};
 function mountain(){return runtimeRules().theme==='mountain';}
 var symbols=['○','△','□','⊕','◇','☆'];
 function marker(ctx,x,y,cell,text,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x+cell/2,y+cell/2,cell*.4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffffff';ctx.font='700 '+Math.floor(cell*.6)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,x+cell/2,y+cell/2+1);}
@@ -89,7 +90,7 @@ function polish(manual){
  var messages=app.querySelectorAll('#msg');messages.forEach(function(m,i){if(i)m.remove();else{m.setAttribute('aria-live','polite');caption.after(m);}});
  if(again){again.classList.add('mz-again');app.append(again);}var help=document.createElement('details');help.className='mz-help';help.innerHTML='<summary>玩法说明</summary><p>'+(manual?'你看完整地图，A 只能看'+view+'。引导 A 完成 '+rules.gateCount+' 个'+tx.gate+'后走到 E（'+tx.end+'）。':'先听 B 指路。遇到'+tx.gate+'报'+tx.clue+'，按 B 说的选。碰墙 '+(rules.penalties.wall?'−'+rules.penalties.wall+' 秒':'不扣时')+'，'+(rules.trapCount?tx.hazard+' −'+rules.penalties.trap+' 秒，':'本局无危险区，')+'选错 −'+rules.penalties.wrongGate+' 秒。')+'</p>';app.append(help);
 }
-var run=runMaze;runMaze=function(set){mazeTerminal=null;mazeStartedAt=performance.now();mazeContext=window._dungeon?window._roomGameContext:null;run(set);polish(false);if(window._dungeon&&window._netMode==='host')netSend({t:'dgT',time:S.time});};
+var run=runMaze;runMaze=function(set){mazeTerminal=null;mazeStartedAt=performance.now();mazeContext=directContext||(window._dungeon?window._roomGameContext:null);run(set);if(runtimeRules().tier===1)(window._mazeGates||[]).forEach(function(g,i){g.symbol=i%6;});if(directContext){var scope=directContext,move=window._mazeMove;window._mazeMove=function(dr,dc){if(scope.isActive())return move(dr,dc);};document.querySelectorAll('#dpad button,[data-valve]').forEach(function(b){var click=b.onclick;b.onclick=function(e){if(scope.isActive()&&click)return click.call(this,e);};});}polish(false);if(window._dungeon&&window._netMode==='host')netSend({t:'dgT',time:S.time});};
 var manual=renderManual;renderManual=function(){var result=manual.apply(this,arguments);if(S.mod==='maze')polish(true);return result;};
 
 // Independent play uses the same host-owned map, with both players ready first.
@@ -123,6 +124,31 @@ var mazeFinish=finish;finish=function(ok){
  var data={win:!!ok,reasonCode:ok?'completed':'timeout',reason:ok?runtimeRules().text.success:'时间耗尽，未能及时到达'+runtimeRules().text.end+'。',metrics:metrics};
  if(mazeContext)mazeContext.finish(data);else RoomResults.report(data);
 };
+function directLive(){return directContext&&directContext.isActive();}
+function directShell(manual){
+ var app=$('app');app.className='';app.innerHTML='<div class="topbar"><button id="back">‹</button><span id="count" class="count">'+scenario.initialTime+'s</span></div>'+(manual?'<div class="manual-card"><div class="stage"><canvas id="maze-map"></canvas></div><div id="msg"></div></div>':'<div id="playarea" class="panel"><div id="stage" class="stage"></div><div id="msg"></div><div class="dpad" id="dpad"><button data-d="up">上</button><button data-d="l">左</button><button data-d="d">下</button><button data-d="r">右</button></div></div>');
+ if(manual){var cv=$('maze-map');cv.width=MAZE.cols*32;cv.height=MAZE.rows*32;drawMazeFull(cv.getContext('2d'),32);polish(true);}else{S.time=scenario.initialTime;runMaze();}
+ $('back').onclick=function(){if(directLive())directContext.abort();};
+}
+function directPacket(d){
+ if(!directLive()||!d||d.id!==(directContext.runId||directContext.sessionId))return false;
+ if(d.t==='m5Offer'&&directContext.role==='B'){
+  if(directSeen!==d.id){if(!d.scenario||d.scenario.sessionId!==d.id||d.scenario.mapId!==d.id||!d.scenario.rules||d.scenario.rules.tier!==directContext.tier||d.scenario.rules.theme!==(directContext.roomId==='room-16'?'mountain':'vent')||!window.mazeApplyScenario(d.scenario))return true;directSeen=d.id;directShell(true);}
+  directContext.send({t:'m5Ready',id:d.id});return true;
+ }
+ if(d.t==='m5Ready'&&directContext.role==='A'){if(!directRunning){directRunning=true;directShell(false);}return true;}
+ if(d.t==='m5Clock'&&directContext.role==='B'){if($('count'))$('count').textContent=d.time+'s';return true;}return false;
+}
+function directStart(role,ctx){
+ clearTimers();directContext=ctx;directRunning=false;directSeen=null;mazeTerminal=null;S.mod='maze';S.role=role;window._dead=false;
+ if(role==='A'){var sc=mazePrepareHost(),last=performance.now();$('app').innerHTML='<div class="msg">等待同伴接收地图…</div>';var tick=setInterval(function(){if(!directLive()){clearInterval(tick);return;}if(!directRunning){last=performance.now();ctx.send({t:'m5Offer',id:sc.sessionId,scenario:sc});return;}if(mazeTerminal){clearInterval(tick);return;}var now=performance.now(),seconds=Math.floor((now-last)/1000);if(seconds){last+=seconds*1000;S.time=Math.max(0,S.time-seconds);if($('count'))$('count').textContent=S.time+'s';}ctx.send({t:'m5Clock',id:sc.sessionId,time:S.time});if(S.time<=0)finish(false);},150);timers.push(tick);}
+ else $('app').innerHTML='<div class="msg">正在接收本局地图…</div>';
+}
+var directHD=dgHostOnData;dgHostOnData=function(d){if(directPacket(d))return;return directHD.apply(this,arguments);};
+var directGD=dgGuestOnData;dgGuestOnData=function(d){if(directPacket(d))return;return directGD.apply(this,arguments);};
+var directClear=clearTimers;clearTimers=function(){if(directContext){window._dead=true;window._mazeMove=null;directContext=null;directRunning=false;directSeen=null;mazeTerminal=null;mazeContext=null;if(observer)observer.disconnect();}return directClear.apply(this,arguments);};
+window.RoomGameAdapters=window.RoomGameAdapters||{};RoomGameAdapters.maze={host:function(ctx){directStart('A',ctx);},guest:function(ctx){directStart('B',ctx);}};
 var shellObserver=new MutationObserver(function(){var app=$('app');if(app&&app.classList.contains('maze-mobile')&&!app.querySelector('.mz-main,.mz-controls')){app.classList.remove('maze-mobile');delete app.dataset.mazeRole;delete app.dataset.mazeValve;delete app.dataset.mazeTheme;}});shellObserver.observe($('app'),{childList:true});
 })();
+
 

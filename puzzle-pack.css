@@ -14,3 +14,4 @@ body:has(.pp-shell){background:#e7e7de}#app:has(.pp-shell){padding:0;max-width:n
 @media(prefers-reduced-motion:reduce){.pp-light-group{animation:none}}
 
 .pp-box-feedback{font-size:14px;text-align:center}.pp-box-feedback p{min-height:2.8em;margin:4px 0;white-space:normal}.pp-box-feedback progress{display:block;width:100%;height:14px;accent-color:#578f77}.pp-box-feedback small{display:block;margin-top:5px}.pp-box-feedback [data-tone=aligned]{color:#267248;font-weight:700}.pp-box-feedback [data-tone=near]{color:#8b5b12;font-weight:700}#pp-box-calibration[data-alignment=aligned] path{stroke:#268357}#pp-box-calibration[data-alignment=near] path{stroke:#b9791d}.pp-shell.lockbox button:disabled{opacity:.5;cursor:default}
+.pp-row{flex-wrap:wrap}.pp-row>button{flex:1 1 72px;min-width:48px;min-height:48px}.pp-shell .pp-row>button{overflow-wrap:normal;word-break:normal}

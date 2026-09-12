@@ -62,3 +62,6 @@
 .radio-studio-sign small{display:block;font:12px sans-serif;letter-spacing:1px;margin-top:7px;color:#c3a5a9}
 @media(max-width:600px){.radio-studio .radio-decor-right{top:8px;right:12px;width:140px;opacity:.4}.radio-studio-sign{font-size:15px;padding:6px}.radio-studio-sign small{display:none}.radio-studio .radio-decor-left{left:-8%;bottom:6%;width:40%}}
 @media(max-height:620px){.radio-studio .radio-display-label b{font-size:15px}.radio-studio .radio-display-label span b{font-size:12px}.radio-studio .radio-console header strong{font-size:18px}}
+
+/* Public lock zone: same position for normalized quality across five tiers. */
+.radio-meter::after{content:'';position:absolute;left:86%;right:0;top:0;bottom:0;border-left:2px solid #f8e0a5;background:#e1f8b522;pointer-events:none}

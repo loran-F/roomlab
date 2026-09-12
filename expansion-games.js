@@ -1,21 +1,29 @@
 /* RoomLab expansion: isolated game engines and UI. No dependencies beyond the host bridge. */
 (function (g) {
   'use strict';
+  let directCtx=null;
+  const sessionMeta=mode=>{const m=g.RoomSession&&g.RoomSession.current();return m&&(!mode||m.mode===mode)?m:null;};
+  const LEVELS={
+    caller:[null,{people:3,checks:1,archives:0,conflicts:1,goal:3,time:140,hp:3},{people:4,checks:2,archives:0,conflicts:1,goal:4,time:140,hp:4},{people:6,checks:2,archives:0,conflicts:2,goal:5,time:160,hp:3},{people:6,checks:3,archives:1,conflicts:2,goal:6,time:200,hp:3},{people:8,checks:3,archives:2,conflicts:3,goal:7,time:240,hp:3}],
+    lookback:[null,{combo:1,decoys:false,pairs:false,goal:3,time:90,hp:5,lures:3},{combo:1,decoys:false,pairs:false,goal:4,time:100,hp:4,lures:2},{combo:2,decoys:false,pairs:false,goal:4,time:120,hp:3,lures:2},{combo:2,decoys:true,pairs:false,goal:5,time:145,hp:3,lures:1},{combo:3,decoys:true,pairs:true,goal:5,time:180,hp:3,lures:1}],
+    shadow:[null,{goal:1,time:140,hp:5},{goal:1,time:140,hp:5},{goal:1,time:140,hp:5},{goal:1,time:140,hp:5},{goal:1,time:160,hp:5}]
+  };
   // Pure seeded plans. Host owns creation; state snapshots carry the resulting plan.
   function variationPlan(mode,tier,seed){
+    tier=Math.max(1,Math.min(5,Math.floor(tier)||1));if(tier===1)seed=1;
     let value=(seed>>>0)||1;const random=()=>{value^=value<<13;value^=value>>>17;value^=value<<5;return(value>>>0)/4294967296;};
     const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-    const choose=a=>a[Math.floor(random()*a.length)];let plan={tier,seed:seed>>>0};
+    const choose=a=>a[Math.floor(random()*a.length)];let plan={tier,seed:seed>>>0,config:LEVELS[mode]?{...LEVELS[mode][tier]}:null};
     if(mode==='beam'){
       const types=tier===1?[0,1,2,3,1,2]:shuffle([0,1,2,3,1,2]);
       const sides=tier===1?[0,1,0,1,0,1]:shuffle([0,0,0,1,1,1]);
       plan.cargo=types.map((type,i)=>({type,x:tier===1?(sides[i]?265:75):sides[i]?choose(tier>=4?[205,215,230]:tier>=3?[215,230,245]:[255,275]):choose(tier>=4?[110,125,135]:tier>=3?[95,110,125]:[65,85])}));
     }else if(mode==='shadow'){
-      plan.layout={button:tier===1?2:choose([1,2]),mirror:tier>=3?choose([false,true]):false,recordLength:tier>=4?choose([6,7,8]):8};
+      plan.layout={button:tier===1?2:choose([1,2]),mirror:tier>=3?choose([false,true]):false,recordLength:tier>=4?choose([8,10,12]):12,keyLatches:tier<5};
     }else if(mode==='lookback'){
-      let last=null;plan.encounters=[];for(let i=0;i<24;i++){let options=[];for(const door of ['left','right'])for(const monster of ['ears','eyes','nose'])if(door+monster!==last)options.push({door,monster});const c=choose(options);last=c.door+c.monster;plan.encounters.push({...c,travel:tier===1?2:choose([1.6,2,2.4]),warning:tier<3?3.2:choose([2.8,3.2,3.6]),danger:tier<4?1.8:choose([1.5,1.8,2.1])});}
+      let last='';plan.encounters=[];for(let i=0;i<24;i++){const cfg=plan.config,door=tier===1?'left':choose(['left','right']),threats=[];for(let j=0;j<cfg.combo;j++){let monster=tier===1?['ears','eyes','nose'][i%3]:choose(['ears','eyes','nose'].filter(x=>x!==last));last=monster;const decoy=cfg.decoys&&i%3===1&&j===0,paired=cfg.pairs&&i%2===1&&j===1;threats.push({monster,decoy,paired});}plan.encounters.push({door,monster:threats[0].monster,threats,travel:tier===1?2:choose([1.6,2,2.4]),warning:3.2,danger:2});}
     }else if(mode==='caller'){
-      let prior='';plan.cases=[];for(let i=0;i<5;i++){const checks=shuffle(choose([['code','task'],['code','route'],['task','route']]));const faults=['real','real',...checks];let fault=choose(faults),person=Math.floor(random()*6);if(person+fault===prior)person=(person+1+Math.floor(random()*5))%6;prior=person+fault;plan.cases.push({person,checks,fault,closed:Math.floor(random()*3),codes:shuffle(Array.from({length:900},(_,j)=>j+100)).slice(0,6),tasks:shuffle([0,1,2,3,4,5]),route:Math.floor(random()*2),falseTask:1+Math.floor(random()*5)});}
+      const cfg=plan.config;let prior='';plan.cases=[];for(let i=0;i<cfg.goal;i++){const checks=tier===1?['code']:shuffle(['code','task','route']).slice(0,cfg.checks),real=tier===1?i!==1:random()<.5;let faults=real?[]:shuffle(checks).slice(0,tier===1?1:1+Math.floor(random()*Math.min(cfg.conflicts,checks.length))),person=tier===1?i:Math.floor(random()*cfg.people);if(tier>1&&person+faults.join()===prior)person=(person+1)%cfg.people;prior=person+faults.join();plan.cases.push({person,checks,fault:real?'real':faults[0],faults,closed:Math.floor(random()*3),codes:shuffle(Array.from({length:900},(_,j)=>j+100)).slice(0,cfg.people),tasks:shuffle(Array.from({length:cfg.people},(_,j)=>j)),route:Math.floor(random()*2),falseTask:1+Math.floor(random()*(cfg.people-1)),archiveOrder:shuffle(Array.from({length:cfg.archives+1},(_,j)=>j))});}
     }else if(mode==='catch'){
       plan.waves=Array.from({length:24},()=>({side:choose([-1,1]),gap:choose([.95,1,1.1])}));
       for(let i=2;i<plan.waves.length;i++)if(plan.waves[i].side===plan.waves[i-1].side&&plan.waves[i].side===plan.waves[i-2].side)plan.waves[i].side*=-1;
@@ -25,18 +33,18 @@
     return plan;
   }
   const variationMemory={};
-  function variationStart(mode){
+  function variationStart(mode,override){
     const key='roomlab-variation-v1:'+mode;let saved=variationMemory[key]||{};try{saved=JSON.parse(localStorage.getItem(key)||'null')||saved;}catch(_){}
-    const tier=typeof coopDifficulty==='function'?Math.max(1,Math.min(4,coopDifficulty().tier||1)):1;
+    const meta=sessionMeta(mode)||override||(directCtx&&directCtx.mode===mode?directCtx:null),tier=Math.max(1,Math.min(5,meta?meta.tier:typeof coopDifficulty==='function'?coopDifficulty().tier||1:1));
     let plan,fingerprint,seed=Math.floor(Math.random()*4294967295)+1;if(seed===saved.seed)seed++;
     for(let tries=0;tries<64;tries++){plan=variationPlan(mode,tier,seed+tries*(mode==='shadow'?2654435761:1));const first=mode==='beam'?plan.cargo.slice(0,2).map(x=>[x.type,x.x<170]):mode==='caller'?{checks:plan.cases[0].checks,fault:plan.cases[0].fault}:mode==='lookback'?plan.encounters[0]:mode==='catch'?plan.waves[0]:mode==='shadow'?plan.layout:plan.phrases&&plan.phrases[0];fingerprint=JSON.stringify(first);if(tier===1||fingerprint!==saved.fingerprint)break;}
     saved={fingerprint,seed:plan.seed};variationMemory[key]=saved;try{localStorage.setItem(key,JSON.stringify(saved));}catch(_){}return plan;
   }
-  g.RoomVariation={generate:variationPlan,start:variationStart};
+  g.RoomVariation={generate:variationPlan,start:variationStart,levels:LEVELS};
   const IDS=['lookback','caller','shadow'];
   const META={
     lookback:{name:'你别回头',tag:'追逃',time:85,a:'你看前路：报门上的箭头，听 B 指挥前进、停步或躲藏。',b:'你看监控：辨认怪物，指挥 A 应对；听 A 报箭头开启对应门。'},
-    caller:{name:'真假接线员',tag:'判断',time:110,a:'先听 B 指定今日核验项，再从工号、任务、来路中选择两个问题。交换证据后投票。',b:'先报今日核验项，再听名字点档案。注意封闭通道与来路证词的矛盾，独立投票。'},
+    caller:{name:'真假接线员',tag:'判断',time:110,a:'先听 B 指定今日核验项，再询问对应证据。交换证据后投票。',b:'先报今日核验项，再听名字点档案。注意封闭通道与来路证词的矛盾，独立投票。'},
     shadow:{name:'影子替身',tag:'机关',time:100,a:'你录下走动：踩按钮留足时间，再走到门禁前的集合出口等待 B。',b:'你取钥匙再集合：播放 A 的轨迹，穿过门禁拿钥匙，再回集合出口。'}
   };
   const pick=a=>a[Math.floor(Math.random()*a.length)];
@@ -44,7 +52,7 @@
   const laneName=n=>['左','中','右'][n];
   const ROOM_THEMES={caller:'room-12',shadow:'room-4',lookback:'room-17'};
   const themed=s=>s&&s.roomId===ROOM_THEMES[s.mode];
-  const roomThemeId=()=>g._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON?DUNGEON.roomId:null;
+  const roomThemeId=()=>sessionMeta()?.roomId||(g._dungeon&&typeof DUNGEON!=='undefined'&&DUNGEON?DUNGEON.roomId:null);
   const themeName=s=>({caller:'员工身份核验',shadow:'双胞胎的影子',lookback:'观察者停走'}[s.mode]);
   function themeText(s,text){if(!themed(s))return text;let t=String(text);if(s.mode==='caller')t=t.replace(/值班室/g,'夜班公司').replace(/值班人员/g,'夜班员工').replace(/工号/g,'员工编号').replace(/来电/g,'门禁呼叫');if(s.mode==='lookback')t=t.replace(/怪物/g,'观察者').replace(/诱饵灯/g,'干扰灯').replace(/走廊/g,'游戏场').replace(/柜子/g,'掩体');return t;}
   function message(s,text){s.message=text;s.messageSeq++;}
@@ -56,7 +64,7 @@
     {name:'顾南星',job:'巡逻员',code:'265',task:'检查三楼应急灯'},
     {name:'许小树',job:'清洁员',code:'591',task:'清理西侧储藏间'},
     {name:'陈小雨',job:'技术员',code:'836',task:'校对监控时间'},
-    {name:'唐可可',job:'厨师',code:'157',task:'送夜班员工餐'}
+    {name:'唐可可',job:'厨师',code:'157',task:'送夜班员工餐'},{name:'林小曼',job:'仓管员',code:'684',task:'核对仓库封条'},{name:'周阿蓝',job:'通讯员',code:'932',task:'送交夜班记录'}
   ];
   const EMPLOYEES=[
     {name:'梁小序',job:'行政专员',code:'413',task:'领取夜班门禁卡'},
@@ -64,33 +72,34 @@
     {name:'杜禾',job:'档案专员',code:'265',task:'归档已签字的会议纪要'},
     {name:'程末',job:'财务专员',code:'591',task:'封存报销原始凭证'},
     {name:'沈知夏',job:'设施维护',code:'836',task:'检修茶水间照明'},
-    {name:'陆言',job:'前台值守',code:'157',task:'核对访客离楼记录'}
+    {name:'陆言',job:'前台值守',code:'157',task:'核对访客离楼记录'},{name:'梁小绪',job:'仓管值班',code:'684',task:'核对仓库封条'},{name:'何依宁',job:'通讯专员',code:'932',task:'送交夜班记录'}
   ];
-  function encounter(s){const item=s.variation.encounters[s.round%s.variation.encounters.length];s.phase='travel';s.phaseTime=0;s.travel=0;s.action='stop';s.door=item.door;s.openDoor='';s.monster=item.monster;s.travelLimit=item.travel;s.warningLimit=item.warning;s.dangerLimit=item.danger;s.bad=0;s.rescue=false;s.round++;}
+  function selectThreat(s,index){s.threatIndex=index;const item=s.threats[index];s.monster=item.monster;s.decoy=item.decoy;s.paired=item.paired;s.bad=0;s.rescue=false;}
+  function encounter(s){const item=s.variation.encounters[s.round%s.variation.encounters.length];s.phase='travel';s.phaseTime=0;s.travel=0;s.action='stop';s.door=item.door;s.openDoor='';s.threats=item.threats;s.travelLimit=item.travel;s.warningLimit=item.warning;s.dangerLimit=item.danger;selectThreat(s,0);s.round++;}
   function callCase(s){
-    const item=s.variation.cases[s.completed],people=themed(s)?EMPLOYEES:PEOPLE;
-    const roster=people.map((x,i)=>({...x,task:people[item.tasks[i]].task,code:String(item.codes[i])}));
+    const item=s.variation.cases[s.completed],people=(themed(s)?EMPLOYEES:PEOPLE).slice(0,s.config.people);
+    const roster=people.map((x,i)=>{const code=String(item.codes[i]),task=people[item.tasks[i]].task;return {...x,code,task,versions:item.archiveOrder.map(v=>({current:v===0,label:v===0?'今夜生效':v===1?'上周过期':'旧班次过期',code:v===0?code:String((+code+137*v)%900+100),task:v===0?task:people[(item.tasks[i]+v)%people.length].task}))};});
     const person=roster[item.person];s.checks=item.checks.slice();
     const routes=themed(s)?['员工闸机','档案层楼梯','后勤电梯']:['东门','西楼梯','货梯'];
-    s.closed=routes[item.closed];const kind=item.fault;
+    s.closed=routes[item.closed];const kind=item.fault,faults=item.faults;
     s.roster=roster;s.claim={...person,route:routes.filter(x=>x!==s.closed)[item.route]+'，我直接过来的，没有绕路。'};
-    if(kind==='code')s.claim.code=String((+person.code+137)%900+100);
-    if(kind==='task')s.claim.task=roster[(item.person+item.falseTask)%6].task;
-    if(kind==='route')s.claim.route=s.closed+'，我刚刚直接过来的，畅通无阻。';
-    s.real=kind==='real';s.fault=kind;s.questions=[];s.extra=false;s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
+    if(faults.includes('code'))s.claim.code=String((+person.code+137)%900+100);
+    if(faults.includes('task'))s.claim.task=roster[(item.person+item.falseTask)%people.length].task;
+    if(faults.includes('route'))s.claim.route=s.closed+'，我刚刚直接过来的，畅通无阻。';
+    s.real=faults.length===0;s.fault=kind;s.faults=faults;s.questions=[];s.extra=false;s.votes={A:null,B:null};s.phase='call';s.phaseTime=0;s.round++;
   }
   function shadowRound(s){
     s.positions={A:0,B:0};s.tape=[];s.ghost=0;s.doorOpen=false;s.keyCollected=false;s.exit=3;s.recordTime=0;s.playTime=0;s.recordLength=s.layout.recordLength;s.moves={A:-1,B:-1};s.phase='plan';s.phaseTime=0;s.attempts=s.attempts||0;s.round++;
   }
   function shadowExit(s){if(!s.done&&['replay','escape'].includes(s.phase)&&s.keyCollected&&s.ghost===s.exit&&s.positions.B===s.exit){s.completed=1;finish(s,true,'钥匙和两人都已到出口，成功撤离！');}}
   function create(mode){
-    const s={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),mode,time:META[mode].time,elapsed:0,ready:{A:false,B:false},cd:3,done:false,win:false,hp:3,completed:0,round:0,phase:'brief',message:'先试一次按钮，再点准备。双方准备后开始。',messageSeq:0,seq:{A:-1,B:-1},seen:{A:0,B:0}};
-    s.roomId=roomThemeId();s.variation=variationStart(mode);s.tier=s.variation.tier;if(mode==='shadow')s.layout={...s.variation.layout};
-    if(mode==='lookback'){s.lures=1;encounter(s);}if(mode==='caller')callCase(s);if(mode==='shadow')shadowRound(s);
+    const s={id:sessionMeta(mode)?.runId||directCtx?.runId||directCtx?.sessionId||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),mode,time:META[mode].time,elapsed:0,ready:{A:false,B:false},cd:3,done:false,win:false,hp:3,completed:0,round:0,phase:'brief',message:'先试一次按钮，再点准备。双方准备后开始。',messageSeq:0,seq:{A:-1,B:-1},seen:{A:0,B:0}};
+    s.roomId=roomThemeId();s.variation=variationStart(mode,directCtx);s.tier=s.variation.tier;s.config={...s.variation.config};s.goal=s.config.goal;s.maxHp=s.config.hp;s.hp=s.maxHp;s.time=s.config.time;if(mode==='shadow')s.layout={...s.variation.layout};
+    if(mode==='lookback'){s.lures=s.config.lures;encounter(s);}if(mode==='caller')callCase(s);if(mode==='shadow')shadowRound(s);
     return s;
   }
   function input(s,who,d){
-    if(!s||s.done||d.id!==s.id||d.mode!==s.mode||!Number.isInteger(d.seq)||d.seq<=s.seq[who])return false;
+    if(!s||s.done||(directCtx&&!directCtx.isActive())||d.id!==s.id||d.mode!==s.mode||!Number.isInteger(d.seq)||d.seq<=s.seq[who])return false;
     s.seq[who]=d.seq;
     if(d.key==='ready'){s.ready[who]=true;return true;}
     if(!s.ready.A||!s.ready.B||s.cd>0||d.round!==s.round||d.phase!==s.phase)return false;
@@ -98,11 +107,11 @@
     if(s.mode==='lookback'){
       if(who==='A'&&['go','stop','hide'].includes(d.key))s.action=d.key;
       if(who==='B'&&['left','right'].includes(d.key))s.openDoor=d.key;
-      if(who==='B'&&d.key==='lure'&&s.phase==='danger'&&!s.rescue&&s.lures>0){s.lures--;s.rescue=true;s.bad=0;message(s,'B 打开诱饵灯，暂时吸引了怪物！本局诱饵已用完。');}
+      if(who==='B'&&d.key==='lure'&&s.phase==='danger'&&!s.rescue&&s.lures>0){s.lures--;s.rescue=true;s.bad=0;message(s,'B 打开诱饵灯，暂时吸引了怪物！请继续听取下一段预告。');}
     }else if(s.mode==='caller'&&s.phase==='call'){
-      if(who==='A'&&d.key==='extra'&&s.questions.length===2&&!s.extra){s.extra=true;s.time=Math.max(0,s.time-8);s.votes={A:null,B:null};message(s,'追加一次追问，行动时间 −8 秒。');}
-      if(who==='A'&&['code','task','route'].includes(d.key)&&!s.questions.includes(d.key)&&s.questions.length<(s.extra?3:2)){s.questions.push(d.key);s.votes={A:null,B:null};}
-      if(['admit','reject'].includes(d.key)&&s.questions.length>=2){
+      if(who==='A'&&d.key==='extra'&&s.questions.length===s.config.checks&&s.config.checks<3&&!s.extra){s.extra=true;s.time=Math.max(0,s.time-8);s.votes={A:null,B:null};message(s,'追加一次追问，行动时间 −8 秒。');}
+      if(who==='A'&&['code','task','route'].includes(d.key)&&!s.questions.includes(d.key)&&s.questions.length<(s.extra?3:s.config.checks)){s.questions.push(d.key);s.votes={A:null,B:null};}
+      if(['admit','reject'].includes(d.key)&&s.questions.length>=s.config.checks){
         s.votes[who]=d.key;
         if(s.votes.A&&s.votes.B){
           if(s.votes.A!==s.votes.B){message(s,'意见不同，先交换证据。任一人改票即可。');return true;}
@@ -111,7 +120,7 @@
           else message(s,s.real?'核验通过，值班人员安全进入。':'发现矛盾，成功拦下冒充者。');
           s.completed++;s.phase='verdict';s.phaseTime=0;
           s.explanation=s.real?'今日要求核验的证据没有矛盾，是真正的值班人员。':s.fault==='route'?'他说刚经过'+s.closed+'，但该通道整晚封闭，行程自相矛盾。':s.fault==='code'?'工号与档案不符。':'任务与档案不符。';
-          if(s.completed>=5&&!s.done)finish(s,true,'五通来电处理完毕，值班室安全！');
+          if(s.completed>=s.goal&&!s.done)finish(s,true,'本班来电处理完毕，值班室安全！');
         }
       }
     }else if(s.mode==='shadow'){
@@ -125,7 +134,7 @@
           if(who==='B'&&((s.positions.B===3&&next===4)||(s.positions.B===4&&next===3))&&!s.doorOpen){message(s,'门还关着，等影子踩到黄色按钮。');return true;}
           s.positions[who]=next;
           if(who==='A'){s.doorOpen=next===s.layout.button;s.tape.push({t:s.recordTime,x:next});message(s,next===s.layout.button?'按钮已压下。留几秒给 B 过门，再向'+(s.layout.mirror?'左':'右')+'走到集合出口。':next===s.exit?'A 已到集合出口，保持这里直到录影结束。':'A 离开按钮，门禁就会关上。');}
-          if(who==='B'&&next===6&&!s.keyCollected){s.keyCollected=true;s.doorOpen=true;message(s,'钥匙已开门，回出口集合！A、B 都到集合出口才算成功。');}
+          if(who==='B'&&next===6&&!s.keyCollected){s.keyCollected=true;s.doorOpen=s.layout.keyLatches||s.ghost===s.layout.button;message(s,s.layout.keyLatches?'钥匙已开门，回出口集合！A、B 都到集合出口才算成功。':'钥匙到手！门只在回声踩住按钮时打开，趁现在返回集合出口。');}
           shadowExit(s);
         }
       }
@@ -143,11 +152,11 @@
         if(s.travel>=s.travelLimit){s.phase='warning';s.phaseTime=0;message(s,'监控发现动静！B 快告诉 A 怎么应对。');}
       }else if(s.phase==='warning'&&s.phaseTime>=s.warningLimit){s.phase='danger';s.phaseTime=0;s.bad=0;}
       else if(s.phase==='danger'){
-        const required={ears:'stop',eyes:'go',nose:'hide'}[s.monster];
+        const required=s.decoy?'go':s.paired?'hide':{ears:'stop',eyes:'go',nose:'hide'}[s.monster];
         if(s.action!==required&&!s.rescue)s.bad+=dt;
-        if(s.bad>.65){damage(s,'被怪物发现了');s.phase='safe';s.phaseTime=0;}
-        else if(s.phaseTime>=s.dangerLimit){s.completed++;message(s,'安全通过第 '+s.completed+' 段走廊。');s.phase='safe';s.phaseTime=0;}
-      }else if(s.phase==='safe'&&s.phaseTime>=1.3){if(s.completed>=5)finish(s,true,'出口就在眼前，两人平安撤离！');else encounter(s);}
+        if(s.bad>(s.tier===1?1.2:.85)){damage(s,'被怪物发现了');s.phase='safe';s.phaseTime=0;}
+        else if(s.phaseTime>=s.dangerLimit){if(s.threatIndex+1<s.threats.length){selectThreat(s,s.threatIndex+1);s.phase='warning';s.phaseTime=0;message(s,'下一段预告：重新核对监控，准备切换动作。');}else{s.completed++;message(s,'安全通过第 '+s.completed+' 段走廊。');s.phase='safe';s.phaseTime=0;}}
+      }else if(s.phase==='safe'&&s.phaseTime>=1.3){if(s.completed>=s.goal)finish(s,true,'出口就在眼前，两人平安撤离！');else encounter(s);}
     }else if(s.mode==='caller'){
       if(s.phase==='verdict'&&s.phaseTime>=2.6&&!s.done)callCase(s);
     }else if(s.mode==='shadow'){
@@ -157,7 +166,7 @@
         if(s.recordTime>=s.recordLength){s.phase='waiting';s.doorOpen=false;message(s,'录影完成。B 播放后拿钥匙再返回集合出口；A 也可以重录。');}
       }else if(s.phase==='replay'){
         s.playTime=Math.min(s.recordLength,s.playTime+dt);
-        s.ghost=s.tape.filter(p=>p.t<=s.playTime).slice(-1)[0].x;s.doorOpen=s.keyCollected||s.ghost===s.layout.button;
+        s.ghost=s.tape.filter(p=>p.t<=s.playTime).slice(-1)[0].x;s.doorOpen=(s.layout.keyLatches&&s.keyCollected)||s.ghost===s.layout.button;
         if(s.playTime>=s.recordLength){s.phase='escape';message(s,s.ghost===s.exit?'A 的回声已在出口等候，B 拿钥匙后回来集合。':'A 的回声没有停在出口。请重录：踩按钮后走到集合出口等待。');}
         shadowExit(s);
       }
@@ -166,10 +175,10 @@
   }
   function snapshot(s,role){
     const v={id:s.id,mode:s.mode,time:s.time,elapsed:s.elapsed,ready:{...s.ready},cd:s.cd,done:s.done,win:s.win,hp:s.hp,completed:s.completed,round:s.round,phase:s.phase,phaseTime:s.phaseTime,message:s.message,messageSeq:s.messageSeq,reasonCode:s.reasonCode};
-    v.roomId=s.roomId;v.tier=s.tier;
+    v.roomId=s.roomId;v.tier=s.tier;v.goal=s.goal;v.maxHp=s.maxHp;v.config={...s.config};
     if(s.mode==='lookback'){
-      Object.assign(v,{travel:s.travel,travelLimit:s.travelLimit,warningLimit:s.warningLimit,dangerLimit:s.dangerLimit,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
-      if(role==='A')v.door=s.door;else v.monster=s.monster;
+      Object.assign(v,{threatIndex:s.threatIndex,threatCount:s.threats.length,travel:s.travel,travelLimit:s.travelLimit,warningLimit:s.warningLimit,dangerLimit:s.dangerLimit,action:s.action,rescue:s.rescue,openDoor:s.openDoor,lures:s.lures});
+      if(role==='A')v.door=s.door;else Object.assign(v,{monster:s.monster,decoy:s.decoy,paired:s.paired,threatIndex:s.threatIndex,threatCount:s.threats.length});
     }else if(s.mode==='caller'){
       Object.assign(v,{questions:[...s.questions],extra:s.extra,votes:{...s.votes}});
       if(role==='A')v.claim={name:s.claim.name,job:s.claim.job,code:s.questions.includes('code')?s.claim.code:null,task:s.questions.includes('task')?s.claim.task:null,route:s.questions.includes('route')?s.claim.route:null};
@@ -196,7 +205,7 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
     const m=META[mode];practice=false;localAction='stop';
     el('app').innerHTML='<main class="x-shell"><header class="x-top"><button class="x-back" id="back" aria-label="返回">‹</button><span>双人合作 · '+esc(PEER.room)+'</span><b id="x-time">准备中</b></header><div class="x-heading">'+icon(mode)+'<h1>'+m.name+'</h1></div><div class="x-role '+(role==='B'?'is-b':'')+'"><b>'+role+'</b><span id="x-duty">'+esc(m[role.toLowerCase()])+'</span></div><section class="x-paper"><div class="x-stats"><span id="x-health">配合机会 ●●●</span><b id="x-progress"></b></div><div id="x-stage" class="x-stage"></div><div class="x-meter"><i id="x-meter"></i></div><p id="x-hint" class="x-hint"></p><div id="x-actions" class="x-actions"></div><div id="x-message" class="x-message" role="status" aria-live="polite"></div></section><section id="x-brief" class="x-brief"><b>先试一下，再出发</b><p>'+esc(m[role.toLowerCase()])+'</p><div id="x-practice"></div><button id="x-ready" class="x-btn primary" disabled>先完成上面的小练习</button></section><div id="x-result" class="x-result" hidden></div></main>';
     if(mode==='shadow')el('app').innerHTML='<main class="x-shell x-shadow-shell"><header class="x-top"><button class="x-back" id="back" aria-label="返回">‹</button><div class="x-heading"><h1>影子替身</h1></div><span id="shadow-tier"></span><b id="x-time">准备中</b></header><div class="x-role '+(role==='B'?'is-b':'')+'"><b>'+role+'</b><span id="x-duty"></span></div><section class="x-paper"><div id="x-health" hidden></div><div id="x-progress" hidden></div><div id="x-stage" class="x-stage"></div><div class="x-meter" hidden><i id="x-meter"></i></div></section><p id="x-hint" class="x-hint"></p><div id="x-actions" class="x-actions"></div><div id="x-message" class="x-message" role="status" aria-live="polite"></div><section id="x-brief" class="x-brief"><b>先试一下，再出发</b><p>'+esc(m[role.toLowerCase()])+'</p><div id="x-practice"></div><button id="x-ready" class="x-btn primary" disabled>先完成上面的小练习</button></section><div id="x-result" class="x-result" hidden></div></main>';
-    el('back').onclick=()=>{if(window._dungeon)dungeonAbort();else{netSend({t:'bye'});clearTimers();closePeer();location.search='';}};
+    el('back').onclick=()=>{if(directCtx){directCtx.abort();return;}if(window._dungeon)dungeonAbort();else{netSend({t:'bye'});clearTimers();closePeer();location.search='';}};
     const demo=mode==='lookback'?(role==='A'?'听到「躲起来」时，点这里躲藏':'练习：长耳朵怪物靠听觉追踪，该喊什么？'):mode==='caller'?(role==='A'?'练习：询问来电者的工号':'练习：工号不符，该怎么投票？'):(role==='A'?'练习：踩按钮留足过门时间，再走到集合出口。':'练习：拿到钥匙后返回出口，等 A 的回声一起撤离。');
     el('x-practice').innerHTML='<p>'+demo+'</p>'+button('practice',mode==='lookback'?(role==='A'?'躲藏':'停步'):mode==='caller'?(role==='A'?'请报工号':'拒绝'):(role==='A'?'踩按钮 → 出口等待':'取钥匙 → 回出口集合'));
     el('x-practice').onclick=e=>{if(!e.target.closest('[data-x]'))return;practice=true;el('x-practice').innerHTML='<p class="x-practiced">✓ 练习完成。正式行动要听搭档的情报。</p>';el('x-ready').disabled=false;el('x-ready').textContent='我准备好了';};
@@ -220,11 +229,11 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
   function draw(s,role){
     if(!el('x-stage'))return;
     view=s;API.view=s;const wait=!s.ready.A||!s.ready.B||s.cd>0;
-    const isTheme=themed(s)&&s.mode!=='shadow',root=document.querySelector('.x-shell');root.dataset.roomTheme=isTheme?s.roomId:'';
+    const isTheme=themed(s)&&s.mode!=='shadow',root=document.querySelector('.x-shell');root.dataset.roomTheme=isTheme?s.roomId:'';root.dataset.gameMode=s.mode;if(!wait&&!root.dataset.started){root.dataset.started="yes";window.scrollTo(0,0);}
     root.querySelector('.x-heading h1').textContent=isTheme?themeName(s):META[s.mode].name;
     el('x-time').textContent=!s.ready.A||!s.ready.B?'准备中':s.cd>0?Math.ceil(s.cd):Math.ceil(s.time)+'s';
-    el('x-health').textContent='配合机会 '+'●'.repeat(Math.max(0,s.hp))+'○'.repeat(Math.max(0,3-s.hp));
-    el('x-progress').textContent=s.completed+' / '+(s.mode==='shadow'?2:5);
+    el('x-health').textContent='配合机会 '+'●'.repeat(Math.max(0,s.hp))+'○'.repeat(Math.max(0,s.maxHp-s.hp));
+    el('x-progress').textContent=s.completed+' / '+s.goal;
     el('x-message').textContent=themeText(s,s.message);
     el('x-brief').hidden=s.ready.A&&s.ready.B;
     if(s.ready[role]){el('x-ready').disabled=true;el('x-ready').textContent='已准备 · 等待搭档';}
@@ -237,10 +246,10 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
         actions(button('go','↑ 前进')+button('stop','■ 停步')+button('hide','↓ 躲藏'));
         hint=warn?'身后有动静！听 B 报怪物，再选择动作。':danger?'怪物经过！保持 B 指定的动作。':s.phase==='safe'?'暂时安全，准备下一段。':'把门上方向报给 B，开门后点前进。';
       }else{
-        const m=monsters[s.monster];
-        html='<div class="x-monitor '+(danger?'danger':'')+'"><div class="x-monitor-label">后方监控 · '+(warn?'发现目标':danger?'接近中':'巡查中')+'</div><div class="x-monster '+s.monster+'"><i></i><i></i><b></b></div><h2>'+(warn||danger?m[0]:'走廊暂时安全')+'</h2><p>'+(warn||danger?m[2]+' · 喊「'+m[1]+'」':'听 A 报方向，打开对应的门')+'</p></div>';
-        actions(button('left','← 开左门')+button('right','开右门 →')+button('lure',s.lures?'应急诱饵 · 本局 1 次':'诱饵已用完','wide'));
-        hint=warn?'还有 '+Math.max(0,s.warningLimit-s.phaseTime).toFixed(1)+' 秒，告诉 A 应对方式。':danger?'来不及应对时可以救场：整局只有一次应急诱饵。':'开门只看 A 报的方向，两扇门可以随时切换。';
+        const m=s.decoy?['过期录像','前进','这是录像干扰，不要跟着录像停步']:s.paired?['双影同时出现','躲藏','双影巡查，统一躲进掩体']:monsters[s.monster];
+        html='<div class="x-combo-step">第 '+(s.threatIndex+1)+' / '+s.threatCount+' 段 · 每段先听预告</div><div class="x-monitor '+(danger?'danger':'')+'"><div class="x-monitor-label">后方监控 · '+(warn?'发现目标':danger?'接近中':'巡查中')+'</div><div class="x-monster '+s.monster+'"><i></i><i></i><b></b></div><h2>'+(warn||danger?m[0]:'走廊暂时安全')+'</h2><p>'+(warn||danger?m[2]+' · 喊「'+m[1]+'」':'听 A 报方向，打开对应的门')+'</p></div>';
+        actions(button('left','← 开左门')+button('right','开右门 →')+button('lure',s.lures?'应急诱饵 · 剩 '+s.lures+' 次':'诱饵已用完','wide'));
+        hint=warn?'还有 '+Math.max(0,s.warningLimit-s.phaseTime).toFixed(1)+' 秒，告诉 A 应对方式。':danger?'来不及应对时可以救场：剩余 '+s.lures+' 次应急诱饵。':'开门只看 A 报的方向，两扇门可以随时切换。';
       }
       meter=s.phase==='travel'?s.travel/s.travelLimit:warn?s.phaseTime/s.warningLimit:danger?s.phaseTime/s.dangerLimit:1;
     }else if(s.mode==='caller'){
@@ -250,24 +259,24 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
         actions(button('code','询问工号')+button('task','询问任务')+button('route','追问来路')+button('extra','追加追问 −8秒')+button('admit','放行','primary')+button('reject','拒绝'));
       }else{
         const roundKey=s.id+':'+s.round;if(callerRound!==roundKey){callerRound=roundKey;callerFocus=0;}const p=s.roster[callerFocus]||s.roster[0];
-        html='<div class="x-speech"><b>今日核验：'+s.checks.map(k=>({code:'工号',task:'任务',route:'来路'})[k]).join('＋')+'</b><p>先告诉 A 该问哪两项。任务以今日档案为准。'+(s.checks.includes('route')?s.closed+'整晚封闭，声称刚从这里直接经过的人在撒谎。':'')+'</p></div><div class="x-file-title">听名字，点开对应档案</div><div class="caller-people">'+s.roster.map((p,i)=>'<button data-person="'+i+'" class="'+(i===callerFocus?'selected':'')+'">'+esc(p.name)+'</button>').join('')+'</div><div class="x-roster"><article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b><strong>'+p.code+'</strong><p>'+esc(p.task)+'</p></article></div>';
+        html='<div class="x-speech"><b>今日核验：'+s.checks.map(k=>({code:'工号',task:'任务',route:'来路'})[k]).join('＋')+'</b><p>先告诉 A 该问'+s.config.checks+'项。任务以今日档案为准。'+(s.checks.includes('route')?s.closed+'整晚封闭，声称刚从这里直接经过的人在撒谎。':'')+'</p></div><div class="x-file-title">听名字，点开对应档案</div><div class="caller-people">'+s.roster.map((p,i)=>'<button data-person="'+i+'" class="'+(i===callerFocus?'selected':'')+'">'+esc(p.name)+'</button>').join('')+'</div><div class="x-roster"><article><b>'+esc(p.name)+' <small>'+esc(p.job)+'</small></b>'+p.versions.map(v=>'<section class="caller-version"><small>'+v.label+'</small><strong>'+esc(v.code)+'</strong><p>'+esc(v.task)+'</p></section>').join('')+'</article></div>';
         actions(button('admit','核对无误 · 放行','primary')+button('reject','发现矛盾 · 拒绝'));
       }
-      hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':(s.extra?'已追加追问 · 共问 '+s.questions.length+' / 3':'免费提问 '+s.questions.length+' / 2')+'；先听 B 指定核验内容，再询问。';
-      meter=Math.min(1,s.questions.length/2);
+      hint=s.phase==='verdict'?s.explanation:s.votes.A&&s.votes.B&&s.votes.A!==s.votes.B?'你们意见不同。交流证据后，可点按钮改票。':(s.extra?'已追加追问 · 共问 '+s.questions.length+' / 3':'免费提问 '+s.questions.length+' / '+s.config.checks)+'；先听 B 指定核验内容，再询问。';
+      meter=Math.min(1,s.questions.length/s.config.checks);
     }else{
       const recording=s.phase==='record',replay=s.phase==='replay',echo=replay||s.phase==='escape';
       const actor=echo?s.ghost:s.positions.A,layout=s.layout,dir=layout.mirror?'左':'右',back=layout.mirror?'右':'左';
       const aAt=echo&&actor===s.exit,bAt=s.positions.B===s.exit,won=s.done&&s.win;
-      el('shadow-tier').textContent=['','入门','进阶','挑战','极限'][s.tier||1];
-      el('x-duty').textContent=role==='A'?'录下踩按钮，再走到集合出口等待。':'播放回声，拿钥匙后回集合出口。';
+      el('shadow-tier').textContent=['','固定教学','入门','标准','困难','极限'][s.tier||1];
+      el('x-duty').textContent=s.layout.keyLatches?(role==='A'?'录下踩按钮，再走到集合出口等待。':'播放回声，拿钥匙后回集合出口。'):(role==='A'?'踩钮留足 B 往返时间，再到集合出口。':'趁回声踩住按钮，取钥匙并返回集合出口。');
       const title=s.done?(s.win?'共同撤离成功':'时间用尽 · 撤离失败'):{plan:'先让 A 录下动作',record:'● A 正在录影',waiting:'录好了，轮到 B',replay:'▶ 回声正在回放',escape:aAt?'A 在出口等你':'回声没有到出口',retry:'重新配合，再试一次'}[s.phase];
-      const status=s.keyCollected?'钥匙已开门禁 · 可以回来':s.doorOpen?'按钮被踩住 → 门禁打开':'按钮松开 → 门禁关闭';
+      const status=s.keyCollected?(s.layout.keyLatches?'钥匙已开门禁 · 可以回来':'钥匙到手 · 须趁回声踩钮返回'):s.doorOpen?'按钮被踩住 → 门禁打开':'按钮松开 → 门禁关闭';
       const timeline=s.done?(won?'两人一起离开密室':'本局已结束，重新开局再挑战'):recording?'录影剩余 '+Math.ceil(s.recordLength-s.recordTime)+' 秒':replay?'回放剩余 '+Math.ceil(s.recordLength-s.playTime)+' 秒':s.phase==='escape'?'回放已结束 · 回声保留末位':'本次录影 '+s.recordLength+' 秒';
       const check=(yes,text)=>'<span class="'+(yes?'yes':'no')+'">'+(yes?'✓':'○')+' '+text+'</span>';
       html='<div class="shadow-body"><h2>'+title+'</h2><div class="shadow-approved-scene">'+shadowSVG({phase:s.phase,button:layout.button,mirror:layout.mirror,a:actor,b:s.positions.B,echo,open:s.doorOpen,key:s.keyCollected})+'</div><div class="shadow-status">'+status+'</div><div class="shadow-clock">'+timeline+'</div><div class="shadow-checklist">'+check(s.keyCollected,'钥匙')+check(aAt,'A 回声到达')+check(bAt,'B 到达')+'</div></div>';
       actions(button('left','← 向左走')+button('right','向右走 →')+(role==='A'?button('record',s.done?(won?'共同撤离成功':'本局已结束'):s.attempts?'重新录一遍':'开始录影 · '+s.recordLength+' 秒','wide primary'):button('replay',s.done?(won?'共同撤离成功':'本局已结束'):s.phase==='escape'?'再放一次影子':'播放影子 · 出发','wide primary')));
-      hint=s.done?s.message:s.phase==='plan'?'A 先向'+dir+'找按钮，踩住几秒，再到集合出口停下。':recording?(role==='A'?'先留足开门时间，再走到集合出口；录影结束前不要离开。':'观察 A 的轨迹；录完后由你播放回声。'):s.phase==='waiting'?(role==='A'?'录好了。等 B 播放，再提醒他何时过门。':'播放后向'+dir+'取钥匙，再向'+back+'回出口集合。'):s.phase==='escape'&&!aAt?(role==='A'?'回声没有停在出口。重新录：踩按钮后走到集合出口。':'回声没到出口。请 A 重新录好轨迹。'):s.keyCollected?(role==='A'?'提醒 B 回集合出口，等待回声一起撤离。':'钥匙已解开门禁。向'+back+'回集合出口，与 A 的回声会合。'):role==='A'?'现在踩按钮的是回声。提醒 B 趁门开时穿过。':'向'+dir+'穿门禁取钥匙，拿到后还要回集合出口。';
+      hint=s.done?s.message:s.phase==='plan'?'A 先向'+dir+'找按钮，踩住几秒，再到集合出口停下。':recording?(role==='A'?'先留足开门时间，再走到集合出口；录影结束前不要离开。':'观察 A 的轨迹；录完后由你播放回声。'):s.phase==='waiting'?(role==='A'?'录好了。等 B 播放，再提醒他何时过门。':'播放后向'+dir+'取钥匙，再向'+back+'回出口集合。'):s.phase==='escape'&&!aAt?(role==='A'?'回声没有停在出口。重新录：踩按钮后走到集合出口。':'回声没到出口。请 A 重新录好轨迹。'):s.keyCollected?(role==='A'?'提醒 B 回集合出口，等待回声一起撤离。':(s.layout.keyLatches?'钥匙已解开门禁。':'门仍由按钮控制，趁回声踩钮时过门。')+'向'+back+'回集合出口，与 A 的回声会合。'):role==='A'?'现在踩按钮的是回声。提醒 B 趁门开时穿过。':'向'+dir+'穿门禁取钥匙，拿到后还要回集合出口。';
       if(s.message==='门还关着，等影子踩到黄色按钮。')hint=s.message;
     }
     // Keep controls stable during state broadcasts; only the scene is redrawn.
@@ -297,7 +306,7 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
       const k=b.dataset.x;
       b.disabled=wait||s.done;
       if(s.mode==='lookback'){if(k==='lure')b.disabled=b.disabled||s.phase!=='danger'||s.rescue||!s.lures;b.classList.toggle('selected',k===s.action||k===s.openDoor);}
-      if(s.mode==='caller'){if(['code','task','route'].includes(k))b.disabled=b.disabled||s.questions.includes(k)||s.questions.length>=(s.extra?3:2);if(k==='extra')b.disabled=b.disabled||s.extra||s.questions.length!==2;b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<2);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
+      if(s.mode==='caller'){if(['code','task','route'].includes(k))b.disabled=b.disabled||s.questions.includes(k)||s.questions.length>=(s.extra?3:s.config.checks);if(k==='extra')b.disabled=b.disabled||s.extra||s.config.checks===3||s.questions.length!==s.config.checks;b.disabled=b.disabled||s.phase!=='call'||(['admit','reject'].includes(k)&&s.questions.length<s.config.checks);b.classList.toggle('selected',s.votes[role]===k||s.questions.includes(k));}
       if(s.mode==='shadow'){if(k==='left'||k==='right')b.disabled=b.disabled||(role==='A'?s.phase!=='record':!['replay','escape'].includes(s.phase));if(k==='record')b.disabled=b.disabled||!['plan','waiting','retry','escape'].includes(s.phase);if(k==='replay')b.disabled=b.disabled||!['waiting','retry','escape'].includes(s.phase)||!s.tape.length;}
       if(s.mode==='lookback'&&['go','stop','hide','left','right'].includes(k)||s.mode==='caller'&&['admit','reject'].includes(k))b.setAttribute('aria-pressed',String(b.classList.contains('selected')));
     });
@@ -309,6 +318,7 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
     r.onclick=e=>{if(!e.target.closest('button'))return;e.target.disabled=true;e.target.textContent='等待搭档准备';if(role==='A'){active.restart.A=true;restartCheck();}else netSend({t:'xRestart',id:s.id});};
   }
   function beginResult(s,role){
+    if(directCtx){s.resultContext=directCtx;s.resultRunId=s.id;return;}
     if(!g.RoomResults)return;
     if(!window._dungeon)g.RoomResults.begin({runId:s.id,role,connection:PEER.conn,gameId:s.mode,title:META[s.mode].name,dungeon:null,onContinue:()=>{if(role==='A')host(s.mode);},onExit:()=>{netSend({t:'bye'});clearTimers();closePeer();renderHall();}});
     s.resultRunId=g.RoomResults.status()?.runId;
@@ -317,18 +327,18 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
   function reportResult(s){
     if(!g.RoomResults||s.resultReported)return;
     if(!s.resultRunId||g.RoomResults.status()?.runId!==s.resultRunId)return;
-    const data={win:s.win,reasonCode:s.win?'completed':s.reasonCode==='time_expired'?'timeout':s.reasonCode||'objective_failed',reason:s.reasonCode==='time_expired'?'行动时间用尽。':s.reasonCode==='attempts_exhausted'?'配合机会已用尽。':s.win?'双方已完成本次目标。':'本次目标未完成。',metrics:{durationMs:Math.round(s.elapsed*1000),timeLeftMs:Math.max(0,Math.round(s.time*1000)),completed:s.completed,goal:s.mode==='shadow'?1:5}};
-    if(s.mode!=='shadow')Object.assign(data.metrics,{hp:Math.max(0,s.hp),mistakesRemaining:Math.max(0,s.hp),maxMistakes:3});
+    const data={win:s.win,reasonCode:s.win?'completed':s.reasonCode==='time_expired'?'timeout':s.reasonCode||'objective_failed',reason:s.reasonCode==='time_expired'?'行动时间用尽。':s.reasonCode==='attempts_exhausted'?'配合机会已用尽。':s.win?'双方已完成本次目标。':'本次目标未完成。',metrics:{durationMs:Math.round(s.elapsed*1000),timeLeftMs:Math.max(0,Math.round(s.time*1000)),completed:s.completed,goal:s.goal}};
+    if(s.mode!=='shadow')Object.assign(data.metrics,{hp:Math.max(0,s.hp),mistakesRemaining:Math.max(0,s.hp),maxMistakes:s.maxHp});
     s.resultReported=s.resultContext?s.resultContext.finish(data):g.RoomResults.report(data);
   }
-  function cleanup(){if(dispose){const f=dispose;dispose=null;f();}active=null;view=null;API.state=null;API.view=null;}
+  function cleanup(){if(dispose){const f=dispose;dispose=null;f();}active=null;view=null;API.state=null;API.view=null;directCtx=null;}
   function restartCheck(){if(active&&active.restart.A&&active.restart.B)host(active.mode);}
-  function host(mode){
-    clearTimers();closeFB();S.mod=mode;window._dead=false;serial=0;
-    active=create(mode);if(window._dungeon&&typeof window.coopTime==='function')active.time=window.coopTime(active.time);active.restart={A:false,B:false};API.state=active;shell(mode,'A');
+  function host(mode,ctx){
+    clearTimers();directCtx=ctx||null;closeFB();S.mod=mode;window._dead=false;serial=0;
+    active=create(mode);if(!directCtx&&window._dungeon&&typeof window.coopTime==='function')active.time=window.coopTime(active.time);active.restart={A:false,B:false};API.state=active;shell(mode,'A');
     const s=active;beginResult(s,'A');let last=performance.now(),next=0,endAt=null,loop;
     function tick(){
-      if(active!==s)return;
+      if(active!==s||(directCtx&&!directCtx.isActive()))return;
       const now=performance.now(),dt=Math.min(.1,(now-last)/1000);last=now;step(s,dt);
       if(now>=next){draw(snapshot(s,'A'),'A');netSend({t:'xState',state:snapshot(s,'B')});next=now+80;}
       if(s.done&&g.RoomResults){draw(snapshot(s,'A'),'A');netSend({t:'xState',state:snapshot(s,'B')});window._dead=true;reportResult(s);if(s.resultReported)clearInterval(loop);return;}
@@ -336,14 +346,14 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
     }
     loop=setInterval(tick,20);timers.push(loop);tick();
   }
-  function guest(mode){clearTimers();closeFB();S.mod=mode;serial=0;window._dead=false;shell(mode,'B');
-    if(!window._dungeon&&PEER.conn!==guestConn){guestConn=PEER.conn;const conn=guestConn;conn.on('data',d=>{if(g.RoomResults&&g.RoomResults.consume(d,conn))return;if(PEER.conn===conn)dgGuestOnData(d);});}
+  function guest(mode,ctx){clearTimers();directCtx=ctx||null;closeFB();S.mod=mode;serial=0;window._dead=false;shell(mode,'B');
+    if(!directCtx&&!window._dungeon&&PEER.conn!==guestConn){guestConn=PEER.conn;const conn=guestConn;conn.on('data',d=>{if(g.RoomResults&&g.RoomResults.consume(d,conn))return;if(PEER.conn===conn)dgGuestOnData(d);});}
   }
   function incoming(d){
     if(d&&d.t==='xWelcome'&&IDS.includes(d.mode)&&!window._dungeon){guest(d.mode);return true;}
     if(!d)return false;
     if(d.t!=='xState'||!d.state||!IDS.includes(d.state.mode))return false;
-    const s=d.state;if(S.mod!==s.mode)return true;
+    const s=d.state;if(directCtx&&(!directCtx.isActive()||s.id!==(directCtx.runId||directCtx.sessionId)))return true;if(S.mod!==s.mode)return true;
     if(resultConnection!==PEER.conn){resultConnection=PEER.conn;retiredRuns.clear();}
     if(retiredRuns.has(s.id))return true;
     if(view&&view.id!==s.id)retiredRuns.add(view.id);
@@ -399,4 +409,5 @@ function shadowSVG(s){const x=n=>s.mirror?336-shadowTrack[n]:shadowTrack[n],gate
     API.startHost=host;API.startGuest=guest;
   }
   install();
+  g.RoomGameAdapters=g.RoomGameAdapters||{};IDS.forEach(mode=>{g.RoomGameAdapters[mode]={host:ctx=>host(mode,ctx),guest:ctx=>guest(mode,ctx)};});
 })(typeof window==='undefined'?globalThis:window);

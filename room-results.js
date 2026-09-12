@@ -11,7 +11,7 @@ function close(){const s=session;session=null;if(s){clearInterval(s.retry);if(s.
 function begin(options){
  if(!options||!options.runId||!['A','B'].includes(options.role))throw Error('RoomResults requires runId and role');
  if(session&&session.runId===options.runId&&session.connection===options.connection)return;
- close();const s=session=Object.assign({},options,{ratingExcluded:!!options.practice||!!options.tutorial||!!(options.dungeon&&g.DUNGEON?.nodes?.find(n=>n.id===options.dungeon.nodeId)?.roomTutorial)||g.RoomProgression?.progress().accessMode==='developer',result:null,acked:!options.connection,advanced:false,disconnected:false});
+ close();const s=session=Object.assign({},options,{ratingExcluded:!!options.developer||!!options.practice||!!options.tutorial||!!(options.dungeon&&g.DUNGEON?.nodes?.find(n=>n.id===options.dungeon.nodeId)?.roomTutorial)||g.RoomProgression?.progress().accessMode==='developer',result:null,acked:!options.connection,advanced:false,disconnected:false});
  s.disconnect=()=>{if(session!==s)return;s.disconnected=true;clearInterval(s.retry);if(s.result)draw(s);};
  if(s.connection){s.connection.on('close',s.disconnect);s.connection.on('error',s.disconnect);}
 }
@@ -63,7 +63,7 @@ function draw(s){
  if(r.dungeon&&r.dungeon.hpAfter!=null&&!r.win)stat('队伍剩余机会',String(r.dungeon.hpAfter));if(stats.childNodes.length)root.append(stats);
  if(!s.disconnected)g.CooperationRating?.decorate(root,r,r.rating);
  const footer=node('div','rr-bottom');footer.append(node('p','rr-note',s.disconnected?'请返回重新连接。':!s.acked?'等待同伴确认结果…':s.role==='B'?'等待同伴继续':'两端已同步本次结果。'));
- const actions=node('div','rr-actions'),exit=node('button','','返回'+(s.dungeon?'密室选择':'玩法选择')),next=node('button','rr-primary',s.role==='B'?'等待同伴继续':s.dungeon?r.stage==='room-fail'?'重新挑战':r.stage==='room-complete'?'再来一局':'返回地图':'再来一局');
+ const actions=node('div','rr-actions'),exit=node('button','','返回'+(s.roomSession?'难度选择':s.dungeon?'密室选择':'玩法选择')),next=node('button','rr-primary',s.role==='B'?'等待同伴继续':s.roomSession?'返回难度选择':s.dungeon?r.stage==='room-fail'?'重新挑战':r.stage==='room-complete'?'再来一局':'返回地图':'再来一局');
  exit.onclick=()=>{close();if(s.onExit)s.onExit();};next.disabled=s.role==='B'||!s.acked||s.disconnected;next.onclick=advance;actions.append(exit,next);footer.append(actions);root.append(footer);document.body.append(root);(next.disabled?exit:next).focus({preventScroll:true});
  const reduced=g.matchMedia&&g.matchMedia('(prefers-reduced-motion: reduce)').matches;
  root.dataset.motion='hold';if(!reduced&&!s.disconnected){const final=r.stage==='room-complete',entry=final?280:180,end=final?900:r.win?600:500;root.dataset.motion='entry';if(final)title.textContent='最后一道门，开了';const skip=node('button','rr-skip','跳过动效');skip.type='button';top.append(skip);const hold=()=>{root.dataset.motion='hold';if(final)title.textContent='恭喜，密室通关！';skip.remove();};skip.onclick=()=>{(root._motionTimers||[]).forEach(clearTimeout);hold();};root._motionTimers=[setTimeout(()=>{if(root.isConnected){root.dataset.motion='emphasis';if(final)title.textContent='恭喜，密室通关！';}},entry),setTimeout(hold,end)];}

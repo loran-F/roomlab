@@ -76,3 +76,6 @@ body:has(.x-shell[data-room-theme="room-17"]){background:#325655}
 .x-shell[data-room-theme="room-17"] .observer>b:after{content:'停';position:absolute;inset:0;display:grid;place-items:center;font-size:21px;color:#273e3a}
 .x-shell[data-room-theme="room-17"] .observer.eyes>b:after{content:'走'}
 .x-shell[data-room-theme="room-17"] .observer.nose>b:after{content:'躲'}
+/* The extra archive versions and preview count belong to existing paper panels. */
+.caller-version{padding:6px 0}.caller-version+.caller-version{border-top:1px dashed #9b8ca6}.caller-version small{font-size:12px;font-weight:700}.caller-version strong{display:block;font-size:19px}.caller-version p{margin:3px 0;font-size:13px;line-height:1.45}.x-combo-step{font-size:12px;text-align:center;margin:0 0 6px;color:#55445d}
+.x-shell[data-game-mode="caller"] .x-paper{display:flex;flex-direction:column;max-height:calc(100dvh - 220px);min-height:0}.x-shell[data-game-mode="caller"] .x-stage{flex:1;min-height:120px;overflow:auto;overscroll-behavior:contain}.x-shell[data-game-mode="caller"] .x-paper>:is(.x-stats,.x-meter,.x-hint,.x-actions,.x-message){flex-shrink:0}

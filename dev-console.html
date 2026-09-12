@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RoomLab · 开发者验收台</title><link rel="stylesheet" href="dev-console.css?v=13.8"><script defer src="dev-console-bot-adapters.js?v=13.8"></script><script defer src="dev-console-bot.js?v=13.8"></script><script defer src="dev-console.js?v=13.8"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RoomLab · 开发者验收台</title><link rel="stylesheet" href="dev-console.css?v=dc-20260912-6"><script defer src="dev-console-bot-adapters.js?v=dc-20260912-6"></script><script defer src="dev-console-bot.js?v=dc-20260912-6"></script><script defer src="dev-console.js?v=dc-20260912-6"></script></head>
 <body data-phase="catalog">
-<header class="app-head"><div class="brand"><b>RoomLab</b><span class="divider"></span><h1>开发者验收台</h1></div><div class="build-strip" aria-label="当前版本身份"><b id="dc-game-version">游戏 —</b><span id="dc-console-version">验收台 dc-2026.09.12.4</span><span id="dc-progression-version">进度规则 —</span><span id="dc-route-version">路线规则 —</span><em id="dc-origin">来源 —</em></div></header>
+<header class="app-head"><div class="brand"><b>RoomLab</b><span class="divider"></span><h1>17 房直达验收台</h1></div><div class="build-strip" aria-label="当前版本身份"><b id="dc-game-version">游戏 —</b><span id="dc-console-version">验收台 dc-2026.09.12.6</span><span id="dc-progression-version">五档规则 —</span><span id="dc-route-version">会话协议 —</span><em id="dc-origin">来源 —</em></div></header>
 <main class="workspace">
  <section class="toolbar" aria-label="开局配置">
-  <div class="field scope"><label for="dc-scope">验收范围</label><select id="dc-scope"><option value="single">单玩法</option><option value="tower">完整爬塔</option></select></div>
+  <div class="field scope"><label for="dc-scope">验收范围</label><select id="dc-scope" disabled><option value="single">17 房直达</option></select></div>
   <div class="field room"><label for="dc-room">密室</label><select id="dc-room" disabled><option>正在读取游戏目录…</option></select></div>
-  <div class="field mode"><label for="dc-mode">玩法</label><select id="dc-mode" disabled><option>加载中</option></select></div>
+  <div class="field mode"><label for="dc-mode">本房玩法</label><select id="dc-mode" disabled><option>随密室绑定</option></select></div>
   <div class="field level"><label for="dc-level">难度</label><select id="dc-level" disabled><option>加载中</option></select></div>
   <button id="dc-start" class="toolbutton primary" disabled>一键开局</button>
   <span class="tools-divider" aria-hidden="true"></span>
@@ -22,7 +22,7 @@
   <section class="endpoint"><header class="endpoint-head"><div><b class="role-symbol A">A</b><strong>创建端</strong></div><span id="dc-state-a" class="endpoint-state">未连接</span></header><div class="viewport" id="dc-slot-a"><p class="placeholder">选择配置，然后一键开局</p><iframe id="dc-frame-a" title="角色 A 游戏画面" width="390" height="844" allow="autoplay" hidden></iframe></div></section>
   <section class="endpoint"><header class="endpoint-head"><div><b class="role-symbol B">B</b><strong>加入端</strong></div><span id="dc-state-b" class="endpoint-state">未连接</span></header><div class="viewport" id="dc-slot-b"><p class="placeholder">自动加入 A 创建的房间</p><iframe id="dc-frame-b" title="角色 B 游戏画面" width="390" height="844" allow="autoplay" hidden></iframe></div></section>
  </div>
- <p id="dc-capability" class="page-note">换题会重新生成开局；同题重试尚无统一接口，暂不可用。</p>
+ <p id="dc-capability" class="page-note">开发模式开放全部五档；每轮通过正式 RoomSession 建立独立会话。</p>
  <p class="page-note">两端视口均为 390 × 844 · 点击对应画面后使用键盘 · 人工输入托管端会自动暂停 · 不合成录像</p>
 </main>
 </body></html>
