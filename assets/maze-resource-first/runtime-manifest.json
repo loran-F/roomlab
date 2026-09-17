@@ -1,0 +1,103 @@
+{
+  "version": "maze-resource-first-20260917-v1",
+  "assets": {
+    "rockA": {
+      "file": "rockA.png",
+      "width": 339,
+      "height": 337,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "rockB": {
+      "file": "rockB.png",
+      "width": 359,
+      "height": 338,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "platform": {
+      "file": "platform.png",
+      "width": 404,
+      "height": 217,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "sign": {
+      "file": "sign.png",
+      "width": 381,
+      "height": 326,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "pool": {
+      "file": "pool.png",
+      "width": 373,
+      "height": 325,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "stump": {
+      "file": "stump.png",
+      "width": 348,
+      "height": 273,
+      "anchor": [
+        0.5,
+        0.5
+      ],
+      "slice": null,
+      "displayBorderCssPx": null
+    },
+    "button": {
+      "file": "button.png",
+      "width": 412,
+      "height": 172,
+      "anchor": [
+        0,
+        0
+      ],
+      "slice": {
+        "left": 52,
+        "right": 52,
+        "top": 52,
+        "bottom": 52
+      },
+      "displayBorderCssPx": 12
+    },
+    "panel": {
+      "file": "panel.png",
+      "width": 383,
+      "height": 337,
+      "anchor": [
+        0,
+        0
+      ],
+      "slice": {
+        "left": 70,
+        "right": 70,
+        "top": 70,
+        "bottom": 70
+      },
+      "displayBorderCssPx": 12
+    }
+  }
+}

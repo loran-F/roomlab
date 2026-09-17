@@ -1437,7 +1437,7 @@ function peerOpts(id){
 }
 function newPeerId(id, opts){ return id ? new window.Peer(id, opts) : new window.Peer(opts); }
 /* 入口选择：单机同屏 / 联网创建 / 联网加入 */
-var APP_VER='v13.10·双人密室';
+var APP_VER='v13.11·双人密室';
 function renderCatchMenu(){
   clearTimers(); closePeer(); clearNetZones(); window._dead=false; window._netMode=null;
   var app=document.getElementById('app');
@@ -3357,7 +3357,7 @@ function pressureResultBegin(s,role){
   if(!runs){runs={current:null,retired:new Set()};pressureResultRuns.set(conn,runs);}
   if(runs.retired.has(s.id))return false;
   if(runs.current&&runs.current!==s.id)runs.retired.add(runs.current);runs.current=s.id;
-  RoomResults.begin({runId:s.id,role:role,connection:PEER.conn,gameId:'pressure',title:'动力稳压',onContinue:function(){if(role==='A')startRealtime('pressure');},onExit:function(){netSend({t:'bye'});clearTimers();closePeer();S.mod=null;renderMain();}});
+  RoomResults.begin({runId:s.id,role:role,connection:PEER.conn,gameId:'pressure',title:'动力稳压',ruleset:window.RoomGameAdapters?.pressure?.ruleset||'standard-v1',pendingCandidate:window.RoomGameAdapters?.pressure?.ruleset==='pressure-b6-v1',onContinue:function(){if(role==='A')startRealtime('pressure');},onExit:function(){netSend({t:'bye'});clearTimers();closePeer();S.mod=null;renderMain();}});
   return true;
 }
 function startRealtime(mode){
@@ -3481,25 +3481,27 @@ function pressureDraw(s,role){
 }
 
 </script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-loading.css?v=13.10">
-<script defer src="room-assets.js?v=13.10"></script>
-<script defer src="room-loading.js?v=13.10"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="coop-upgrade.css?v=13.10">
-<script defer src="coop-upgrade.js?v=13.10"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-results.css?v=13.10">
-<link data-room-style rel="stylesheet" href="game-feedback.css?v=13.10">
-<script defer src="game-feedback.js?v=13.10"></script>
-<link data-room-style rel="stylesheet" href="cooperation-rating.css?v=13.10">
-<script defer src="cooperation-rating.js?v=13.10"></script>
-<script defer src="room-results.js?v=13.10"></script>
-<script defer src="room-directory.js?v=13.10"></script>
-<script defer src="room-level-progress.js?v=13.10"></script>
-<link data-room-style rel="stylesheet" href="room-session.css?v=13.10">
-<script defer src="room-direct-core.js?v=13.10"></script>
-<script defer src="room-mode-loader.js?v=13.10"></script>
-<script defer src="room-session.js?v=13.10"></script>
-<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="room-cover-loader.css?v=13.10">
-<script defer src="room-cover-loader.js?v=13.10"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="runtime/core/room-loading.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/core/room-assets.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/core/room-loading.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="runtime/compat/coop-upgrade.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/compat/coop-upgrade.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="runtime/feedback/room-results.css?v=13.11&build=release-20260917-v13.11">
+<link data-room-style rel="stylesheet" href="runtime/feedback/game-feedback.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/feedback/game-feedback.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" href="runtime/feedback/cooperation-rating.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/feedback/cooperation-rating.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/feedback/room-results.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/core/room-directory.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/core/room-level-progress.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" href="runtime/core/room-session.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/core/room-direct-core.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/core/room-mode-loader.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" href="runtime/core/room-shell.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/core/room-shell.js?v=13.11&build=release-20260917-v13.11"></script>
+<script defer src="runtime/core/room-session.js?v=13.11&build=release-20260917-v13.11"></script>
+<link data-room-style rel="stylesheet" media="print" onload="this.media='all'" href="runtime/core/room-cover-loader.css?v=13.11&build=release-20260917-v13.11">
+<script defer src="runtime/core/room-cover-loader.js?v=13.11&build=release-20260917-v13.11"></script>
 <script>
 window.__roomStylesReady=Promise.all(Array.from(document.querySelectorAll('link[data-room-style]')).map(function(link){return new Promise(function(resolve){if(link.sheet||window.__roomLoadFailures.includes(link.href)){resolve();return;}var timer=setTimeout(function(){window.__roomLoadFailures.push(link.href);resolve();},30000);function done(){clearTimeout(timer);resolve();}link.addEventListener('load',done,{once:true});link.addEventListener('error',done,{once:true});});}));
 document.addEventListener('DOMContentLoaded',function(){if(window.RoomLoading){RoomLoading.boot();}else{document.getElementById('room-boot-detail').textContent='界面没有加载完成，请重新加载。';}},{once:true});

@@ -1,0 +1,42 @@
+body:has(#app.maze-mobile){background:#eef3f8}
+#app.maze-mobile{box-sizing:border-box;max-width:560px;min-height:100dvh;margin:auto;padding:12px;color:#223b52;background:#eef3f8;font-family:"Microsoft YaHei",sans-serif;display:flex;flex-direction:column;gap:8px}
+.maze-mobile *{box-sizing:border-box}.maze-mobile .topbar{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;min-height:44px;margin:0;padding:0;border:0;background:none;box-shadow:none}.maze-mobile .topbar strong{font-size:19px;white-space:nowrap}.maze-mobile .mz-role{margin-left:auto;font-size:11px;color:#315ce7;white-space:nowrap}.maze-mobile[data-maze-role=B] .mz-role{color:#087b70}.maze-mobile .count{font-size:21px;font-weight:700;color:#223b52;white-space:nowrap;margin:0;font-variant-numeric:tabular-nums}
+.maze-mobile button{position:static;min-height:48px;border:1px solid #bbccdf;border-radius:10px;background:#fff;color:#274b67;font:600 16px/1.3 "Microsoft YaHei",sans-serif;padding:8px;box-shadow:none;text-shadow:none;writing-mode:horizontal-tb;touch-action:manipulation;cursor:pointer}.maze-mobile button>*{background:transparent;border:0;box-shadow:none}.maze-mobile button::before,.maze-mobile button::after{content:none}.maze-mobile button:active:not(:disabled){background:#dfeaf3;transform:translateY(1px)}.maze-mobile button:focus-visible,.maze-mobile summary:focus-visible{outline:3px solid #315ce7;outline-offset:2px}.maze-mobile button:disabled{opacity:.55;cursor:default}.maze-mobile #back{min-width:32px;width:32px;min-height:44px;margin:0!important;padding:0;border:0;background:none;font-size:28px}
+.maze-mobile .panel,.maze-mobile .manual-card{display:block;width:100%;margin:0;padding:0;border:0;background:none;box-shadow:none}.maze-mobile .mz-notice{min-height:42px;padding:8px 10px;display:flex;align-items:center;font-size:13px;line-height:1.5;background:#dfeaf3;border-left:3px solid #315ce7;margin-bottom:8px}.maze-mobile[data-maze-role=B] .mz-notice{border-color:#087b70}
+.maze-mobile .stage{display:flex;align-items:center;justify-content:center;height:clamp(230px,40dvh,360px);width:100%;padding:12px;background:#142a40;border:1px solid #c5d2df;border-radius:12px;overflow:hidden;margin:0;box-shadow:none}.maze-mobile .stage canvas{display:block;width:auto;height:100%;max-width:100%;object-fit:contain;background:#142a40;border-radius:0}.maze-mobile .mz-map-caption{display:flex;justify-content:space-between;gap:8px;font-size:10px;line-height:1.5;color:#586e83;padding:8px 0;flex-wrap:wrap}.maze-mobile .msg{margin:0;padding:6px 8px;font-size:12px;line-height:1.5;background:#e0eaf4;color:#345578;border:0;border-radius:6px;writing-mode:horizontal-tb;width:100%}.maze-mobile .msg:empty{display:none}.maze-mobile .msg.err{background:#f2e1e8;color:#923247}.maze-mobile .msg.ok{background:#deeee9;color:#18695f}.maze-mobile .msg.warn{background:#e0eaf4;color:#345578}
+.maze-mobile .mz-controls{flex:1;min-height:160px;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:8px 0}.maze-mobile .mz-controls h3{font-size:16px;margin:0}.maze-mobile .mz-controls p{font-size:12px;line-height:1.5;color:#536b80;margin:0}.maze-mobile .dpad{position:static;display:grid;grid-template-columns:repeat(3,minmax(0,82px));gap:7px;justify-content:center;width:100%;max-width:none;padding:0;margin:0}.maze-mobile .dpad button{height:52px;min-height:52px;font-size:20px;width:100%}.maze-mobile .dpad button:first-child{grid-column:2}.maze-mobile .dpad button:nth-child(2){grid-column:1}.maze-mobile .mz-touch-note{text-align:center}
+.maze-mobile .maze-valve{padding:0;margin:0;background:none;border:0;border-radius:0}.maze-mobile .maze-valve[hidden]{display:none}.maze-mobile #maze-valve-clue{display:block;font-size:18px;line-height:1.5;margin-bottom:4px;color:#274b67}.maze-mobile .maze-valve p{margin-bottom:12px}.maze-mobile .maze-valve button{width:calc((100% - 16px)/3);min-height:58px;margin-right:8px;color:#274b67;background:#fff;border-color:#9eb7cc}.maze-mobile .maze-valve button:last-child{margin-right:0}.maze-mobile[data-maze-valve=open] .dpad,.maze-mobile[data-maze-valve=open] .mz-touch-note{display:none}
+.maze-mobile .mz-valve-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.maze-mobile .mz-valve-grid>div{height:76px;background:#f9fcff;border:1px solid #becddd;border-radius:9px;display:grid;align-content:center;gap:9px;text-align:center}.maze-mobile .mz-valve-grid strong{font-size:21px;font-weight:500;color:#334e69;white-space:nowrap}.maze-mobile .mz-valve-grid span{font-size:14px;font-weight:700}.maze-mobile .mz-help{font-size:12px;color:#62798b;margin:0}.maze-mobile .mz-help summary{padding:8px;cursor:pointer}.maze-mobile .mz-help p{line-height:1.6;margin:0;padding:8px}.maze-mobile .mz-again{font-size:12px;min-height:40px;align-self:center;background:none}
+@media(max-width:350px){.maze-mobile .topbar{gap:5px}.maze-mobile .topbar strong{font-size:17px}.maze-mobile .count{font-size:19px}.maze-mobile .mz-valve-grid strong{font-size:19px}}
+/* Match the approved cold preview even inside themed dungeon shells. */
+#app.maze-mobile .topbar strong,#app.maze-mobile .mz-notice,#app.maze-mobile .mz-controls h3,#app.maze-mobile .mz-valve-grid span{color:#223b52!important}
+#app.maze-mobile .coop-theme{background:transparent!important;border:0!important;box-shadow:none!important;color:#586e83!important;font-size:11px!important;padding:0!important;margin:0!important;text-align:right}
+#app.maze-mobile[data-maze-valve=open] #dpad{display:none!important}
+#app.maze-mobile .stage{flex-shrink:0}
+#app.maze-mobile[data-maze-valve=open] #msg:not(.err){visibility:hidden}
+/* Interaction-only: redistribute the existing HUD and controls; retain skin. */
+.maze-mobile .mz-hud{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0}
+.maze-mobile .mz-hud>span{display:flex;align-items:baseline;gap:6px}
+.maze-mobile .mz-controls{min-height:0;flex:0;margin-top:auto}
+.maze-mobile .mz-help{flex:none}
+.maze-mobile.has-round-menu .mz-help{display:none}
+.maze-mobile .mz-notice{display:none}
+.maze-mobile[data-maze-phase=ready] .mz-controls{margin-top:clamp(20px,12dvh,100px);gap:18px}
+.maze-mobile #mz-prepare{min-height:52px}
+.maze-mobile .mz-map-caption{gap:6px}
+.maze-mobile #back{width:60px;min-width:60px}
+
+/* Common-location controls reuse the approved maze skin. */
+.maze-mobile #mz-location{margin-top:0;gap:8px}
+.maze-mobile .mz-candidates{display:flex;gap:6px;flex-wrap:wrap}
+.maze-mobile .mz-candidates button{flex:1;min-width:120px;font-size:14px}
+.maze-mobile .mz-probes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.maze-mobile .mz-probes button{font-size:14px;min-height:48px;padding:6px}
+.maze-mobile #mz-located{width:100%}
+.maze-mobile .mz-location-actions[hidden]{display:none}
+
+.maze-mobile .mz-explore-controls[hidden]{display:none}
+
+/* Public map reading aid; reuse current skin, no player location. */
+.maze-mobile #mz-candidate-description{white-space:pre-line;font-size:14px;line-height:1.6}
+.maze-mobile #mz-toggle-guide{width:100%;min-height:48px;font-size:14px}
